@@ -1,456 +1,852 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Alkaff Fragrances - Kasir</title>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
-<style>
-:root{--bg:#f3f7f5;--card:#fff;--ink:#12312c;--mut:#5b716c;--line:#d9e3e0;--pri:#0f5e54;--onpri:#fff;--wa:#1a9e4f;--soft:#e4f0ed;--danger:#b3392f}
-*{box-sizing:border-box}
-html{scroll-padding-top:env(safe-area-inset-top,0px)}
-body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.45 "Plus Jakarta Sans",system-ui,sans-serif;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-button,input,select,textarea{font:inherit;color:inherit}
-button:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid #f2b705;outline-offset:2px}
-header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:14px 18px;background:var(--pri);color:var(--onpri)}
-header input{background:transparent;border:0;border-bottom:1px dashed currentColor;color:inherit;font-weight:800;font-size:18px;width:min(260px,60vw);padding:2px 0}
-nav{display:flex;gap:4px;flex-wrap:wrap}
-nav button{background:transparent;border:0;color:inherit;padding:8px 14px;border-radius:8px;font-weight:600;cursor:pointer;opacity:.75}
-nav button[aria-selected=true]{background:rgba(255,255,255,.18);opacity:1}
-main{max-width:1080px;margin:0 auto;padding:16px}
-.view{display:none}.view.on{display:block}
-.pos{display:grid;grid-template-columns:1fr 340px;gap:16px;align-items:start}
-@media(max-width:800px){.pos{grid-template-columns:1fr}}
-.box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
-.search{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);margin-bottom:12px}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
-.item{text-align:left;background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:12px;cursor:pointer;min-height:76px;border:none}
-.item:hover{background:var(--line)}
-.item b{display:block;font-weight:600}.item span{color:var(--mut);font-size:13px}
-h2{font-size:16px;margin:0 0 10px}
-.line{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
-.line .n{flex:1;min-width:0}
-.line small{color:var(--mut);display:block}
-.q{display:flex;align-items:center;gap:6px}
-.q button{width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:var(--card);cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center}
-.row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;gap:8px}
-.row input{width:130px;text-align:right;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
-.total{font-size:22px;font-weight:800;padding-top:8px}
-.btn{display:inline-block;border:0;border-radius:10px;padding:12px 16px;font-weight:700;cursor:pointer;background:var(--pri);color:var(--onpri);text-align:center;text-decoration:none}
-.btn:hover{opacity:.9}
-.btn.wa{background:var(--wa);color:#fff}.btn.ghost{background:var(--soft);color:var(--ink)}
-.btn.full{width:100%;margin-top:10px}.btn:disabled{opacity:.45;cursor:not-allowed}
-.empty{color:var(--mut);padding:14px 0}
-.form{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
-.form input,.form select{padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);flex:1;min-width:130px}
-.x{background:transparent;border:0;color:var(--danger);cursor:pointer;font-weight:600;padding:0}
-.scroll{overflow-x:auto}
-dialog{border:0;border-radius:14px;padding:18px;max-width:420px;width:calc(100% - 24px);background:var(--card);color:var(--ink)}
-dialog::backdrop{background:rgba(0,0,0,.5)}
-pre{background:var(--bg);border:1px dashed var(--line);border-radius:8px;padding:12px;font:13px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;max-height:42vh;overflow:auto;margin:10px 0}
-label{font-weight:600;font-size:13px}
-.phone{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);margin-top:4px}
-.err{color:var(--danger);font-size:13px;min-height:18px}
-.item span{display:block}.item:disabled{opacity:.45;cursor:not-allowed}
-.item .low,.low{color:var(--danger);font-weight:600}
-.ra{width:72px;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);text-align:right}
-.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:6px}
-.seg button{border:0;background:var(--card);padding:9px 16px;cursor:pointer;font-weight:600}
-.seg button[aria-pressed=true]{background:var(--pri);color:var(--onpri)}
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:8px 0 18px}
-.stat{background:var(--soft);border-radius:10px;padding:12px}.stat span{display:block;color:var(--mut);font-size:13px}.stat b{font-size:20px}
-#lock{position:fixed;inset:0;z-index:50;background:var(--pri);display:flex;align-items:center;justify-content:center;padding:20px}
-#lock[hidden]{display:none}
-.lk{background:var(--card);border-radius:14px;padding:22px;width:min(340px,100%)}
-.lk h1{margin:0 0 6px;font-size:20px}.lk p{margin:0 0 12px;line-height:1.4}
-.lk input{width:100%;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);margin-bottom:8px;font-size:18px;letter-spacing:4px;text-align:center}
-.lkb{background:rgba(255,255,255,.18);border:0;color:inherit;padding:8px 14px;border-radius:8px;font-weight:600;cursor:pointer}
-[hidden]{display:none!important}
-#paym{display:flex;width:100%}#paym button{flex:1;padding:9px 4px}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Alkaff Fragrances - Kasir</title>
+  <style>
+    :root {
+      --bg: #f4f8f7;
+      --card: #ffffff;
+      --ink: #12312c;
+      --muted: #5a726d;
+      --line: #dfe9e6;
+      --primary: #0f5d54;
+      --primary-soft: #e7f3f0;
+      --wa: #1a9e4f;
+      --danger: #b74137;
+      --warning: #f4b942;
+      --shadow: 0 10px 30px rgba(17, 43, 36, 0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+    header {
+      background: var(--primary);
+      color: white;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      box-shadow: var(--shadow);
+      gap: 12px;
+    }
+    .brand {
+      background: transparent;
+      color: white;
+      border: none;
+      border-bottom: 1px dashed rgba(255,255,255,0.7);
+      font-size: 1.05rem;
+      font-weight: 700;
+      padding: 4px 0;
+      min-width: 220px;
+      max-width: 260px;
+    }
+    nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    nav button {
+      background: transparent;
+      border: 0;
+      color: inherit;
+      padding: 8px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      opacity: 0.8;
+    }
+    nav button[aria-selected="true"] {
+      background: rgba(255,255,255,0.18);
+      opacity: 1;
+    }
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 18px 14px 30px;
+    }
+    .view { display: none; }
+    .view.on { display: block; }
+    .layout {
+      display: grid;
+      grid-template-columns: 1.35fr 0.8fr;
+      gap: 18px;
+      align-items: start;
+    }
+    @media (max-width: 860px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+    .box {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: var(--shadow);
+    }
+    h2 {
+      margin: 0 0 12px;
+      font-size: 1rem;
+    }
+    .search, .field, .phone, select, textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: #fafdfc;
+      border-radius: 10px;
+      padding: 10px 12px;
+      color: var(--ink);
+      font: inherit;
+    }
+    .field, .phone, select {
+      min-height: 42px;
+    }
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 6px 0;
+    }
+    .row input {
+      width: 132px;
+      text-align: right;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .item {
+      text-align: left;
+      background: var(--primary-soft);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px 10px;
+      cursor: pointer;
+      color: var(--ink);
+      min-height: 80px;
+    }
+    .item b { display: block; margin-bottom: 4px; }
+    .item span { display: block; font-size: 0.75rem; color: var(--muted); }
+    .item:disabled { opacity: 0.45; cursor: not-allowed; }
+    .line {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--line);
+      flex-wrap: wrap;
+    }
+    .line .n { flex: 1; min-width: 0; }
+    .line small { display: block; color: var(--muted); }
+    .q {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .q button {
+      width: 30px; height: 30px; border-radius: 50%;
+      border: 1px solid var(--line); background: white; cursor: pointer;
+      font-size: 1rem; font-weight: 700;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 0;
+      background: var(--primary);
+      color: white;
+      border-radius: 10px;
+      padding: 11px 16px;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .btn.ghost { background: var(--primary-soft); color: var(--ink); }
+    .btn.wa { background: var(--wa); }
+    .btn.full { width: 100%; }
+    .btn.sm { padding: 8px 10px; font-size: 0.85rem; }
+    .muted { color: var(--muted); font-size: 0.81rem; }
+    .err {
+      min-height: 18px;
+      color: var(--danger);
+      font-size: 0.8rem;
+      margin: 8px 0 0;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .stat {
+      background: var(--primary-soft);
+      border-radius: 12px;
+      padding: 12px;
+    }
+    .stat span { display: block; color: var(--muted); font-size: 0.75rem; }
+    .stat b { font-size: 1.2rem; }
+    .seg {
+      display: flex;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      margin: 10px 0;
+    }
+    .seg button {
+      flex: 1;
+      border: none;
+      background: white;
+      padding: 9px 10px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .seg button[aria-pressed="true"] {
+      background: var(--primary);
+      color: white;
+    }
+    .hide { display: none !important; }
+    .lock-screen {
+      position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(135deg, #0f5d54 0%, #183f3a 100%);
+      z-index: 30;
+    }
+    .lock-box {
+      background: white; border-radius: 18px; width: min(360px, calc(100vw - 26px));
+      padding: 22px 20px; box-shadow: var(--shadow);
+    }
+    .lock-box h1 {
+      margin: 0 0 8px; font-size: 1.3rem; text-align: center; color: var(--ink);
+    }
+    .lock-box p {
+      margin: 0 0 12px; text-align: center; color: var(--muted);
+    }
+    .lock-box input {
+      width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 13px 12px;
+      text-align: center; font-size: 1.1rem; letter-spacing: 0.24rem; margin-bottom: 8px;
+    }
+    textarea {
+      resize: vertical;
+      min-height: 100px;
+    }
+    .x {
+      border: none; background: transparent; color: var(--danger); font-weight: 700; cursor: pointer;
+    }
+    pre {
+      background: #f7f9f9; border: 1px dashed var(--line); border-radius: 10px; padding: 12px; white-space: pre-wrap; overflow: auto; max-height: 40vh;
+    }
+    @media (max-width: 560px) {
+      header { padding: 12px 12px; }
+      nav { width: 100%; }
+      nav button { flex: 1 1 30%; }
+      .brand { min-width: 0; width: 100%; }
+    }
+  </style>
 </head>
 <body>
-<header>
-  <input id="store" aria-label="Nama toko" placeholder="Nama toko">
-  <nav role="tablist">
-    <button role="tab" data-t="kasir" aria-selected="true">Kasir</button>
-    <button role="tab" data-t="produk" data-owner aria-selected="false">Produk</button>
-    <button role="tab" data-t="riwayat" aria-selected="false">Riwayat</button>
-    <button role="tab" data-t="member" aria-selected="false">Member</button>
-    <button role="tab" data-t="laporan" data-owner aria-selected="false">Laporan</button>
-  </nav>
-  <button class="lkb" id="lockbtn" hidden>Kunci</button>
-</header>
+  <header>
+    <input id="storeName" class="brand" value="Alkaff Fragrances" aria-label="Nama toko" />
+    <nav>
+      <button role="tab" data-tab="kasir" aria-selected="true">Kasir</button>
+      <button role="tab" data-tab="produk" aria-selected="false">Produk</button>
+      <button role="tab" data-tab="riwayat" aria-selected="false">Riwayat</button>
+      <button role="tab" data-tab="member" aria-selected="false">Member</button>
+      <button role="tab" data-tab="laporan" aria-selected="false">Laporan</button>
+    </nav>
+    <button id="lockBtn" class="btn ghost sm">Kunci</button>
+  </header>
 
-<main style="display:none" id="app">
-<section class="view on" id="v-kasir">
-  <div class="pos">
-    <div class="box">
-      <input class="search" id="q" placeholder="Cari nama atau kode barang" aria-label="Cari produk">
-      <div class="grid" id="grid"></div>
-    </div>
-    <div class="box">
-      <h2>Pesanan</h2>
-      <div id="cart"></div>
-      <div class="row"><span>Subtotal</span><b id="sub">Rp0</b></div>
-      <div class="row"><label for="disc">Diskon (Rp)</label><input id="disc" inputmode="numeric" placeholder="0"></div>
-      <div class="row total"><span>Total</span><span id="tot">Rp0</span></div>
-      <div id="mbox" style="margin:6px 0">
-        <input class="search" id="mq" placeholder="Cari member" aria-label="Cari member" autocomplete="off" style="margin-bottom:4px">
-        <div id="msug"></div>
-        <div id="mchip" hidden></div>
+  <main id="app" class="hide">
+    <section id="kasir" class="view on">
+      <div class="layout">
+        <div class="box">
+          <input id="q" class="search" placeholder="Cari nama atau kode barang" aria-label="Cari produk" />
+          <div id="grid" class="grid"></div>
+        </div>
+        <div class="box">
+          <h2>Pesanan</h2>
+          <div id="cart"></div>
+          <div class="row"><span>Subtotal</span><b id="sub">Rp0</b></div>
+          <div class="row"><label for="disc">Diskon</label><input id="disc" class="field" type="number" min="0" placeholder="0" /></div>
+          <div class="row"><span>Total</span><b id="tot">Rp0</b></div>
+
+          <div class="seg" id="payType">
+            <button data-type="Tunai" aria-pressed="true">Tunai</button>
+            <button data-type="QRIS" aria-pressed="false">QRIS</button>
+            <button data-type="Transfer" aria-pressed="false">Transfer</button>
+          </div>
+
+          <div id="cashRow" class="row"><label for="cashIn">Uang diterima</label><input id="cashIn" class="field" type="number" min="0" placeholder="0" /></div>
+
+          <div id="memberBox" style="margin-top: 10px;">
+            <input id="memberSearch" class="search" placeholder="Cari member" aria-label="Cari member" />
+            <div id="memberSug"></div>
+            <div id="memberChip" class="hide"></div>
+          </div>
+
+          <div class="err" id="err" role="alert"></div>
+          <button id="payBtn" class="btn full" style="margin-top: 12px;">Bayar</button>
+          <button id="clearBtn" class="btn ghost full" style="margin-top: 8px;">Kosongkan</button>
+        </div>
       </div>
-      <div class="seg" id="paym" role="group">
-        <button data-m="Tunai" aria-pressed="true">Tunai</button>
-        <button data-m="QRIS" aria-pressed="false">QRIS</button>
-        <button data-m="Transfer" aria-pressed="false">Transfer</button>
+    </section>
+
+    <section id="produk" class="view">
+      <div class="box">
+        <h2>Tambah produk</h2>
+        <div class="row" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+          <input id="prodCode" class="field" placeholder="Kode barang" style="flex:1 1 130px;" />
+          <input id="prodName" class="field" placeholder="Nama produk" style="flex:2 1 180px;" />
+          <input id="prodCost" class="field" type="number" min="0" placeholder="Harga modal" style="flex:1 1 120px;" />
+          <input id="prodPrice" class="field" type="number" min="0" placeholder="Harga jual" style="flex:1 1 120px;" />
+          <button id="addProdBtn" class="btn">Simpan</button>
+        </div>
+        <div id="prodMsg" class="err"></div>
+        <h2 style="margin-top: 18px;">Daftar produk</h2>
+        <div id="prodList"></div>
       </div>
-      <div class="row" id="cashrow"><label for="cash">Uang diterima</label><input id="cash" inputmode="numeric" placeholder="Pas"></div>
-      <div class="err" id="err" role="alert"></div>
-      <button class="btn full" id="pay">Bayar</button>
-      <button class="btn ghost full" id="clr">Kosongkan</button>
+    </section>
+
+    <section id="riwayat" class="view">
+      <div class="box">
+        <h2>Riwayat transaksi</h2>
+        <div id="historyList"></div>
+      </div>
+    </section>
+
+    <section id="member" class="view">
+      <div class="box">
+        <h2>Tambah member</h2>
+        <div class="row" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+          <input id="memberName" class="field" placeholder="Nama member" style="flex:2 1 200px;" />
+          <input id="memberPhone" class="field" placeholder="Nomor WhatsApp" style="flex:1 1 160px;" />
+          <button id="saveMemberBtn" class="btn">Simpan</button>
+        </div>
+        <div id="memberMsg" class="err"></div>
+        <h2 style="margin-top:18px;">Daftar member</h2>
+        <input id="memberListSearch" class="search" placeholder="Cari member" />
+        <div id="memberList"></div>
+      </div>
+    </section>
+
+    <section id="laporan" class="view">
+      <div class="box">
+        <div class="row" style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
+          <label for="reportDate" class="muted" style="font-weight:700;">Tanggal</label>
+          <input id="reportDate" class="field" type="date" style="max-width:220px;" />
+          <button id="todayBtn" class="btn ghost">Hari ini</button>
+        </div>
+        <div id="stats" class="stats" style="margin-top:12px;"></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="lockScreen" class="lock-screen">
+    <div class="lock-box">
+      <h1>Alkaff Fragrances</h1>
+      <p id="lockMessage">Masukkan PIN untuk membuka kasir</p>
+      <input id="pinInput" type="password" inputmode="numeric" maxlength="12" autocomplete="off" />
+      <div id="lockErr" class="err"></div>
+      <button id="unlockBtn" class="btn full">Buka</button>
     </div>
   </div>
-</section>
 
-<section class="view" id="v-produk">
-  <div class="box">
-    <h2>Tambah produk</h2>
-    <div class="form">
-      <input id="pc" placeholder="Kode barang">
-      <input id="pn" placeholder="Nama produk">
-      <input id="pm" inputmode="numeric" placeholder="Harga modal (Rp)">
-      <input id="pp" inputmode="numeric" placeholder="Harga jual (Rp)">
-      <button class="btn" id="padd">Simpan</button>
-    </div>
-    <div class="err" id="pmsg"></div>
-    <h2>Daftar produk</h2>
-    <div id="plist"></div>
-  </div>
-</section>
+  <dialog id="receiptDlg">
+    <h2>Struk siap dikirim</h2>
+    <pre id="receiptText"></pre>
+    <label for="custPhone">Nomor WhatsApp</label>
+    <input id="custPhone" class="phone" placeholder="08123456789" />
+    <a id="waLink" class="btn wa full" style="margin-top: 10px;" target="_blank" rel="noopener">Kirim via WhatsApp</a>
+    <button id="copyBtn" class="btn ghost full" style="margin-top: 8px;">Salin struk</button>
+    <button id="doneBtn" class="btn full" style="margin-top: 10px;">Selesai</button>
+  </dialog>
 
-<section class="view" id="v-riwayat">
-  <div class="box">
-    <h2>Riwayat transaksi</h2>
-    <div id="hist"></div>
-  </div>
-</section>
+  <script>
+    const app = (() => {
+      const $ = (sel) => document.querySelector(sel);
+      const formatRp = (n) => 'Rp' + Math.round(Number(n || 0)).toLocaleString('id-ID');
+      const safeText = (v) => (v === null || v === undefined ? '' : String(v).trim());
+      const safeNum = (v) => {
+        const s = String(v ?? '').replace(/[^\d.-]/g, '');
+        if (!s || s === '-' || s === '.') return 0;
+        const n = Number(s);
+        return Number.isFinite(n) ? n : 0;
+      };
 
-<section class="view" id="v-member">
-  <div class="box">
-    <h2>Tambah member</h2>
-    <div class="form">
-      <input id="mn" maxlength="40" placeholder="Nama member">
-      <input id="mp" inputmode="tel" placeholder="No. telp (08xxx)">
-    </div>
-    <div class="form">
-      <button class="btn" id="msave">Simpan member</button>
-    </div>
-    <div class="err" id="merr"></div>
-    <h2>Daftar member</h2>
-    <input class="search" id="mq2" placeholder="Cari member">
-    <div id="mlist"></div>
-  </div>
-</section>
+      const defaultData = {
+        store: 'Alkaff Fragrances',
+        products: [
+          { id: 1, code: 'P001', name: 'Parfum A', cost: 850000, price: 1200000, stock: 0 },
+          { id: 2, code: 'P002', name: 'Parfum B', cost: 400000, price: 650000, stock: 0 },
+          { id: 3, code: 'P003', name: 'Parfum C', cost: 60000, price: 100000, stock: 0 }
+        ],
+        history: [],
+        members: [],
+        seq: 1,
+        pid: 10
+      };
 
-<section class="view" id="v-laporan">
-  <div class="box">
-    <div class="form">
-      <label for="rd" style="align-self:center">Tanggal</label>
-      <input type="date" id="rd" style="flex:0 0 auto">
-      <button class="btn ghost" id="rtoday">Hari ini</button>
-    </div>
-    <div class="stats" id="stats"></div>
-  </div>
-</section>
-</main>
+      let state = { ...defaultData };
+      let cart = {};
+      let currentMember = null;
+      let paymentType = 'Tunai';
+      let ownerHash = '';
+      let lockSalt = '';
+      let appLocked = true;
 
-<div id="lock" role="dialog" aria-modal="true" aria-labelledby="lt">
-  <div class="lk">
-    <h1 id="lt">Alkaff Fragrances</h1>
-    <p id="lmsg">Masukkan PIN untuk membuka kasir</p>
-    <input id="pin" type="password" inputmode="numeric" maxlength="12" autocomplete="off" aria-label="PIN">
-    <div class="err" id="lerr"></div>
-    <button class="btn full" id="lgo">Buka</button>
-  </div>
-</div>
+      function loadState() {
+        try {
+          const raw = localStorage.getItem('alkaff_kasir_v1');
+          if (raw) state = { ...defaultData, ...JSON.parse(raw) };
+          if (!Array.isArray(state.products)) state.products = defaultData.products;
+          if (!Array.isArray(state.history)) state.history = [];
+          if (!Array.isArray(state.members)) state.members = [];
+        } catch (e) {
+          state = { ...defaultData };
+        }
 
-<dialog id="dlg">
-  <h2>Struk</h2>
-  <pre id="rc"></pre>
-  <label for="ph">Nomor WhatsApp (opsional)</label>
-  <input class="phone" id="ph" inputmode="tel" placeholder="08xxx">
-  <a class="btn wa full" id="wa" target="_blank" rel="noopener">Kirim via WhatsApp</a>
-  <button class="btn ghost full" id="copy">Salin</button>
-  <button class="btn full" id="done">Selesai</button>
-</dialog>
+        try {
+          const sec = localStorage.getItem('alkaff_kasir_sec');
+          if (sec) {
+            const s = JSON.parse(sec);
+            ownerHash = s.ownerHash || '';
+            lockSalt = s.lockSalt || '';
+          }
+        } catch (e) {
+          ownerHash = '';
+          lockSalt = '';
+        }
 
-<script>
-window.app = {
-  $: (s) => document.querySelector(s),
-  safe: (v, f = "") => (v === null || v === undefined ? f : String(v).trim()),
-  num: (v) => parseInt(String(v||0).replace(/\D/g,""), 10) || 0,
-  rp: (n) => "Rp" + Math.round(n).toLocaleString("id-ID"),
-  esc: (s) => window.app.safe(s).replace(/[&<>"']/g, c => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-  }[c])),
-  
-  S: {
-    store: "Alkaff Fragrances",
-    products: [
-      { id:1, name:"Parfum A", price:1200000, cost:850000, code:"P001", stock:0 },
-      { id:2, name:"Parfum B", price:650000, cost:400000, code:"P002", stock:0 },
-      { id:3, name:"Parfum C", price:100000, cost:60000, code:"P003", stock:0 }
-    ],
-    history: [],
-    members: [],
-    seq: 1,
-    pid: 7
-  },
-  
-  cart: {},
-  curMember: null,
-  payM: "Tunai",
-  role: null,
-  me: "",
-  lock: { salt:"", owner:"", cashiers:[{name:"Kasir 1", pin:""},{name:"Kasir 2", pin:""}] },
-  
-  init() {
-    try { this.S = Object.assign(this.S, JSON.parse(localStorage.getItem("kasir-v1") || "{}")); } catch(e) {}
-    try { this.lock = Object.assign(this.lock, JSON.parse(localStorage.getItem("kasir-sec") || "{}")); } catch(e) {}
-    this.showLock();
-    this.setupEvents();
-    this.renderGrid();
-  },
-  
-  save() { try { localStorage.setItem("kasir-v1", JSON.stringify(this.S)); } catch(e) {} },
-  saveLock() { try { localStorage.setItem("kasir-sec", JSON.stringify(this.lock)); } catch(e) {} },
-  
-  async hash(pin) {
-    const txt = this.lock.salt + ":" + pin;
-    try {
-      const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(txt));
-      return Array.from(new Uint8Array(buf)).map(v => v.toString(16).padStart(2,"0")).join("");
-    } catch(e) {
-      return "error";
-    }
-  },
-  
-  showLock() {
-    this.$("#lock").hidden = false;
-    this.$("#app").style.display = "none";
-    this.$("main").inert = true;
-    this.$("header").inert = true;
-    this.$("#pin").value = "";
-    this.$("#lerr").textContent = "";
-    this.$("#pin").focus();
-  },
-  
-  async login() {
-    const pin = this.$("#pin").value.trim();
-    if (!/^\d{4,12}$/.test(pin)) { this.$("#lerr").textContent = "PIN 4-12 angka"; return; }
-    
-    if (!this.lock.owner) {
-      this.lock.salt = Math.random().toString(36).slice(2);
-      this.lock.owner = await this.hash(pin);
-      this.saveLock();
-      this.enter("owner");
-      return;
-    }
-    
-    const h = await this.hash(pin);
-    if (h === this.lock.owner) {
-      this.enter("owner");
-      return;
-    }
-    
-    this.$("#lerr").textContent = "PIN salah";
-    this.$("#pin").value = "";
-  },
-  
-  enter(role, name = "") {
-    this.role = role;
-    this.me = role === "owner" ? "Pemilik" : name;
-    this.$("#lock").hidden = true;
-    this.$("#app").style.display = "block";
-    this.$("main").inert = false;
-    this.$("header").inert = false;
-    this.renderGrid();
-  },
-  
-  setupEvents() {
-    this.$("#pin").addEventListener("keypress", (e) => { if (e.key === "Enter") this.login(); });
-    this.$("#lgo").addEventListener("click", () => this.login());
-    this.$("#lockbtn").addEventListener("click", () => this.showLock());
-    this.$("nav").addEventListener("click", (e) => {
-      const b = e.target.closest("button[role='tab']");
-      if (!b) return;
-      document.querySelectorAll("nav button").forEach(x => x.setAttribute("aria-selected", x === b ? "true" : "false"));
-      document.querySelectorAll(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + b.dataset.t));
-    });
-    
-    this.$("#store").addEventListener("change", () => { this.S.store = this.$("#store").value; this.save(); });
-    this.$("#q").addEventListener("input", () => this.renderGrid());
-    this.$("#grid").addEventListener("click", (e) => { const b = e.target.closest(".item"); if (b) { this.cart[b.dataset.id] = (this.cart[b.dataset.id]||0) + 1; this.renderCart(); } });
-    this.$("#disc").addEventListener("input", () => this.renderCart());
-    this.$("#pay").addEventListener("click", () => this.pay());
-    this.$("#clr").addEventListener("click", () => { this.cart = {}; this.renderCart(); });
-    this.$("#paym").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) this.payM = b.dataset.m; this.renderCart(); });
-    
-    this.$("#padd").addEventListener("click", () => this.addProd());
-    this.$("#pn").addEventListener("keypress", (e) => { if (e.key === "Enter") this.addProd(); });
-    
-    this.$("#msave").addEventListener("click", () => this.addMember());
-    this.$("#mq").addEventListener("input", () => this.suggestMember());
-    this.$("#mq2").addEventListener("input", () => this.renderMem());
-    
-    this.$("#hist").addEventListener("click", (e) => { const b = e.target.closest("[data-re]"); if (b) this.showReceipt(b.dataset.re); });
-    this.$("#ph").addEventListener("change", () => this.updateWA());
-    this.$("#copy").addEventListener("click", () => navigator.clipboard.writeText(this.$("#rc").textContent));
-    this.$("#done").addEventListener("click", () => { this.$("#dlg").close(); this.renderGrid(); });
-    
-    this.$("#rd").value = new Date().toISOString().split("T")[0];
-    this.$("#rd").addEventListener("change", () => this.renderReport());
-    this.$("#rtoday").addEventListener("click", () => { this.$("#rd").value = new Date().toISOString().split("T")[0]; this.renderReport(); });
-  },
-  
-  renderGrid() {
-    const q = this.$("#q").value.toLowerCase();
-    let h = "";
-    this.S.products.filter(p => window.app.safe(p.name).toLowerCase().includes(q) || window.app.safe(p.code).toLowerCase().includes(q)).forEach(p => {
-      h += '<button class="item" data-id="' + p.id + '"><b>' + this.esc(p.name) + '</b><span>' + this.esc(p.code) + ' · ' + this.rp(p.price) + '</span><span>Stok ' + (p.stock||0) + '</span></button>';
-    });
-    this.$("#grid").innerHTML = h || '<div class="empty">Tidak ada produk</div>';
-  },
-  
-  renderCart() {
-    let h = "", sub = 0;
-    this.S.products.forEach(p => {
-      const qty = this.cart[p.id] || 0;
-      if (!qty) return;
-      sub += p.price * qty;
-      h += '<div class="line"><div class="n">' + this.esc(p.name) + '<small>' + this.rp(p.price) + ' x ' + qty + '</small></div><div class="q"><button data-m="' + p.id + '">-</button><b>' + qty + '</b><button data-p="' + p.id + '">+</button></div></div>';
-    });
-    this.$("#cart").innerHTML = h || '<div class="empty">Pesanan kosong</div>';
-    this.$("#cart").addEventListener("click", (e) => {
-      const m = e.target.closest("[data-m]"); if (m) { this.cart[m.dataset.m]--; if (this.cart[m.dataset.m] <= 0) delete this.cart[m.dataset.m]; this.renderCart(); }
-      const p = e.target.closest("[data-p]"); if (p) { this.cart[p.dataset.p] = (this.cart[p.dataset.p]||0) + 1; this.renderCart(); }
-    });
-    const disc = Math.min(this.num(this.$("#disc").value), sub);
-    this.$("#sub").textContent = this.rp(sub);
-    this.$("#tot").textContent = this.rp(sub - disc);
-  },
-  
-  pay() {
-    if (!Object.keys(this.cart).length) { this.$("#err").textContent = "Pesanan kosong"; return; }
-    const sub = Object.keys(this.cart).reduce((a, id) => a + (this.S.products.find(p => String(p.id) === id)?.price || 0) * (this.cart[id]||0), 0);
-    const disc = Math.min(this.num(this.$("#disc").value), sub);
-    const total = sub - disc;
-    const cash = this.payM === "Tunai" ? this.num(this.$("#cash").value) : total;
-    if (cash < total) { this.$("#err").textContent = "Uang kurang " + this.rp(total - cash); return; }
-    
-    const items = Object.keys(this.cart).map(id => { const p = this.S.products.find(x => String(x.id) === id); return { id, name: p.name, qty: this.cart[id], price: p.price }; });
-    const tx = {
-      no: "INV-" + String(this.S.seq++).padStart(4,"0"),
-      store: this.S.store,
-      kasir: this.me,
-      date: new Date().toLocaleString("id-ID", {dateStyle:"medium", timeStyle:"short"}),
-      items, sub, disc, total, cash,
-      phone: this.curMember?.phone || ""
-    };
-    this.S.history.push(tx);
-    this.save();
-    items.forEach(i => { const p = this.S.products.find(x => String(x.id) === String(i.id)); if (p) p.stock = (p.stock||0) - i.qty; });
-    this.cart = {}; this.$("#err").textContent = "";
-    this.showReceipt(tx.no);
-    this.renderCart();
-    this.renderHist();
-  },
-  
-  showReceipt(no) {
-    const t = this.S.history.find(x => x.no === no);
-    if (!t) return;
-    const lines = ["*" + t.store.toUpperCase() + "*", t.no, t.date, "---------"];
-    t.items.forEach(i => { lines.push(i.qty + "x " + i.name); lines.push("   @" + this.rp(i.price) + " = " + this.rp(i.qty * i.price)); });
-    lines.push("---------", "Subtotal: " + this.rp(t.sub));
-    if (t.disc) lines.push("Diskon: -" + this.rp(t.disc));
-    lines.push("*Total: " + this.rp(t.total) + "*", "");
-    this.$("#rc").textContent = lines.join("\n");
-    this.$("#ph").value = t.phone || "";
-    this.updateWA();
-    if (!this.$("#dlg").open) this.$("#dlg").showModal();
-  },
-  
-  updateWA() {
-    const ph = String(this.$("#ph").value).replace(/\D/g, "");
-    let wa = ph;
-    if (ph.indexOf("0") === 0) wa = "62" + ph.slice(1);
-    const a = this.$("#wa");
-    if (wa.length >= 10 && wa.length <= 15) {
-      a.href = "https://wa.me/" + wa + "?text=" + encodeURIComponent(this.$("#rc").textContent);
-    }
-  },
-  
-  renderHist() {
-    let h = "";
-    this.S.history.slice().reverse().forEach(t => {
-      h += '<div class="line"><div class="n"><b>' + t.no + '</b><small>' + t.date + '</small></div><b>' + this.rp(t.total) + '</b><button class="btn ghost" data-re="' + t.no + '">Buka</button></div>';
-    });
-    this.$("#hist").innerHTML = h || '<div class="empty">Belum ada transaksi</div>';
-  },
-  
-  addProd() {
-    const name = this.$("#pn").value.trim();
-    const price = this.num(this.$("#pp").value);
-    if (!name || !price) { this.$("#pmsg").textContent = "Isi nama dan harga"; return; }
-    this.S.products.push({ id: this.S.pid++, code: this.$("#pc").value.trim() || "P" + this.S.pid, name, price, cost: this.num(this.$("#pm").value), stock:0 });
-    this.save();
-    this.$("#pn").value = ""; this.$("#pp").value = ""; this.$("#pm").value = ""; this.$("#pc").value = ""; this.$("#pmsg").textContent = "";
-    this.renderGrid(); this.renderProd();
-  },
-  
-  renderProd() {
-    let h = "";
-    this.S.products.forEach(p => {
-      h += '<div class="line"><div class="n">' + this.esc(p.name) + '<small>Kode ' + this.esc(p.code) + ' · Jual ' + this.rp(p.price) + '</small></div><button class="x" data-del="' + p.id + '">Hapus</button></div>';
-    });
-    this.$("#plist").innerHTML = h || '<div class="empty">Belum ada produk</div>';
-    this.$("#plist").addEventListener("click", (e) => { const b = e.target.closest("[data-del]"); if (b) { this.S.products = this.S.products.filter(p => String(p.id) !== b.dataset.del); this.save(); this.renderGrid(); this.renderProd(); } });
-  },
-  
-  addMember() {
-    const nm = this.$("#mn").value.trim();
-    const ph = String(this.$("#mp").value).replace(/\D/g, "");
-    if (!nm || !ph) { this.$("#merr").textContent = "Isi nama dan nomor"; return; }
-    this.S.members.push({ phone: ph, name: nm });
-    this.save();
-    this.$("#mn").value = ""; this.$("#mp").value = ""; this.$("#merr").textContent = "";
-    this.renderMem();
-  },
-  
-  renderMem() {
-    const q = this.$("#mq2").value.toLowerCase();
-    const list = this.S.members.filter(m => m.name.toLowerCase().includes(q) || m.phone.includes(q));
-    this.$("#mlist").innerHTML = list.length ? list.map(m => '<div class="line"><div class="n"><b>' + this.esc(m.name) + '</b><small>' + m.phone + '</small></div></div>').join("") : '<div class="empty">Belum ada member</div>';
-  },
-  
-  suggestMember() {
-    const q = this.$("#mq").value.toLowerCase();
-    if (!q) { this.$("#msug").innerHTML = ""; return; }
-    const list = this.S.members.filter(m => m.name.toLowerCase().includes(q)).slice(0, 5);
-    this.$("#msug").innerHTML = list.map(m => '<div class="line" data-pick="' + m.phone + '"><div class="n"><b>' + this.esc(m.name) + '</b><small>' + m.phone + '</small></div></div>').join("");
-    this.$("#msug").addEventListener("click", (e) => { const b = e.target.closest("[data-pick]"); if (b) { const m = this.S.members.find(x => x.phone === b.dataset.pick); if (m) { this.curMember = m; this.$("#mchip").innerHTML = '<div class="line"><div class="n"><b>' + this.esc(m.name) + '</b></div><button class="x" id="mrm">X</button></div>'; this.$("#mchip").hidden = false; this.$("#mq").value = ""; this.$$("#msug").innerHTML = ""; this.$("#mq").hidden = true; } } });
-  },
-  
-  renderReport() {
-    const d = this.$("#rd").value;
-    let total = 0, count = 0;
-    this.S.history.forEach(t => { if (t.date.includes(d)) { total += t.total; count++; } });
-    this.$("#stats").innerHTML = '<div class="stat"><span>Total penjualan</span><b>' + this.rp(total) + '</b></div><div class="stat"><span>Transaksi</span><b>' + count + '</b></div>';
-  }
-};
+        if (!lockSalt) lockSalt = Math.random().toString(36).slice(2, 12);
+      }
 
-window.app.init();
-</script>
+      function saveState() {
+        localStorage.setItem('alkaff_kasir_v1', JSON.stringify(state));
+      }
+
+      function saveSecurity() {
+        localStorage.setItem('alkaff_kasir_sec', JSON.stringify({ ownerHash, lockSalt }));
+      }
+
+      async function hashPin(pin) {
+        const text = lockSalt + ':' + pin;
+        try {
+          const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+          return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
+        } catch (e) {
+          let h = 2166136261 >>> 0;
+          for (let i = 0; i < text.length; i++) {
+            h ^= text.charCodeAt(i);
+            h = Math.imul(h, 16777619);
+          }
+          return (h >>> 0).toString(16);
+        }
+      }
+
+      function renderGrid() {
+        const q = $('#q').value.toLowerCase();
+        let html = '';
+        state.products.filter((p) => {
+          const hay = (p.name + ' ' + p.code).toLowerCase();
+          return hay.includes(q);
+        }).forEach((p) => {
+          const qty = cart[p.id] || 0;
+          html += '<button class="item" data-id="' + p.id + '" ' + (qty >= (p.stock || 0) ? 'disabled' : '') + '>' +
+            '<b>' + escapeHtml(p.name) + '</b>' +
+            '<span>' + escapeHtml(p.code) + ' · ' + formatRp(p.price) + '</span>' +
+            '<span>Stok ' + (p.stock || 0) + '</span>' +
+            '</button>';
+        });
+        $('#grid').innerHTML = html || '<div class="muted">Produk tidak ditemukan.</div>';
+      }
+
+      function renderCart() {
+        let html = '';
+        let sub = 0;
+        state.products.forEach((p) => {
+          const qty = cart[p.id] || 0;
+          if (!qty) return;
+          sub += (p.price || 0) * qty;
+          html += '<div class="line">' +
+            '<div class="n"><b>' + escapeHtml(p.name) + '</b><small>' + formatRp(p.price) + ' x ' + qty + '</small></div>' +
+            '<div class="q"><button data-change="-' + p.id + '">-</button><b>' + qty + '</b><button data-change="+' + p.id + '">+</button></div>' +
+            '</div>';
+        });
+        $('#cart').innerHTML = html || '<div class="muted">Produk belum dipilih.</div>';
+        const disc = Math.min(safeNum($('#disc').value), sub);
+        $('#sub').textContent = formatRp(sub);
+        $('#tot').textContent = formatRp(sub - disc);
+      }
+
+      function renderHistory() {
+        const html = state.history.slice().reverse().map(tx => {
+          return '<div class="line">' +
+            '<div class="n"><b>' + escapeHtml(tx.no) + '</b><small>' + escapeHtml(tx.date) + '</small></div>' +
+            '<div class="q"><b>' + formatRp(tx.total) + '</b><button class="btn ghost sm" data-receipt="' + tx.no + '">Buka</button></div>' +
+            '</div>';
+        }).join('');
+        $('#historyList').innerHTML = html || '<div class="muted">Belum ada transaksi.</div>';
+      }
+
+      function renderProducts() {
+        const html = state.products.map((p) => {
+          return '<div class="line">' +
+            '<div class="n"><b>' + escapeHtml(p.name) + '</b><small>Kode ' + escapeHtml(p.code) + ' · Jual ' + formatRp(p.price) + ' · Modal ' + formatRp(p.cost) + '</small></div>' +
+            '<button class="x" data-del-product="' + p.id + '">Hapus</button>' +
+            '</div>';
+        }).join('');
+        $('#prodList').innerHTML = html || '<div class="muted">Belum ada produk.</div>';
+      }
+
+      function renderMembers() {
+        const q = $('#memberListSearch').value.toLowerCase();
+        const list = state.members.filter(m => (m.name + ' ' + m.phone).toLowerCase().includes(q));
+        const html = list.map(m => '<div class="line"><div class="n"><b>' + escapeHtml(m.name) + '</b><small>' + escapeHtml(m.phone) + '</small></div></div>').join('');
+        $('#memberList').innerHTML = html || '<div class="muted">Belum ada member.</div>';
+      }
+
+      function renderReport() {
+        const d = $('#reportDate').value || new Date().toISOString().slice(0, 10);
+        let total = 0; let count = 0;
+        state.history.forEach(tx => {
+          if (tx.date.startsWith(d)) {
+            total += Number(tx.total || 0);
+            count++;
+          }
+        });
+        $('#stats').innerHTML = '<div class="stat"><span>Penjualan</span><b>' + formatRp(total) + '</b></div><div class="stat"><span>Transaksi</span><b>' + count + '</b></div>';
+      }
+
+      function openReceipt(no) {
+        const tx = state.history.find((x) => x.no === no);
+        if (!tx) return;
+        const lines = [
+          '*' + state.store.toUpperCase() + '*',
+          tx.no,
+          tx.date,
+          '--------------------------',
+        ];
+        tx.items.forEach((i) => {
+          lines.push(i.qty + 'x ' + i.name);
+          lines.push('   @' + formatRp(i.price) + ' = ' + formatRp(i.qty * i.price));
+        });
+        lines.push('--------------------------');
+        lines.push('Subtotal: ' + formatRp(tx.sub));
+        if (tx.disc > 0) lines.push('Diskon: -' + formatRp(tx.disc));
+        lines.push('*Total: ' + formatRp(tx.total) + '*');
+        lines.push('');
+        $('#receiptText').textContent = lines.join('\n');
+        $('#custPhone').value = tx.phone || '';
+        updateWA();
+        $('#receiptDlg').showModal();
+      }
+
+      function updateWA() {
+        const raw = $('#custPhone').value.replace(/\D/g, '');
+        let wa = raw;
+        if (wa.startsWith('0')) wa = '62' + wa.slice(1);
+        const valid = /^62\d{9,13}$/.test(wa);
+        const link = $('#waLink');
+        if (valid) {
+          link.href = 'https://wa.me/' + wa + '?text=' + encodeURIComponent($('#receiptText').textContent);
+          link.style.opacity = '1';
+        } else {
+          link.href = '#';
+          link.style.opacity = '0.5';
+        }
+      }
+
+      function addProduct() {
+        const code = $('#prodCode').value.trim();
+        const name = $('#prodName').value.trim();
+        const cost = safeNum($('#prodCost').value);
+        const price = safeNum($('#prodPrice').value);
+        if (!name || !price) {
+          $('#prodMsg').textContent = 'Nama dan harga jual wajib diisi.';
+          return;
+        }
+        const newProduct = {
+          id: state.pid++,
+          code: code || 'P' + String(state.pid).padStart(3, '0'),
+          name,
+          cost,
+          price,
+          stock: 0
+        };
+        state.products.push(newProduct);
+        saveState();
+        renderGrid();
+        renderProducts();
+        $('#prodCode').value = '';
+        $('#prodName').value = '';
+        $('#prodCost').value = '';
+        $('#prodPrice').value = '';
+        $('#prodMsg').textContent = '';
+      }
+
+      function addMember() {
+        const name = $('#memberName').value.trim();
+        const phone = $('#memberPhone').value.replace(/\D/g, '');
+        if (!name || !phone) {
+          $('#memberMsg').textContent = 'Nama dan nomor wajib diisi.';
+          return;
+        }
+        state.members.push({ name, phone });
+        saveState();
+        renderMembers();
+        $('#memberName').value = '';
+        $('#memberPhone').value = '';
+        $('#memberMsg').textContent = '';
+      }
+
+      function suggestMembers() {
+        const q = $('#memberSearch').value.toLowerCase();
+        if (!q) {
+          $('#memberSug').innerHTML = '';
+          return;
+        }
+        const list = state.members.filter(m => (m.name + ' ' + m.phone).toLowerCase().includes(q)).slice(0, 5);
+        $('#memberSug').innerHTML = list.map(m => '<div class="line" data-pick-member="' + m.phone + '"><div class="n"><b>' + escapeHtml(m.name) + '</b><small>' + escapeHtml(m.phone) + '</small></div></div>').join('');
+      }
+
+      function setMemberByPhone(phone) {
+        const member = state.members.find(m => m.phone === phone);
+        if (!member) return;
+        currentMember = member;
+        $('#memberChip').innerHTML = '<div class="line"><div class="n"><b>' + escapeHtml(member.name) + '</b><small>' + escapeHtml(member.phone) + '</small></div><button class="x" id="clearMember">X</button></div>';
+        $('#memberChip').classList.remove('hide');
+        $('#memberSearch').value = '';
+        $('#memberSug').innerHTML = '';
+      }
+
+      function pay() {
+        const entries = Object.entries(cart);
+        if (!entries.length) {
+          $('#err').textContent = 'Pesanan masih kosong.';
+          return;
+        }
+        let sub = 0;
+        const items = entries.map(([id, qty]) => {
+          const p = state.products.find(x => String(x.id) === String(id));
+          if (!p) return null;
+          sub += Number(p.price) * Number(qty);
+          return { id: p.id, name: p.name, code: p.code, price: p.price, qty: Number(qty) };
+        }).filter(Boolean);
+
+        const disc = Math.min(safeNum($('#disc').value), sub);
+        const total = sub - disc;
+        const cashIn = paymentType === 'Tunai' ? safeNum($('#cashIn').value) : total;
+        if (cashIn < total) {
+          $('#err').textContent = 'Uang diterima kurang ' + formatRp(total - cashIn) + '.';
+          return;
+        }
+
+        const tx = {
+          no: 'INV-' + String(state.seq++).padStart(4, '0'),
+          total,
+          sub,
+          disc,
+          cash: cashIn,
+          date: new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }),
+          items,
+          method: paymentType,
+          phone: currentMember ? currentMember.phone : '',
+          store: state.store
+        };
+
+        state.history.push(tx);
+        items.forEach(item => {
+          const p = state.products.find(x => x.id === item.id);
+          if (p) p.stock = Math.max(0, (p.stock || 0) - item.qty);
+        });
+        saveState();
+        renderHistory();
+        renderReport();
+        renderGrid();
+        cart = {};
+        $('#disc').value = '';
+        $('#cashIn').value = '';
+        $('#err').textContent = '';
+        renderCart();
+        openReceipt(tx.no);
+      }
+
+      function escapeHtml(str) {
+        return safeText(str).replace(/[&<>"']/g, (chars) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[chars]));
+      }
+
+      function bindEvents() {
+        $('#q').addEventListener('input', renderGrid);
+        $('#disc').addEventListener('input', renderCart);
+        $('#grid').addEventListener('click', (e) => {
+          const item = e.target.closest('.item');
+          if (!item) return;
+          const id = item.dataset.id;
+          const p = state.products.find(x => String(x.id) === String(id));
+          if (!p) return;
+          if ((cart[id] || 0) >= (p.stock || 0)) return;
+          cart[id] = (cart[id] || 0) + 1;
+          renderCart();
+        });
+
+        $('#cart').addEventListener('click', (e) => {
+          const target = e.target.closest('[data-change]');
+          if (!target) return;
+          const val = target.dataset.change;
+          const sign = val.startsWith('+') ? 1 : -1;
+          const id = val.slice(1);
+          cart[id] = (cart[id] || 0) + sign;
+          if ((cart[id] || 0) <= 0) delete cart[id];
+          renderCart();
+        });
+
+        $('#payType').addEventListener('click', (e) => {
+          const btn = e.target.closest('button[data-type]');
+          if (!btn) return;
+          paymentType = btn.dataset.type;
+          document.querySelectorAll('#payType button').forEach((b) => {
+            b.setAttribute('aria-pressed', String(b === btn));
+          });
+        });
+
+        $('#payBtn').addEventListener('click', pay);
+        $('#clearBtn').addEventListener('click', () => { cart = {}; renderCart(); });
+
+        $('#addProdBtn').addEventListener('click', addProduct);
+        $('#prodList').addEventListener('click', (e) => {
+          const btn = e.target.closest('[data-del-product]');
+          if (!btn) return;
+          const id = Number(btn.dataset.delProduct);
+          state.products = state.products.filter(p => p.id !== id);
+          saveState();
+          renderProducts();
+          renderGrid();
+        });
+
+        $('#saveMemberBtn').addEventListener('click', addMember);
+        $('#memberListSearch').addEventListener('input', renderMembers);
+        $('#memberSearch').addEventListener('input', suggestMembers);
+        $('#memberSug').addEventListener('click', (e) => {
+          const item = e.target.closest('[data-pick-member]');
+          if (!item) return;
+          setMemberByPhone(item.dataset.pickMember);
+        });
+        $('#memberChip').addEventListener('click', (e) => {
+          const btn = e.target.closest('#clearMember');
+          if (!btn) return;
+          currentMember = null;
+          $('#memberChip').classList.add('hide');
+          $('#memberChip').innerHTML = '';
+        });
+
+        $('#historyList').addEventListener('click', (e) => {
+          const btn = e.target.closest('[data-receipt]');
+          if (!btn) return;
+          openReceipt(btn.dataset.receipt);
+        });
+
+        $('#receiptDlg').addEventListener('close', () => {
+          $('#custPhone').value = '';
+        });
+        $('#custPhone').addEventListener('input', updateWA);
+        $('#waLink').addEventListener('click', (e) => {
+          if (!$('#waLink').href || $('#waLink').href === location.href + '#') {
+            e.preventDefault();
+          }
+        });
+        $('#copyBtn').addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText($('#receiptText').textContent);
+          } catch (e) {}
+        });
+        $('#doneBtn').addEventListener('click', () => $('#receiptDlg').close());
+
+        $('#lockBtn').addEventListener('click', () => {
+          appLocked = true;
+          $('#lockScreen').classList.remove('hide');
+          $('#pinInput').focus();
+        });
+
+        $('#unlockBtn').addEventListener('click', unlock);
+        $('#pinInput').addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') unlock();
+        });
+
+        $('#storeName').addEventListener('input', () => {
+          state.store = $('#storeName').value || 'Alkaff Fragrances';
+          saveState();
+        });
+
+        document.querySelectorAll('nav button[role="tab"]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const tab = btn.dataset.tab;
+            document.querySelectorAll('.view').forEach(v => v.classList.toggle('on', v.id === tab));
+            document.querySelectorAll('nav button').forEach(b => b.setAttribute('aria-selected', String(b === btn)));
+            if (tab === 'laporan') renderReport();
+          });
+        });
+
+        $('#reportDate').value = new Date().toISOString().slice(0, 10);
+        $('#reportDate').addEventListener('change', renderReport);
+        $('#todayBtn').addEventListener('click', () => {
+          $('#reportDate').value = new Date().toISOString().slice(0, 10);
+          renderReport();
+        });
+      }
+
+      async function unlock() {
+        const pin = $('#pinInput').value.trim();
+        if (!/^\d{4,12}$/.test(pin)) {
+          $('#lockErr').textContent = 'PIN harus 4 sampai 12 angka.';
+          return;
+        }
+        const hashed = await hashPin(pin);
+        const defaultPin = '1234';
+        if (!ownerHash) {
+          ownerHash = await hashPin(defaultPin);
+          saveSecurity();
+        }
+        if (hashed === ownerHash) {
+          appLocked = false;
+          $('#lockScreen').classList.add('hide');
+          $('#app').classList.remove('hide');
+          $('#lockErr').textContent = '';
+          $('#pinInput').value = '';
+          return;
+        }
+        $('#lockErr').textContent = 'PIN salah.';
+        $('#pinInput').value = '';
+      }
+
+      function initialRender() {
+        renderGrid();
+        renderCart();
+        renderHistory();
+        renderProducts();
+        renderMembers();
+        renderReport();
+        $('#storeName').value = state.store;
+      }
+
+      function init() {
+        loadState();
+        bindEvents();
+        initialRender();
+        $('#lockScreen').classList.remove('hide');
+        $('#app').classList.add('hide');
+      }
+
+      return { init, renderGrid, renderCart, renderHistory, renderProducts, renderMembers, renderReport };
+    })();
+
+    app.init();
+  </script>
 </body>
 </html>
