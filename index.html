@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Alkaff Fragrances - Kasir</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f3f7f5;--card:#fff;--ink:#12312c;--mut:#5b716c;--line:#d9e3e0;--pri:#0f5e54;--onpri:#fff;--wa:#1a9e4f;--soft:#e4f0ed;--danger:#b3392f}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.45 "Plus Jakarta Sans",system-ui,sans-serif;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+button,input,select,textarea{font:inherit;color:inherit}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid #f2b705;outline-offset:2px}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:14px 18px;background:var(--pri);color:var(--onpri)}
+header input{background:transparent;border:0;border-bottom:1px dashed currentColor;color:inherit;font-weight:800;font-size:18px;width:min(260px,60vw);padding:2px 0}
+nav{display:flex;gap:4px;flex-wrap:wrap}
+nav button{background:transparent;border:0;color:inherit;padding:8px 14px;border-radius:8px;font-weight:600;cursor:pointer;opacity:.75}
+nav button[aria-selected=true]{background:rgba(255,255,255,.18);opacity:1}
+main{max-width:1080px;margin:0 auto;padding:16px}
+.view{display:none}.view.on{display:block}
+.pos{display:grid;grid-template-columns:1fr 340px;gap:16px;align-items:start}
+@media(max-width:800px){.pos{grid-template-columns:1fr}}
+.box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+.search{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);margin-bottom:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
+.item{text-align:left;background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:12px;cursor:pointer;min-height:76px}
+.item b{display:block;font-weight:600}.item span{color:var(--mut);font-size:13px}
+h2{font-size:16px;margin:0 0 10px}
+.line{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.line .n{flex:1;min-width:0}
+.line small{color:var(--mut);display:block}
+.q{display:flex;align-items:center;gap:6px}
+.q button{width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:var(--card);cursor:pointer}
+.row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;gap:8px}
+.row input{width:130px;text-align:right;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
+.total{font-size:22px;font-weight:800;padding-top:8px}
+.btn{display:inline-block;border:0;border-radius:10px;padding:12px 16px;font-weight:700;cursor:pointer;background:var(--pri);color:var(--onpri);text-align:center;text-decoration:none}
+.btn.wa{background:var(--wa);color:#fff}.btn.ghost{background:var(--soft);color:var(--ink)}
+.btn.full{width:100%;margin-top:10px}.btn:disabled{opacity:.45;cursor:not-allowed}
+.empty{color:var(--mut);padding:14px 0}
+.form{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.form input{padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);flex:1;min-width:130px}
+.x{background:transparent;border:0;color:var(--danger);cursor:pointer;font-weight:600}
+.scroll{overflow-x:auto}
+dialog{border:0;border-radius:14px;padding:18px;max-width:420px;width:calc(100% - 24px);background:var(--card);color:var(--ink)}
+dialog::backdrop{background:rgba(0,0,0,.5)}
+pre{background:var(--bg);border:1px dashed var(--line);border-radius:8px;padding:12px;font:13px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;max-height:42vh;overflow:auto;margin:10px 0}
+label{font-weight:600;font-size:13px}
+.phone{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);margin-top:4px}
+.err{color:var(--danger);font-size:13px;min-height:18px}
+.item span{display:block}.item:disabled{opacity:.45;cursor:not-allowed}
+.item .low,.low{color:var(--danger);font-weight:600}
+.ra{width:72px;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);text-align:right}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:6px}
+.seg button{border:0;background:var(--card);padding:9px 16px;cursor:pointer;font-weight:600}
+.seg button[aria-pressed=true]{background:var(--pri);color:var(--onpri)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:8px 0 18px}
+.stat{background:var(--soft);border-radius:10px;padding:12px}.stat span{display:block;color:var(--mut);font-size:13px}.stat b{font-size:20px}
+.pe{flex-basis:100%;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.pe .ra{width:110px}.mut{color:var(--mut);font-size:13px}
+#lock{position:fixed;inset:0;z-index:50;background:var(--pri);display:flex;align-items:center;justify-content:center;padding:20px}
+#lock[hidden]{display:none}
+.lk{background:var(--card);border-radius:14px;padding:22px;width:min(340px,100%)}
+.lk h1{margin:0 0 6px;font-size:20px}.lk p{margin:0 0 12px}
+.lk input{width:100%;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);margin-bottom:8px;font-size:18px;letter-spacing:4px;text-align:center}
+.lk input[hidden]{display:none}
+.lkb{background:rgba(255,255,255,.18);border:0;color:inherit;padding:8px 14px;border-radius:8px;font-weight:600;cursor:pointer}
+.form select{padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.box h2:not(:first-child){margin-top:18px}
+textarea{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:13px/1.5 ui-monospace,Menlo,monospace;resize:vertical}
+.bkb{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+[hidden]{display:none!important}
+#paym{display:flex;width:100%}#paym button{flex:1;padding:9px 4px}
+</style>
+</head>
+<body>
+<header>
+  <input id="store" aria-label="Nama toko" placeholder="Nama toko">
+  <nav role="tablist">
+    <button role="tab" data-t="kasir" aria-selected="true">Kasir</button>
+    <button role="tab" data-t="produk" data-owner aria-selected="false">Produk</button>
+    <button role="tab" data-t="riwayat" aria-selected="false">Riwayat</button>
+    <button role="tab" data-t="member" aria-selected="false">Member</button>
+    <button role="tab" data-t="laporan" data-owner aria-selected="false">Laporan</button>
+  </nav>
+  <button class="lkb" id="lockbtn" hidden>Kunci</button>
+</header>
+
+<main>
+<section class="view on" id="v-kasir">
+  <div class="pos">
+    <div class="box">
+      <input class="search" id="q" placeholder="Cari nama atau kode barang" aria-label="Cari produk">
+      <div class="grid" id="grid"></div>
+    </div>
+    <div class="box">
+      <h2>Pesanan</h2>
+      <div id="cart"></div>
+      <div class="row"><span>Subtotal</span><b id="sub">Rp0</b></div>
+      <div class="row"><label for="disc">Diskon (Rp)</label><input id="disc" inputmode="numeric" placeholder="0"></div>
+      <div class="row total"><span>Total</span><span id="tot">Rp0</span></div>
+      <div id="mbox" style="margin:6px 0">
+        <input class="search" id="mq" placeholder="Cari member" aria-label="Cari member" autocomplete="off" style="margin-bottom:4px">
+        <div id="msug"></div>
+        <div id="mchip" hidden></div>
+      </div>
+      <div class="seg" id="paym" role="group" aria-label="Metode pembayaran">
+        <button data-m="Tunai" aria-pressed="true">Tunai</button>
+        <button data-m="QRIS" aria-pressed="false">QRIS</button>
+        <button data-m="Transfer" aria-pressed="false">Transfer</button>
+      </div>
+      <div class="row" id="cashrow"><label for="cash">Uang diterima</label><input id="cash" inputmode="numeric" placeholder="Pas"></div>
+      <div class="err" id="err" role="alert"></div>
+      <button class="btn full" id="pay">Bayar</button>
+      <button class="btn ghost full" id="clr">Kosongkan pesanan</button>
+    </div>
+  </div>
+</section>
+
+<section class="view" id="v-produk">
+  <div class="box">
+    <h2>Tambah produk</h2>
+    <div class="form">
+      <input id="pc" placeholder="Kode barang" aria-label="Kode barang">
+      <input id="pn" placeholder="Nama produk" aria-label="Nama produk">
+      <input id="pm" inputmode="numeric" placeholder="Harga modal (Rp)" aria-label="Harga modal">
+      <input id="pp" inputmode="numeric" placeholder="Harga jual (Rp)" aria-label="Harga jual">
+      <button class="btn" id="padd">Simpan produk</button>
+    </div>
+    <div class="err" id="pmsg" role="alert"></div>
+    <h2>Daftar produk</h2>
+    <div id="plist"></div>
+  </div>
+</section>
+
+<section class="view" id="v-riwayat">
+  <div class="box">
+    <h2>Riwayat transaksi</h2>
+    <div id="hist" class="scroll"></div>
+    <div id="hmsg" class="mut" role="status" style="margin-top:8px"></div>
+  </div>
+</section>
+
+<section class="view" id="v-member">
+  <div class="box">
+    <h2>Tambah member</h2>
+    <div class="form">
+      <input id="mn" maxlength="40" placeholder="Nama member" aria-label="Nama member">
+      <input id="mp" inputmode="tel" placeholder="No. telp / WhatsApp" aria-label="No. telepon">
+    </div>
+    <div class="form">
+      <button class="btn" id="msave">Simpan member</button>
+    </div>
+    <div class="err" id="merr" role="alert"></div>
+    <h2>Daftar member</h2>
+    <input class="search" id="mq2" placeholder="Cari nama atau no. telp" aria-label="Cari member">
+    <div id="mlist"></div>
+  </div>
+</section>
+
+<section class="view" id="v-laporan">
+  <div class="box">
+    <div class="form">
+      <label for="rd" class="mut" style="align-self:center">Tanggal laporan</label>
+      <input type="date" id="rd" style="flex:0 0 auto">
+      <button class="btn ghost" id="rtoday">Hari ini</button>
+    </div>
+    <div class="stats" id="stats"></div>
+  </div>
+</section>
+</main>
+
+<div id="lock" role="dialog" aria-modal="true" aria-labelledby="lt">
+  <div class="lk">
+    <h1 id="lt">Alkaff Fragrances</h1>
+    <p id="lmsg"></p>
+    <input id="pin" type="password" inputmode="numeric" maxlength="12" autocomplete="off" aria-label="PIN">
+    <div class="err" id="lerr" role="alert"></div>
+    <button class="btn full" id="lgo">Buka</button>
+  </div>
+</div>
+
+<dialog id="dlg">
+  <h2>Struk</h2>
+  <pre id="rc"></pre>
+  <label for="ph">Nomor WhatsApp</label>
+  <input class="phone" id="ph" inputmode="tel" placeholder="08123456789">
+  <a class="btn wa full" id="wa" target="_blank" rel="noopener">Kirim struk via WhatsApp</a>
+  <button class="btn ghost full" id="copy">Salin struk</button>
+  <button class="btn full" id="done">Selesai</button>
+</dialog>
+
+<script>
+(function(){
+  function safeText(v, fallback = "") {
+    if (v === null || v === undefined) return fallback;
+    return String(v).trim();
+  }
+  function safeNumber(v, fallback = 0) {
+    if (v === null || v === undefined || v === "") return fallback;
+    const raw = String(v).replace(/[^\d.-]/g, "");
+    if (raw === "" || raw === "-" || raw === ".") return fallback;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : fallback;
+  }
+  function safeArray(v) { return Array.isArray(v) ? v : []; }
+  function safeParseJson(key, fallback) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return fallback;
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === "object" ? parsed : fallback;
+    } catch (e) {
+      return fallback;
+    }
+  }
+  function esc(s){ return safeText(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+  function rp(n){ return "Rp" + Math.round(Number(n)||0).toLocaleString("id-ID"); }
+  function num(v){ return safeNumber(v, 0); }
+  function waNumber(v){ let d = safeText(v).replace(/\D/g, ""); if (!d) return ""; if (d.indexOf("0") === 0) d = "62" + d.slice(1); else if (d.indexOf("8") === 0) d = "62" + d; return (d.length >= 10 && d.length <= 15 && d.indexOf("62") === 0) ? d : ""; }
+  function today(){ var d = new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+  function dfmt(d){ if(!d) return "-"; var date = new Date(d+"T00:00:00"); return date.toLocaleDateString("id-ID", {day:"numeric", month:"long", year:"numeric"}); }
+  function codeTaken(code, exId){ const val = safeText(code).toLowerCase(); if(!val) return false; return safeArray(S.products).some(p => p && String(p.id) !== String(exId) && safeText(p.code).toLowerCase() === val); }
+  function nextCode(){ let n=1, c=""; do { c = "P" + String(n++).padStart(3,"0"); } while (codeTaken(c,0)); return c; }
+  
+  const $ = selector => document.querySelector(selector);
+
+  var DEF = [["Parfum Contoh A 100ml",1200000,850000],["Parfum Contoh B 50ml",650000,400000],["Parfum Contoh C 5ml",100000,60000]];
+  var S = {
+    store:"Alkaff Fragrances",
+    products: DEF.map((p,i) => ({ id:i+1, name:p[0], price:p[1], cost:p[2], stock:0, code:"" })),
+    history:[],
+    seq:1,
+    pid:7,
+    members:[]
+  };
+
+  try{ var saved = safeParseJson("kasir-v1", null); if (saved && typeof saved === "object") S = Object.assign(S, saved); }catch(e){}
+  
+  S.store = safeText(S.store, "Alkaff Fragrances");
+  S.products = safeArray(S.products).map(p => p && typeof p === "object" ? { id:Number(p.id)||0, code:safeText(p.code,""), name:safeText(p.name,"Produk"), price:safeNumber(p.price,0), cost:safeNumber(p.cost,0), stock:safeNumber(p.stock,0) } : null).filter(Boolean);
+  S.history = safeArray(S.history);
+  S.members = safeArray(S.members);
+
+  S.products.forEach(p => { if(!p.code) p.code = nextCode(); });
+
+  function save(){ try { localStorage.setItem("kasir-v1", JSON.stringify(S)); } catch(e){} }
+
+  var cart = {};
+  var current = null;
+  var curMember = null;
+  var payM = "Tunai";
+  var role = null;
+  var me = "";
+  var SLOCK = { salt:"", owner:"", cashiers:[{name:"Kasir 1",pin:""},{name:"Kasir 2",pin:""}], lockMin:5 };
+  var fails = 0, until = 0;
+
+  try{ var sec = safeParseJson("kasir-sec", {}); if (sec && typeof sec === "object") SLOCK = Object.assign(SLOCK, sec); until = Number(localStorage.getItem("kasir-until")) || 0; }catch(e){}
+  if(!Array.isArray(SLOCK.cashiers) || SLOCK.cashiers.length < 2) SLOCK.cashiers = [{name:"Kasir 1",pin:""},{name:"Kasir 2",pin:""}];
+
+  function saveSec(){ try { localStorage.setItem("kasir-sec", JSON.stringify(SLOCK)); } catch(e){} }
+
+  async function H(pin, salt){ const x = salt + ":" + pin; try{ const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(x)); return Array.from(new Uint8Array(digest)).map(v => v.toString(16).padStart(2,"0")).join(""); } catch (e) { let h1 = 0xdeadbeef, h2 = 0x41c6ce57; for (let i = 0; i < x.length; i++) { const c = x.charCodeAt(i); h1 = Math.imul(h1 ^ c, 2654435761); h2 = Math.imul(h2 ^ c, 1597334677); } h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507); h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507); return "f" + ((4294967296 * (2097151 & h2)) + (h1 >>> 0)).toString(16); } }
+
+  const prod = id => safeArray(S.products).find(p => String(p.id) === String(id));
+  const avail = p => !p ? 0 : Math.max(0, Number(p.stock)||0) - (Number(cart[p.id])||0);
+  const findMember = phone => { const t = safeText(phone); return S.members.find(m => safeText(m.phone) === t); };
+  const pfmt = p => { const v = safeText(p); return v ? "0" + v.slice(2) : ""; };
+
+  function renderGrid(){
+    const q = safeText($("#q").value).toLowerCase();
+    let h = "";
+    S.products.filter(p => safeText(p.name).toLowerCase().indexOf(q) > -1 || safeText(p.code).toLowerCase().indexOf(q) > -1).forEach(p => {
+      const a = avail(p);
+      h += '<button class="item" data-id="' + p.id + '"' + (a <= 0 ? " disabled" : "") + '><b>' + esc(safeText(p.name)) + '</b><span>' + esc(safeText(p.code)) + ' · ' + rp(Number(p.price)||0) + '</span><span>Stok ' + a + '</span></button>';
+    });
+    $("#grid").innerHTML = h || '<div class="empty">Produk tidak ditemukan.</div>';
+  }
+
+  function totals(){
+    let sub = 0;
+    S.products.forEach(p => { const qty = Number(cart[p.id]) || 0; if(qty > 0) sub += (Number(p.price)||0) * qty; });
+    const disc = Math.min(num($("#disc").value), sub);
+    return { sub, disc, total: sub - disc };
+  }
+
+  function renderCart(){
+    let h = "";
+    S.products.forEach(p => {
+      const qty = Number(cart[p.id]) || 0;
+      if(!qty) return;
+      h += '<div class="line"><div class="n">' + esc(safeText(p.name)) + '<small>' + rp(Number(p.price)||0) + ' x ' + qty + '</small></div><div class="q"><button data-m="' + p.id + '">-</button><b>' + qty + '</b><button data-p="' + p.id + '">+</button></div></div>';
+    });
+    $("#cart").innerHTML = h || '<div class="empty">Ketuk produk untuk menambah.</div>';
+    const t = totals();
+    $("#sub").textContent = rp(t.sub);
+    $("#tot").textContent = rp(t.total);
+    renderGrid();
+  }
+
+  function setPay(m){ payM = m; document.querySelectorAll("#paym button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.m === m))); $("#cashrow").hidden = m !== "Tunai"; }
+  function reset(){ cart = {}; $("#disc").value=""; $("#cash").value=""; setPay("Tunai"); $("#err").textContent=""; renderCart(); }
+
+  function renderHist(){
+    if(!S.history.length){ $("#hist").innerHTML = '<div class="empty">Belum ada transaksi.</div>'; return; }
+    let h = "";
+    S.history.slice().reverse().forEach(t => {
+      h += '<div class="line"><div class="n"><b>' + esc(safeText(t.no)) + '</b><small>' + esc(safeText(t.date)) + (t.kasir ? " · " + esc(safeText(t.kasir)) : "") + '</small></div><b>' + rp(Number(t.total)||0) + '</b><button class="btn ghost" data-re="' + esc(safeText(t.no)) + '">Kirim ulang</button></div>';
+    });
+    $("#hist").innerHTML = h;
+  }
+
+  function receipt(t){
+    const list = ["*" + safeText(t.store).toUpperCase() + "*", safeText(t.no), safeText(t.date)];
+    if (t.kasir) list.push("Kasir: " + safeText(t.kasir));
+    if (t.memberName) list.push("Member: " + safeText(t.memberName));
+    list.push("--------------------------");
+    (t.items||[]).forEach(i => {
+      list.push((Number(i.qty)||0) + "x " + safeText(i.name));
+      list.push("   @" + rp(Number(i.price)||0) + " = " + rp((Number(i.qty)||0) * (Number(i.price)||0)));
+    });
+    list.push("--------------------------");
+    list.push("Subtotal: " + rp(Number(t.sub)||0));
+    if (Number(t.disc) > 0) list.push("Diskon: -" + rp(Number(t.disc)||0));
+    list.push("*Total: " + rp(Number(t.total)||0) + "*");
+    if ((safeText(t.method,"Tunai")) === "Tunai"){
+      list.push("Tunai: " + rp(Number(t.cash)||0));
+      list.push("Kembali: " + rp((Number(t.cash)||0) - (Number(t.total)||0)));
+    }
+    list.push("", "Terima kasih!");
+    return list.join("\n");
+  }
+
+  function updateWA(){
+    const n = waNumber($("#ph").value);
+    const a = $("#wa");
+    if (n && current){ a.href = "https://wa.me/" + n + "?text=" + encodeURIComponent(receipt(current)); a.style.opacity = 1; } else { a.removeAttribute("href"); a.style.opacity = 0.5; }
+  }
+
+  function openReceipt(t){ current = t; $("#rc").textContent = receipt(t).replace(/\*/g, ""); $("#ph").value = safeText(t.phone); updateWA(); if (!$("#dlg").open) $("#dlg").showModal(); }
+
+  function renderReport(){
+    const v = safeText($("#rd").value) || today();
+    let total = 0, count = 0;
+    S.history.forEach(t => { if (t.date === v){ total += Number(t.total)||0; count++; } });
+    function st(label, value){ return '<div class="stat"><span>' + label + '</span><b>' + value + '</b></div>'; }
+    $("#stats").innerHTML = st("Penjualan", rp(total)) + st("Transaksi", String(count));
+  }
+
+  function renderProd(){
+    let h = "";
+    S.products.forEach(p => {
+      h += '<div class="line"><div class="n">' + esc(safeText(p.name)) + '<small>Kode ' + esc(safeText(p.code)) + ' · Modal ' + rp(Number(p.cost)||0) + ' · Jual ' + rp(Number(p.price)||0) + ' · Stok ' + (Number(p.stock)||0) + '</small></div><button class="x" data-del="' + p.id + '">Hapus</button></div>';
+    });
+    $("#plist").innerHTML = h || '<div class="empty">Belum ada produk.</div>';
+  }
+
+  function setMember(m){ curMember = m || null; if(curMember){ $("#mchip").hidden = false; $("#mchip").innerHTML = '<div class="line"><div class="n"><b>' + esc(safeText(curMember.name)) + '</b><small>' + pfmt(safeText(curMember.phone)) + '</small></div><button class="x" id="mrm">Lepas</button></div>'; } else { $("#mchip").hidden = true; } }
+  
+  function renderMem(){ const q = safeText($("#mq2").value).toLowerCase().replace(/^0/,"62"); const list = S.members.filter(m => safeText(m.name).toLowerCase().indexOf(q) > -1 || safeText(m.phone).indexOf(q) > -1); $("#mlist").innerHTML = list.length ? list.map(m => '<div class="line"><div class="n"><b>' + esc(safeText(m.name)) + '</b><small>' + pfmt(safeText(m.phone)) + '</small></div></div>').join("") : '<div class="empty">Belum ada member.</div>'; }
+
+  // Events
+  $("#q").oninput = renderGrid;
+  $("#q").onkeydown = e => { if(e.key !== "Enter") return; const v = safeText($("#q").value).toLowerCase(); if(!v) return; const p = S.products.find(x => safeText(x.code).toLowerCase() === v || safeText(x.name).toLowerCase() === v); if (p && avail(p) > 0){ cart[p.id] = (Number(cart[p.id])||0) + 1; $("#q").value = ""; renderCart(); } };
+  $("#grid").onclick = e => { const b = e.target.closest("[data-id]"); if(!b) return; const p = prod(b.dataset.id); if(!p || avail(p) <= 0) return; cart[p.id] = (Number(cart[p.id])||0) + 1; renderCart(); };
+  $("#cart").onclick = e => { const b = e.target.closest("button"); if(!b) return; if(b.dataset.p){ const p = prod(b.dataset.p); if(p && avail(p) > 0) cart[b.dataset.p] = (Number(cart[b.dataset.p])||0) + 1; } if(b.dataset.m){ cart[b.dataset.m] = (Number(cart[b.dataset.m])||0) - 1; if((Number(cart[b.dataset.m])||0) <= 0) delete cart[b.dataset.m]; } renderCart(); };
+  $("#pay").onclick = () => { if(!Object.keys(cart).length){ $("#err").textContent = "Pesanan masih kosong."; return; } const t = totals(); const cash = payM === "Tunai" ? num($("#cash").value) : t.total; if(cash < t.total){ $("#err").textContent = "Uang kurang " + rp(t.total - cash); return; } const tx = { no:"INV-" + String(S.seq++).padStart(4,"0"), store:S.store, kasir:me||"Pemilik", method:payM, date:new Date().toLocaleString("id-ID",{dateStyle:"medium",timeStyle:"short"}), total:t.total, sub:t.sub, disc:t.disc, cash:cash, items:[], phone:curMember ? safeText(curMember.phone) : "", memberName:curMember ? safeText(curMember.name) : "" }; S.products.forEach(p => { const qty = Number(cart[p.id])||0; if(qty){ tx.items.push({ id:p.id, name:p.name, qty:qty, price:Number(p.price)||0, cost:Number(p.cost)||0 }); } }); S.history.push(tx); save(); openReceipt(tx); reset(); };
+  $("#clr").onclick = reset;
+  $("#paym").onclick = e => { const b = e.target.closest("[data-m]"); if(!b) return; setPay(b.dataset.m); };
+  $("#disc").oninput = renderCart;
+  $("#hist").onclick = e => { const b = e.target.closest("[data-re]"); if(!b) return; const t = S.history.find(x => safeText(x.no) === safeText(b.dataset.re)); if(t) openReceipt(t); };
+  $("#ph").oninput = updateWA;
+  $("#copy").onclick = () => { navigator.clipboard.writeText(receipt(current || { store:S.store, no:"", date:"", items:[] })); };
+  $("#done").onclick = () => { $("#dlg").close(); };
+  $("#padd").onclick = () => { const name = $("#pn").value.trim(); const price = num($("#pp").value); if(!name || !price){ $("#pmsg").textContent = "Nama dan harga wajib."; return; } S.products.push({ id:S.pid++, code:$("#pc").value.trim() || nextCode(), name:name, price:price, cost:num($("#pm").value), stock:0 }); $("#pmsg").textContent = ""; $("#pn").value = ""; $("#pp").value = ""; $("#pm").value = ""; $("#pc").value = ""; save(); renderProd(); renderGrid(); };
+  $("#plist").onclick = e => { const del = e.target.closest("[data-del]"); if(del){ S.products = S.products.filter(p => String(p.id) !== String(del.dataset.del)); delete cart[del.dataset.del]; save(); renderProd(); renderGrid(); renderCart(); } };
+  $("#mq").oninput = () => { const q = safeText($("#mq").value).toLowerCase().replace(/^0/,"62"); if(!q){ $("#msug").innerHTML = ""; return; } const list = S.members.filter(m => safeText(m.name).toLowerCase().indexOf(q) > -1 || safeText(m.phone).indexOf(q) > -1).slice(0,5); $("#msug").innerHTML = list.length ? list.map(m => '<div class="line" data-pick="' + safeText(m.phone) + '"><div class="n">' + esc(safeText(m.name)) + '<small>' + pfmt(safeText(m.phone)) + '</small></div></div>').join("") : '<div class="empty">Tidak ditemukan.</div>'; };
+  $("#msug").onclick = e => { const b = e.target.closest("[data-pick]"); if(!b) return; const m = findMember(b.dataset.pick); if(m) setMember(m); };
+  $("#mchip").onclick = e => { if(e.target.closest("#mrm")) setMember(null); };
+  $("#msave").onclick = () => { const nm = $("#mn").value.trim(); const ph = waNumber($("#mp").value); if(!nm || !ph){ $("#merr").textContent = "Nama dan nomor wajib."; return; } S.members.push({ phone:ph, name:nm, ts:Date.now() }); save(); $("#mn").value=""; $("#mp").value=""; renderMem(); };
+  $("#mq2").oninput = renderMem;
+  $("#rd").value = today();
+  $("#rd").onchange = renderReport;
+  $("#rtoday").onclick = () => { $("#rd").value = today(); renderReport(); };
+
+  function showLock(){ role=null; if($("#dlg").open) $("#dlg").close(); document.querySelectorAll("header,main").forEach(x => x.inert = true); $("#lock").hidden = false; $("#pin").focus(); }
+  function enter(r, who){ me = r === "owner" ? "Pemilik" : safeText(who,"Kasir"); role = r; $("#lock").hidden = true; document.querySelectorAll("header,main").forEach(x => x.inert = false); $("#pin").value = ""; document.querySelectorAll("nav button[data-owner]").forEach(b => b.hidden = r !== "owner"); }
+  
+  $("#lgo").onclick = async () => { const pin = $("#pin").value.trim(); if(!/^\\d{4,12}$/.test(pin)){ $("#lerr").textContent = "PIN harus 4-12 angka."; return; } if(!SLOCK.owner){ SLOCK.salt = Math.random().toString(36).slice(2) + Date.now().toString(36); SLOCK.owner = await H(pin, SLOCK.salt); saveSec(); enter("owner"); return; } const h = await H(pin, SLOCK.salt); if(h === SLOCK.owner){ enter("owner"); return; } $("#lerr").textContent = "PIN salah."; $("#pin").value = ""; };
+  $("#pin").onkeydown = e => { if(e.key === "Enter") $("#lgo").click(); };
+
+  $("#store").value = S.store;
+  $("#store").oninput = () => { S.store = safeText($("#store").value, "Toko"); save(); };
+  $("#lockbtn").onclick = showLock;
+
+  document.querySelectorAll("nav button[role='tab']").forEach(b => { b.onclick = () => { document.querySelectorAll("nav button").forEach(x => x.setAttribute("aria-selected", x === b ? "true" : "false")); document.querySelectorAll(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + b.dataset.t)); renderReport(); }; });
+
+  renderGrid(); renderProd(); renderHist(); renderReport(); renderMem(); showLock();
+})();
+</script>
+</body>
+</html>
