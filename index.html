@@ -183,6 +183,9 @@
     .q button {
       width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line); background: white; cursor: pointer; font-weight: 700;
     }
+    .q button.action { width: auto; height: auto; border: 0; border-radius: 10px; background: var(--primary); color: #fff; font-weight: 700; }
+    .q button.action.ghost { background: var(--primary-soft); color: var(--ink); }
+    .q { flex-wrap: wrap; justify-content: flex-end; }
     textarea { resize: vertical; min-height: 100px; }
     .chip {
       display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; background: var(--primary-soft); border-radius: 12px; border: 1px solid var(--line);
@@ -207,6 +210,17 @@
       background: #f7faf9; border: 1px dashed var(--line); border-radius: 10px; padding: 12px; white-space: pre-wrap; overflow: auto; max-height: 40vh;
     }
     .low { color: var(--danger); font-weight: 700; }
+    #printArea { display: none; }
+    pre.rcpt { white-space: pre; font: 12px/1.35 "Courier New", monospace; overflow-x: auto; }
+    #printArea pre.rcpt { background: none; border: 0; padding: 0; margin: 0; max-height: none; overflow: visible; }
+    @media print {
+      body > *:not(#printArea) { display: none !important; }
+      html, body { background: #fff !important; }
+      #printArea { display: block; color: #000; padding: 0; }
+    }
+    dialog { width: min(420px, calc(100vw - 28px)); border: 1px solid var(--line); border-radius: 14px; }
+    dialog label.blk { display: block; margin: 8px 0 4px; }
+    .lnk { border: 0; background: transparent; color: var(--primary); cursor: pointer; font-weight: 700; padding: 0 4px; }
     @media (max-width: 560px){
       header { padding: 12px 12px; }
       .brand { min-width: 0; width: 100%; }
@@ -228,14 +242,17 @@
       <button role="tab" data-tab="laporan" aria-selected="false">Laporan</button>
       <button role="tab" data-tab="pengaturan" aria-selected="false">Pengaturan</button>
     </nav>
-    <button id="lockBtn" class="action ghost">Kunci</button>
+    <div style="display:flex; gap:10px; align-items:center;">
+      <span id="whoami" style="font-weight:700;"></span>
+      <button id="lockBtn" class="action ghost">Kunci</button>
+    </div>
   </header>
 
   <main id="app" class="hide">
     <section id="kasir" class="view on">
       <div class="layout">
         <div class="box">
-          <input id="searchProduct" class="search" placeholder="Cari nama atau kode barang" />
+          <input id="searchProduct" class="search" placeholder="Cari nama, kode, brand, kategori" />
           <div id="productGrid" class="grid"></div>
         </div>
         <div class="box">
@@ -276,12 +293,21 @@
         <div class="row" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
           <input id="prodCode" placeholder="Kode barang" style="flex:1 1 120px;" />
           <input id="prodName" placeholder="Nama produk" style="flex:2 1 180px;" />
+          <input id="prodBrand" list="brandOptions" placeholder="Brand" style="flex:1 1 130px;" autocomplete="off" />
+          <input id="prodCategory" list="categoryOptions" placeholder="Kategori" style="flex:1 1 130px;" autocomplete="off" />
+          <datalist id="brandOptions"></datalist>
+          <datalist id="categoryOptions"></datalist>
           <input id="prodCost" type="number" min="0" placeholder="Harga modal" style="flex:1 1 120px;" />
           <input id="prodPrice" type="number" min="0" placeholder="Harga jual" style="flex:1 1 120px;" />
           <button id="addProductBtn" class="action">Simpan</button>
         </div>
         <div id="prodMsg" class="err"></div>
         <h2 style="margin-top:18px;">Daftar produk</h2>
+        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:6px;">
+          <input id="listSearch" class="search" placeholder="Cari nama, kode, brand, kategori" style="flex:2 1 200px;" />
+          <select id="filterCategory" style="flex:1 1 140px;"></select>
+          <select id="filterBrand" style="flex:1 1 140px;"></select>
+        </div>
         <div id="productList"></div>
       </div>
     </section>
@@ -314,6 +340,10 @@
         <h2>Riwayat transaksi</h2>
         <div id="historyList"></div>
       </div>
+      <div class="box" style="margin-top:18px;">
+        <h2>Riwayat refund</h2>
+        <div id="refundList"></div>
+      </div>
     </section>
 
     <section id="member" class="view">
@@ -336,6 +366,11 @@
     <section id="piutang" class="view">
       <div class="box">
         <h2>Daftar piutang</h2>
+        <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:6px;">
+          <input id="debtSearch" class="search" placeholder="Cari nama / no. telp member" style="flex:2 1 200px;" />
+          <label class="muted" style="display:flex; align-items:center; gap:6px;"><input id="debtShowPaid" type="checkbox" style="width:auto;" /> Tampilkan lunas</label>
+        </div>
+        <div id="debtSummary" style="font-weight:700; margin:6px 0;"></div>
         <div id="debtList"></div>
       </div>
     </section>
@@ -348,6 +383,7 @@
           <button id="todayBtn" class="action ghost">Hari ini</button>
         </div>
         <div id="reportStats" class="stats"></div>
+        <div id="reportCashier" style="margin-top:14px;"></div>
       </div>
     </section>
 
@@ -360,6 +396,21 @@
           <button id="changePinBtn" class="action">Simpan PIN</button>
         </div>
         <div id="pinMsg" class="err"></div>
+      </div>
+      <div class="box" style="margin-top:18px;">
+        <h2>Izin kasir</h2>
+        <label style="display:flex; align-items:center; gap:8px;"><input id="allowCashierRefund" type="checkbox" style="width:auto;" /> Kasir boleh memproses refund</label>
+        <div class="muted" style="margin-top:6px;">Menerima pembayaran hutang selalu boleh dilakukan kasir. Refund hanya untuk transaksi milik kasir itu sendiri.</div>
+      </div>
+      <div class="box" style="margin-top:18px;">
+        <h2>Kelola kasir</h2>
+        <div class="row" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+          <input id="cashierName" placeholder="Nama kasir" style="flex:2 1 160px;" autocomplete="off" />
+          <input id="cashierPin" inputmode="numeric" maxlength="12" placeholder="PIN kasir (4-12 angka)" style="flex:1 1 150px;" autocomplete="off" />
+          <button id="addCashierBtn" class="action">Tambah kasir</button>
+        </div>
+        <div id="cashierMsg" class="err"></div>
+        <div id="cashierList"></div>
       </div>
     </section>
   </main>
@@ -374,13 +425,61 @@
     </div>
   </div>
 
+  <dialog id="payDebtDialog">
+    <h2>Bayar hutang</h2>
+    <div id="payDebtInfo" style="margin-bottom:6px;"></div>
+    <label class="blk" for="payAmount">Jumlah dibayar</label>
+    <input id="payAmount" type="number" min="0" placeholder="0" />
+    <label class="blk" for="payMethod">Metode</label>
+    <select id="payMethod"><option>Tunai</option><option>QRIS</option><option>Transfer</option></select>
+    <div class="err" id="payErr" role="alert"></div>
+    <button id="paySubmit" class="action success full">Terima pembayaran</button>
+    <button id="payCancel" class="action ghost full" style="margin-top:8px;">Batal</button>
+  </dialog>
+
+  <dialog id="refundDialog">
+    <h2 id="refundTitle">Refund</h2>
+    <div id="refundItems"></div>
+    <div id="refundNote" class="muted hide" style="margin:6px 0;"></div>
+    <label class="blk" for="refundReason">Alasan (opsional)</label>
+    <input id="refundReason" placeholder="Contoh: barang rusak / salah pilih" />
+    <label class="blk" for="refundMethod">Dikembalikan lewat</label>
+    <select id="refundMethod"><option>Tunai</option><option>QRIS</option><option>Transfer</option></select>
+    <label style="display:flex; align-items:center; gap:8px; margin-top:10px;"><input id="refundRestock" type="checkbox" checked style="width:auto;" /> Kembalikan barang ke stok</label>
+    <div class="row" style="margin-top:8px;"><span>Total refund</span><b id="refundTotal">Rp0</b></div>
+    <div class="err" id="refundErr" role="alert"></div>
+    <button id="refundSubmit" class="action danger full">Proses refund</button>
+    <button id="refundCancel" class="action ghost full" style="margin-top:8px;">Batal</button>
+  </dialog>
+
+  <div id="printArea" aria-hidden="true"></div>
+  <style id="pageStyle"></style>
+
   <dialog id="receiptDialog">
-    <h2>Struk siap dikirim</h2>
-    <pre id="receiptText"></pre>
-    <label for="customerPhone">Nomor WhatsApp</label>
-    <input id="customerPhone" placeholder="08123456789" />
-    <a id="waLink" class="action success full" style="margin-top:10px;" target="_blank" rel="noopener">Kirim via WhatsApp</a>
-    <button id="copyReceiptBtn" class="action ghost full" style="margin-top:8px;">Salin struk</button>
+    <h2>Struk</h2>
+    <pre id="receiptText" class="rcpt"></pre>
+    <div class="seg" id="receiptMode">
+      <button data-mode="print" aria-pressed="false">Cetak struk</button>
+      <button data-mode="wa" aria-pressed="true">Struk via WhatsApp</button>
+    </div>
+
+    <div id="waPanel">
+      <label class="blk" for="customerPhone">Nomor WhatsApp</label>
+      <input id="customerPhone" placeholder="08123456789" />
+      <a id="waLink" class="action success full" style="margin-top:10px;" target="_blank" rel="noopener">Kirim via WhatsApp</a>
+      <button id="copyReceiptBtn" class="action ghost full" style="margin-top:8px;">Salin struk</button>
+    </div>
+
+    <div id="printPanel" class="hide">
+      <label class="blk" for="paperSize">Ukuran kertas</label>
+      <select id="paperSize">
+        <option value="58">58 mm</option>
+        <option value="80">80 mm</option>
+        <option value="a4">A4</option>
+      </select>
+      <button id="printReceiptBtn" class="action success full" style="margin-top:10px;">Cetak struk</button>
+    </div>
+
     <button id="closeReceiptBtn" class="action full" style="margin-top:10px;">Selesai</button>
   </dialog>
 
@@ -406,9 +505,16 @@
       history: [],
       stockHistory: [],
       debts: [],
+      users: [],
       seq: 1,
       pid: 10,
       ownerPin: '1234',
+      paper: '58',
+      kasirRefund: false,
+      refunds: [],
+      bseq: 1,
+      rseq: 1,
+      receiptMode: 'wa',
       lockSalt: ''
     };
 
@@ -417,6 +523,24 @@
     let paymentType = 'Tunai';
     let currentMember = null;
     let activeStockDraft = [];
+    let currentUser = null;
+    let currentReceiptTx = null;
+    const KASIR_TABS = ['kasir', 'riwayat', 'member', 'piutang'];
+    const canRefund = () => !!currentUser && (currentUser.role === 'owner' || !!state.kasirRefund);
+    const nowLabel = () => new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
+    const debtPaid = (d) => (d.payments || []).reduce((a, p) => a + Number(p.amount || 0), 0);
+    const debtRemaining = (d) => Math.max(0, Number(d.total || 0) - Number(d.dp || 0) - debtPaid(d) - Number(d.credit || 0));
+    const memberOutstanding = (phone) => state.debts.filter((d) => d.memberPhone === phone).reduce((a, d) => a + debtRemaining(d), 0);
+    const findDebtForTx = (tx) => state.debts.find((d) => d.txNo === tx.no) ||
+      state.debts.find((d) => !d.txNo && tx.member && d.memberPhone === tx.member.phone && Number(d.total) === Number(tx.total) && Number(d.dp || 0) === Number(tx.cash || 0));
+    let payDebtId = null;
+    let refundTxNo = null;
+    let currentReceiptText = '';
+    const localISODate = () => {
+      const d = new Date();
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    };
+    const canAccess = (tab) => !!currentUser && (currentUser.role === 'owner' || KASIR_TABS.includes(tab));
 
     function loadState() {
       try {
@@ -429,10 +553,18 @@
           if (!Array.isArray(state.history)) state.history = [];
           if (!Array.isArray(state.stockHistory)) state.stockHistory = [];
           if (!Array.isArray(state.debts)) state.debts = [];
+          if (!Array.isArray(state.users)) state.users = [];
+          if (!Array.isArray(parsed.refunds)) state.refunds = [];
         }
       } catch (e) {
         state = structuredClone(defaultState);
       }
+      state.debts.forEach((d) => {
+        if (!Array.isArray(d.payments)) d.payments = [];
+        d.credit = Number(d.credit || 0);
+      });
+      if (!state.bseq) state.bseq = 1;
+      if (!state.rseq) state.rseq = 1;
       if (!state.lockSalt) state.lockSalt = Math.random().toString(36).slice(2, 12);
       if (!state.ownerPin) state.ownerPin = '1234';
     }
@@ -493,12 +625,13 @@
       const keyword = $('#searchProduct').value.toLowerCase();
       let html = '';
       state.products.filter((p) => {
-        const hay = (p.name + ' ' + p.code).toLowerCase();
+        const hay = (p.name + ' ' + p.code + ' ' + (p.brand || '') + ' ' + (p.category || '')).toLowerCase();
         return hay.includes(keyword);
       }).forEach((p) => {
         const qty = cart[p.id] || 0;
         html += '<button class="item" data-id="' + p.id + '" ' + ((qty >= (p.stock || 0)) ? 'disabled' : '') + '>' +
           '<b>' + escapeHtml(p.name) + '</b>' +
+          ((p.brand || p.category) ? '<span>' + escapeHtml([p.brand, p.category].filter(Boolean).join(' · ')) + '</span>' : '') +
           '<span>' + escapeHtml(p.code) + ' · ' + formatRp(p.price) + '</span>' +
           '<span>' + (p.stock <= 5 ? '<span class="low">Stok ' + p.stock + '</span>' : 'Stok ' + p.stock) + '</span>' +
           '</button>';
@@ -506,14 +639,49 @@
       $('#productGrid').innerHTML = html || '<div class="muted">Produk tidak ditemukan.</div>';
     }
 
+    function uniqueValues(key) {
+      const set = new Set(state.products.map((p) => String(p[key] || '').trim()).filter(Boolean));
+      return Array.from(set).sort((a, b) => a.localeCompare(b, 'id'));
+    }
+
+    function fillFilter(sel, label, values) {
+      const el = $(sel);
+      const current = el.value;
+      el.innerHTML = '<option value="">' + label + '</option>' +
+        values.map((v) => '<option value="' + escapeHtml(v) + '">' + escapeHtml(v) + '</option>').join('');
+      el.value = values.includes(current) ? current : '';
+    }
+
+    function refreshTaxonomy() {
+      const cats = uniqueValues('category');
+      const brands = uniqueValues('brand');
+      $('#categoryOptions').innerHTML = cats.map((c) => '<option value="' + escapeHtml(c) + '"></option>').join('');
+      $('#brandOptions').innerHTML = brands.map((b) => '<option value="' + escapeHtml(b) + '"></option>').join('');
+      fillFilter('#filterCategory', 'Semua kategori', cats);
+      fillFilter('#filterBrand', 'Semua brand', brands);
+    }
+
     function renderProductList() {
-      const html = state.products.map((p) => {
+      refreshTaxonomy();
+      const q = $('#listSearch').value.toLowerCase();
+      const fc = $('#filterCategory').value;
+      const fb = $('#filterBrand').value;
+      const list = state.products.filter((p) => {
+        if (fc && (p.category || '') !== fc) return false;
+        if (fb && (p.brand || '') !== fb) return false;
+        const hay = (p.name + ' ' + p.code + ' ' + (p.brand || '') + ' ' + (p.category || '')).toLowerCase();
+        return hay.includes(q);
+      });
+      const html = list.map((p) => {
         return '<div class="line">' +
-          '<div class="n"><b>' + escapeHtml(p.name) + '</b><small>Kode ' + escapeHtml(p.code) + ' · Modal ' + formatRp(p.cost) + ' · Jual ' + formatRp(p.price) + ' · Stok ' + (p.stock || 0) + '</small></div>' +
-          '<button class="x" data-del-product="' + p.id + '">Hapus</button>' +
+          '<div class="n"><b>' + escapeHtml(p.name) + '</b>' +
+          '<small>Brand ' + escapeHtml(p.brand || '-') + ' · Kategori ' + escapeHtml(p.category || '-') + '</small>' +
+          '<small>Kode ' + escapeHtml(p.code) + ' · Modal ' + formatRp(p.cost) + ' · Jual ' + formatRp(p.price) + ' · Stok ' + (p.stock || 0) + '</small></div>' +
+          '<div class="q"><button class="action ghost" data-edit-product="' + p.id + '" style="padding:6px 10px;">Ubah</button>' +
+          '<button class="x" data-del-product="' + p.id + '">Hapus</button></div>' +
           '</div>';
       }).join('');
-      $('#productList').innerHTML = html || '<div class="muted">Belum ada produk.</div>';
+      $('#productList').innerHTML = html || '<div class="muted">' + (state.products.length ? 'Produk tidak ditemukan.' : 'Belum ada produk.') + '</div>';
     }
 
     function renderMembers() {
@@ -523,14 +691,37 @@
       $('#memberList').innerHTML = html || '<div class="muted">Belum ada member.</div>';
     }
 
+    function txFullyRefunded(tx) {
+      return tx.items.every((it) => refundableQty(tx, it) <= 0);
+    }
+
     function renderHistory() {
-      const html = state.history.slice().reverse().map((tx) => {
+      const isOwner = !!currentUser && currentUser.role === 'owner';
+      const visible = currentUser ? state.history.filter((tx) => isOwner || tx.cashierId === currentUser.id) : [];
+      const html = visible.slice().reverse().map((tx) => {
+        const refunded = Number(tx.refundedAmount || 0);
+        const canBtn = canRefund() && !txFullyRefunded(tx);
         return '<div class="line">' +
-          '<div class="n"><b>' + escapeHtml(tx.no) + '</b><small>' + escapeHtml(tx.date) + ' · ' + escapeHtml(tx.method) + (tx.member ? ' · ' + escapeHtml(tx.member.name) : '') + '</small></div>' +
-          '<div class="q"><b>' + formatRp(tx.total) + '</b><button class="action ghost" data-open-receipt="' + tx.no + '" style="padding:8px 10px;">Buka</button></div>' +
-          '</div>';
+          '<div class="n"><b>' + escapeHtml(tx.no) + '</b><small>' + escapeHtml(tx.date) + ' · ' + escapeHtml(tx.method) + (tx.member ? ' · ' + escapeHtml(tx.member.name) : '') + (tx.cashier ? ' · Kasir ' + escapeHtml(tx.cashier) : '') + '</small>' +
+          (refunded ? '<small class="low">' + (txFullyRefunded(tx) ? 'Direfund penuh' : 'Direfund sebagian') + ' · -' + formatRp(refunded) + '</small>' : '') +
+          '</div>' +
+          '<div class="q"><b>' + formatRp(tx.total) + '</b>' +
+          '<button class="action ghost" data-open-receipt="' + tx.no + '" style="padding:8px 10px;">Buka</button>' +
+          (canBtn ? '<button class="action ghost" data-refund-tx="' + tx.no + '" style="padding:8px 10px;">Refund</button>' : '') +
+          '</div></div>';
       }).join('');
       $('#historyList').innerHTML = html || '<div class="muted">Belum ada transaksi.</div>';
+      renderRefunds();
+    }
+
+    function renderRefunds() {
+      const isOwner = !!currentUser && currentUser.role === 'owner';
+      const list = currentUser ? state.refunds.filter((r) => isOwner || r.cashierId === currentUser.id) : [];
+      const html = list.slice().reverse().map((r) => {
+        return '<div class="line"><div class="n"><b>' + escapeHtml(r.no) + '</b><small>' + escapeHtml(r.date) + ' · ' + escapeHtml(r.txNo) + (r.cashier ? ' · Kasir ' + escapeHtml(r.cashier) : '') + (r.reason ? ' · ' + escapeHtml(r.reason) : '') + '</small></div>' +
+          '<div class="q"><b>-' + formatRp(r.amount) + '</b><button class="action ghost" data-open-refund="' + r.no + '" style="padding:8px 10px;">Buka</button></div></div>';
+      }).join('');
+      $('#refundList').innerHTML = html || '<div class="muted">Belum ada refund.</div>';
     }
 
     function renderStockHistory() {
@@ -541,27 +732,77 @@
     }
 
     function renderDebts() {
-      const html = state.debts.length ? state.debts.map((d) => {
-        return '<div class="line"><div class="n"><b>' + escapeHtml(d.memberName) + '</b><small>' + escapeHtml(d.memberPhone) + ' · Jatuh tempo ' + (d.dueDate || '-') + '</small></div><b>' + formatRp(d.total - (d.dp || 0)) + '</b></div>';
-      }).join('') : '<div class="muted">Belum ada piutang.</div>';
-      $('#debtList').innerHTML = html;
+      const q = ($('#debtSearch').value || '').toLowerCase();
+      const showPaid = $('#debtShowPaid').checked;
+      const today = localISODate();
+      let outstanding = 0;
+      state.debts.forEach((d) => { outstanding += debtRemaining(d); });
+      $('#debtSummary').textContent = 'Total piutang aktif: ' + formatRp(outstanding);
+      const list = state.debts.filter((d) => {
+        if (!showPaid && debtRemaining(d) <= 0) return false;
+        return (d.memberName + ' ' + d.memberPhone + ' ' + (d.txNo || '')).toLowerCase().includes(q);
+      }).sort((a, b) => {
+        const ao = debtRemaining(a) > 0 ? 0 : 1;
+        const bo = debtRemaining(b) > 0 ? 0 : 1;
+        if (ao !== bo) return ao - bo;
+        return String(a.dueDate || '9999').localeCompare(String(b.dueDate || '9999'));
+      });
+      const html = list.map((d) => {
+        const rem = debtRemaining(d);
+        const paid = debtPaid(d);
+        const late = rem > 0 && d.dueDate && d.dueDate < today;
+        const pays = (d.payments || []).map((p) => '<small>' + escapeHtml(p.date) + ' · ' + escapeHtml(p.method) + ' · ' + formatRp(p.amount) +
+          ' <button class="lnk" data-pay-receipt="' + p.id + '">Struk</button></small>').join('');
+        return '<div class="line">' +
+          '<div class="n"><b>' + escapeHtml(d.memberName) + '</b>' +
+          '<small>' + escapeHtml(d.memberPhone) + (d.txNo ? ' · ' + escapeHtml(d.txNo) : '') + ' · Jatuh tempo ' + escapeHtml(d.dueDate || '-') + (late ? ' · <span class="low">Terlambat</span>' : '') + '</small>' +
+          '<small>Total ' + formatRp(d.total) + ' · DP ' + formatRp(d.dp || 0) + (paid ? ' · Dibayar ' + formatRp(paid) : '') + (d.credit ? ' · Refund ' + formatRp(d.credit) : '') + '</small>' +
+          pays + '</div>' +
+          '<div class="q">' + (rem > 0
+            ? '<b>Sisa ' + formatRp(rem) + '</b><button class="action" data-pay-debt="' + d.id + '" style="padding:8px 10px;">Bayar</button>'
+            : '<b style="color:var(--accent);">Lunas</b>') + '</div></div>';
+      }).join('');
+      $('#debtList').innerHTML = html || '<div class="muted">Belum ada piutang.</div>';
     }
 
     function renderReport() {
-      const date = $('#reportDate').value || new Date().toISOString().slice(0, 10);
-      let totalSales = 0;
-      let count = 0;
-      let debt = 0;
+      const date = $('#reportDate').value || localISODate();
+      let sales = 0, count = 0, refunds = 0, payments = 0, debt = 0;
+      const by = {};
+      const row = (name) => (by[name] = by[name] || { name, count: 0, sales: 0, refund: 0, pay: 0 });
       state.history.forEach((tx) => {
-        if (tx.date.startsWith(date)) {
-          totalSales += Number(tx.total || 0);
+        if (tx.day === date) {
+          sales += Number(tx.total || 0);
           count++;
+          const r = row(tx.cashier || 'Tanpa nama');
+          r.count++;
+          r.sales += Number(tx.total || 0);
+        }
+      });
+      state.refunds.forEach((r) => {
+        if (r.day === date) {
+          refunds += Number(r.amount || 0);
+          row(r.cashier || 'Tanpa nama').refund += Number(r.amount || 0);
         }
       });
       state.debts.forEach((d) => {
-        debt += Number((d.total || 0) - (d.dp || 0));
+        debt += debtRemaining(d);
+        (d.payments || []).forEach((p) => {
+          if (p.day === date) {
+            payments += Number(p.amount || 0);
+            row(p.cashier || 'Tanpa nama').pay += Number(p.amount || 0);
+          }
+        });
       });
-      $('#reportStats').innerHTML = '<div class="stat"><span>Penjualan</span><b>' + formatRp(totalSales) + '</b></div><div class="stat"><span>Transaksi</span><b>' + count + '</b></div><div class="stat"><span>Piutang aktif</span><b>' + formatRp(debt) + '</b></div><div class="stat"><span>Member</span><b>' + state.members.length + '</b></div>';
+      const stat = (label, value) => '<div class="stat"><span>' + label + '</span><b>' + value + '</b></div>';
+      $('#reportStats').innerHTML = stat('Penjualan', formatRp(sales)) + stat('Refund', '-' + formatRp(refunds)) +
+        stat('Penjualan bersih', formatRp(sales - refunds)) + stat('Transaksi', count) +
+        stat('Bayar hutang masuk', formatRp(payments)) + stat('Piutang aktif', formatRp(debt)) + stat('Member', state.members.length);
+      const rows = Object.values(by);
+      $('#reportCashier').innerHTML = rows.length
+        ? '<h2>Per kasir</h2>' + rows.map((r) => '<div class="line"><div class="n"><b>' + escapeHtml(r.name) + '</b><small>' + r.count + ' transaksi' +
+            (r.refund ? ' · Refund -' + formatRp(r.refund) : '') + (r.pay ? ' · Bayar hutang ' + formatRp(r.pay) : '') + '</small></div><b>' + formatRp(r.sales) + '</b></div>').join('')
+        : '';
     }
 
     function renderStockDraft() {
@@ -640,6 +881,8 @@
     function addProduct() {
       const code = $('#prodCode').value.trim();
       const name = $('#prodName').value.trim();
+      const brand = $('#prodBrand').value.trim();
+      const category = $('#prodCategory').value.trim();
       const cost = cleanNum($('#prodCost').value);
       const price = cleanNum($('#prodPrice').value);
       if (!name || !price) {
@@ -650,6 +893,8 @@
         id: state.pid++,
         code: code || 'P' + String(state.pid).padStart(3, '0'),
         name,
+        brand,
+        category,
         cost,
         price,
         stock: 0,
@@ -660,6 +905,8 @@
       renderProductGrid();
       $('#prodCode').value = '';
       $('#prodName').value = '';
+      $('#prodBrand').value = '';
+      $('#prodCategory').value = '';
       $('#prodCost').value = '';
       $('#prodPrice').value = '';
       $('#prodMsg').textContent = '';
@@ -725,6 +972,7 @@
       let cashNeeded = total;
       let payment = paymentType;
       let dp = 0;
+      let newDebt = null;
       if (paymentType === 'Hutang') {
         if (!currentMember) {
           $('#saleErr').textContent = 'Pilih member untuk metode hutang.';
@@ -736,21 +984,23 @@
           return;
         }
         const member = currentMember;
-        if (member.limit && (member.limit || 0) < (member.currentDebt || 0) + (total - dp)) {
+        if (member.limit && memberOutstanding(member.phone) + (total - dp) > member.limit) {
           $('#saleErr').textContent = 'Batas hutang member melebihi limit.';
           return;
         }
         cashNeeded = dp;
-        state.debts.push({
+        newDebt = {
           id: Date.now(),
           memberName: member.name,
           memberPhone: member.phone,
           total,
           dp,
           dueDate: $('#dueInput').value || '',
-          status: 'open'
-        });
-        member.currentDebt = (member.currentDebt || 0) + (total - dp);
+          status: 'open',
+          payments: [],
+          credit: 0
+        };
+        state.debts.push(newDebt);
       } else {
         const cashIn = cleanNum($('#cashInput').value);
         if (cashIn < total) {
@@ -770,8 +1020,12 @@
         disc,
         total,
         cash: cashNeeded,
-        store: state.store
+        store: state.store,
+        day: localISODate(),
+        cashier: currentUser ? currentUser.name : '',
+        cashierId: currentUser ? currentUser.id : ''
       };
+      if (newDebt) newDebt.txNo = tx.no;
       state.history.push(tx);
 
       items.forEach(({ id, qty }) => {
@@ -795,27 +1049,129 @@
       showReceipt(tx);
     }
 
-    function showReceipt(tx) {
-      const lines = ['*' + state.store.toUpperCase() + '*', tx.no, tx.date];
-      if (tx.member) lines.push('Member: ' + tx.member.name + ' (' + tx.member.phone + ')');
-      lines.push('--------------------------');
-      tx.items.forEach(item => {
-        lines.push(item.qty + 'x ' + item.name);
-        lines.push('   @' + formatRp(item.price) + ' = ' + formatRp(item.qty * item.price));
+    const RECEIPT_W = 32;
+
+    function receiptKit() {
+      const W = RECEIPT_W;
+      const center = (t) => {
+        t = String(t);
+        return t.length >= W ? t : ' '.repeat(Math.floor((W - t.length) / 2)) + t;
+      };
+      const wrap = (text) => {
+        const out = [];
+        let line = '';
+        String(text).split(/\s+/).filter(Boolean).forEach((word) => {
+          while (word.length > W) {
+            if (line) { out.push(line); line = ''; }
+            out.push(word.slice(0, W));
+            word = word.slice(W);
+          }
+          if (!line) line = word;
+          else if ((line + ' ' + word).length <= W) line += ' ' + word;
+          else { out.push(line); line = word; }
+        });
+        if (line) out.push(line);
+        return out;
+      };
+      const lr = (l, r) => {
+        l = String(l); r = String(r);
+        const gap = W - l.length - r.length;
+        return gap >= 1 ? l + ' '.repeat(gap) + r : l + '\n' + ' '.repeat(Math.max(0, W - r.length)) + r;
+      };
+      return { W, center, wrap, lr, dash: '-'.repeat(W) };
+    }
+
+    function receiptHead(k, store, title, no, date, cashier, memberName) {
+      const L = [];
+      k.wrap(String(store).toUpperCase()).forEach((l) => L.push(k.center(l)));
+      if (title) L.push(k.center(title));
+      L.push(k.center(no));
+      L.push(k.center(date));
+      if (cashier) k.wrap('Kasir: ' + cashier).forEach((l) => L.push(l));
+      if (memberName) k.wrap('Member: ' + memberName).forEach((l) => L.push(l));
+      L.push(k.dash);
+      return L;
+    }
+
+    function buildReceiptText(tx) {
+      const k = receiptKit();
+      const L = receiptHead(k, tx.store || state.store, '', tx.no, tx.date, tx.cashier, tx.member ? tx.member.name : '');
+      tx.items.forEach((item) => {
+        k.wrap(item.name).forEach((l) => L.push(l));
+        L.push(k.lr(item.qty + ' x ' + formatRp(item.price), formatRp(item.qty * item.price)));
       });
-      lines.push('--------------------------');
-      lines.push('Subtotal: ' + formatRp(tx.sub));
-      if (tx.disc) lines.push('Diskon: -' + formatRp(tx.disc));
-      lines.push('*Total: ' + formatRp(tx.total) + '*');
-      if (tx.method === 'Tunai' || tx.method === 'QRIS' || tx.method === 'Transfer') {
-        lines.push('Metode: ' + tx.method);
+      L.push(k.dash);
+      L.push(k.lr('Subtotal', formatRp(tx.sub)));
+      if (tx.disc) L.push(k.lr('Diskon', '-' + formatRp(tx.disc)));
+      L.push(k.lr('TOTAL', formatRp(tx.total)));
+      L.push(k.lr('Metode', tx.method));
+      if (tx.method === 'Tunai') {
+        L.push(k.lr('Bayar', formatRp(tx.cash)));
+        L.push(k.lr('Kembali', formatRp(Math.max(0, tx.cash - tx.total))));
       } else if (tx.method === 'Hutang') {
-        lines.push('Metode: Hutang');
+        L.push(k.lr('DP', formatRp(tx.cash)));
+        L.push(k.lr('Sisa hutang', formatRp(tx.total - tx.cash)));
       }
-      $('#receiptText').textContent = lines.join('\n');
-      $('#customerPhone').value = tx.member ? tx.member.phone : '';
+      L.push(k.dash);
+      L.push(k.center('Terima kasih'));
+      return L.join('\n');
+    }
+
+    function buildPaymentReceiptText(pay, debt) {
+      const k = receiptKit();
+      const L = receiptHead(k, state.store, 'PEMBAYARAN HUTANG', pay.no, pay.date, pay.cashier, debt.memberName);
+      if (debt.txNo) L.push(k.lr('Ref. transaksi', debt.txNo));
+      L.push(k.lr('Total transaksi', formatRp(debt.total)));
+      L.push(k.lr('Sisa sebelumnya', formatRp(pay.before)));
+      L.push(k.lr('Pembayaran', formatRp(pay.amount)));
+      L.push(k.lr('Metode', pay.method));
+      L.push(k.dash);
+      L.push(k.lr('SISA HUTANG', formatRp(pay.after)));
+      if (pay.after <= 0) L.push(k.center('LUNAS'));
+      L.push(k.dash);
+      L.push(k.center('Terima kasih'));
+      return L.join('\n');
+    }
+
+    function buildRefundReceiptText(r) {
+      const k = receiptKit();
+      const L = receiptHead(k, state.store, 'REFUND', r.no, r.date, r.cashier, r.memberName);
+      L.push(k.lr('Ref. transaksi', r.txNo));
+      L.push(k.dash);
+      r.items.forEach((item) => {
+        k.wrap(item.name).forEach((l) => L.push(l));
+        L.push(k.lr(item.qty + ' x ' + formatRp(item.price), formatRp(item.qty * item.price)));
+      });
+      L.push(k.dash);
+      if (r.amount !== r.itemsValue) {
+        L.push(k.lr('Nilai barang', formatRp(r.itemsValue)));
+        L.push(k.lr('Penyesuaian diskon', '-' + formatRp(r.itemsValue - r.amount)));
+      }
+      L.push(k.lr('TOTAL REFUND', formatRp(r.amount)));
+      if (r.creditApplied > 0) L.push(k.lr('Potong hutang', formatRp(r.creditApplied)));
+      if (r.cashBack > 0) {
+        L.push(k.lr('Dikembalikan', formatRp(r.cashBack)));
+        L.push(k.lr('Metode', r.method));
+      }
+      if (r.reason) k.wrap('Alasan: ' + r.reason).forEach((l) => L.push(l));
+      L.push(k.dash);
+      L.push(k.center('Terima kasih'));
+      return L.join('\n');
+    }
+
+    function showReceiptText(text, phone) {
+      currentReceiptText = text;
+      $('#receiptText').textContent = text;
+      $('#paperSize').value = state.paper || '58';
+      $('#customerPhone').value = phone || '';
+      setReceiptMode(state.receiptMode === 'print' ? 'print' : 'wa');
       updateReceiptLink();
-      $('#receiptDialog').showModal();
+      if (!$('#receiptDialog').open) $('#receiptDialog').showModal();
+    }
+
+    function showReceipt(tx) {
+      currentReceiptTx = tx;
+      showReceiptText(buildReceiptText(tx), tx.member ? tx.member.phone : '');
     }
 
     function updateReceiptLink() {
@@ -824,12 +1180,239 @@
       if (wa.startsWith('0')) wa = '62' + wa.slice(1);
       const link = $('#waLink');
       if (/^62\d{9,13}$/.test(wa)) {
-        link.href = 'https://wa.me/' + wa + '?text=' + encodeURIComponent($('#receiptText').textContent);
+        link.href = 'https://wa.me/' + wa + '?text=' + encodeURIComponent('```\n' + $('#receiptText').textContent + '\n```');
         link.style.opacity = '1';
       } else {
         link.href = '#';
         link.style.opacity = '0.5';
       }
+    }
+
+    function setReceiptMode(mode) {
+      state.receiptMode = mode;
+      saveState();
+      document.querySelectorAll('#receiptMode button').forEach((b) => {
+        b.setAttribute('aria-pressed', String(b.dataset.mode === mode));
+      });
+      $('#waPanel').classList.toggle('hide', mode !== 'wa');
+      $('#printPanel').classList.toggle('hide', mode !== 'print');
+    }
+
+    function printReceipt() {
+      if (!currentReceiptText) return;
+      const paper = $('#paperSize').value;
+      state.paper = paper;
+      saveState();
+      const fontSize = { '58': '10.5px', '80': '14px', 'a4': '12px' }[paper] || '12px';
+      const area = $('#printArea');
+      area.innerHTML = '<pre class="rcpt" style="font-size:' + fontSize + ';">' + escapeHtml(currentReceiptText) + '</pre>';
+      if (paper === 'a4') {
+        area.style.width = '100%';
+        $('#pageStyle').textContent = '@page { size: A4; margin: 12mm; }';
+      } else {
+        area.style.width = paper + 'mm';
+        $('#pageStyle').textContent = '@page { margin: 2mm; }';
+      }
+      window.print();
+    }
+
+    function openPayDebt(id) {
+      const d = state.debts.find((x) => String(x.id) === String(id));
+      if (!d) return;
+      const rem = debtRemaining(d);
+      if (rem <= 0) return;
+      payDebtId = d.id;
+      $('#payDebtInfo').innerHTML = '<b>' + escapeHtml(d.memberName) + '</b><div class="muted">' + escapeHtml(d.memberPhone) + (d.txNo ? ' · ' + escapeHtml(d.txNo) : '') + '</div>' +
+        '<div class="row"><span>Sisa hutang</span><b>' + formatRp(rem) + '</b></div>';
+      $('#payAmount').value = rem;
+      $('#payMethod').value = 'Tunai';
+      $('#payErr').textContent = '';
+      $('#payDebtDialog').showModal();
+    }
+
+    function processPayDebt() {
+      const d = state.debts.find((x) => String(x.id) === String(payDebtId));
+      if (!d || !currentUser) return;
+      const rem = debtRemaining(d);
+      const amount = Math.round(cleanNum($('#payAmount').value));
+      if (!amount || amount <= 0) {
+        $('#payErr').textContent = 'Masukkan jumlah pembayaran.';
+        return;
+      }
+      if (amount > rem) {
+        $('#payErr').textContent = 'Jumlah melebihi sisa hutang (' + formatRp(rem) + ').';
+        return;
+      }
+      const pay = {
+        id: Date.now(),
+        no: 'BYR-' + String(state.bseq++).padStart(4, '0'),
+        date: nowLabel(),
+        day: localISODate(),
+        amount,
+        method: $('#payMethod').value,
+        before: rem,
+        after: rem - amount,
+        cashier: currentUser.name,
+        cashierId: currentUser.id
+      };
+      d.payments = d.payments || [];
+      d.payments.push(pay);
+      saveState();
+      $('#payDebtDialog').close();
+      renderDebts();
+      renderReport();
+      showReceiptText(buildPaymentReceiptText(pay, d), d.memberPhone);
+    }
+
+    function openPaymentReceipt(payId) {
+      for (const d of state.debts) {
+        const pay = (d.payments || []).find((p) => String(p.id) === String(payId));
+        if (pay) { showReceiptText(buildPaymentReceiptText(pay, d), d.memberPhone); return; }
+      }
+    }
+
+    function refundableQty(tx, item) {
+      return Number(item.qty) - Number((tx.refundedQty || {})[item.id] || 0);
+    }
+
+    function computeRefund(tx, qtyMap) {
+      let itemsValue = 0, units = 0;
+      tx.items.forEach((it) => {
+        const q = Number(qtyMap[it.id] || 0);
+        itemsValue += q * Number(it.price);
+        units += q;
+      });
+      const left = Math.max(0, Number(tx.total) - Number(tx.refundedAmount || 0));
+      const allBack = tx.items.every((it) => refundableQty(tx, it) - Number(qtyMap[it.id] || 0) <= 0);
+      let amount = allBack ? left : Math.round(itemsValue * (tx.sub > 0 ? tx.total / tx.sub : 1));
+      amount = Math.max(0, Math.min(amount, left));
+      return { itemsValue, units, amount };
+    }
+
+    function readRefundQty(tx) {
+      const map = {};
+      document.querySelectorAll('#refundItems input[data-refund-item]').forEach((inp) => {
+        const item = tx.items.find((it) => String(it.id) === inp.dataset.refundItem);
+        if (!item) return;
+        const max = refundableQty(tx, item);
+        const v = Math.floor(cleanNum(inp.value));
+        map[item.id] = Math.max(0, Math.min(max, v));
+      });
+      return map;
+    }
+
+    function openRefund(txNo) {
+      if (!canRefund()) return;
+      const tx = state.history.find((h) => h.no === txNo);
+      if (!tx || txFullyRefunded(tx)) return;
+      if (currentUser.role !== 'owner' && tx.cashierId !== currentUser.id) return;
+      refundTxNo = tx.no;
+      $('#refundTitle').textContent = 'Refund ' + tx.no;
+      $('#refundItems').innerHTML = tx.items.map((it) => {
+        const max = refundableQty(tx, it);
+        return '<div class="line"><div class="n"><b>' + escapeHtml(it.name) + '</b><small>' + formatRp(it.price) + ' · bisa direfund: ' + max + '</small></div>' +
+          '<input type="number" min="0" max="' + max + '" value="0" data-refund-item="' + it.id + '" style="width:80px;"' + (max <= 0 ? ' disabled' : '') + ' /></div>';
+      }).join('');
+      $('#refundReason').value = '';
+      $('#refundMethod').value = ['Tunai', 'QRIS', 'Transfer'].includes(tx.method) ? tx.method : 'Tunai';
+      $('#refundRestock').checked = true;
+      $('#refundErr').textContent = '';
+      updateRefundPreview();
+      $('#refundDialog').showModal();
+    }
+
+    function updateRefundPreview() {
+      const tx = state.history.find((h) => h.no === refundTxNo);
+      if (!tx) return;
+      const c = computeRefund(tx, readRefundQty(tx));
+      $('#refundTotal').textContent = formatRp(c.amount);
+      const note = $('#refundNote');
+      if (tx.method === 'Hutang') {
+        const debt = findDebtForTx(tx);
+        if (debt) {
+          const credit = Math.min(c.amount, debtRemaining(debt));
+          note.textContent = 'Transaksi hutang: refund memotong sisa hutang (' + formatRp(credit) + ') lebih dulu. Kelebihan ' + formatRp(c.amount - credit) + ' dikembalikan ke pelanggan.';
+        } else {
+          note.textContent = 'Data hutang untuk transaksi ini tidak ditemukan.';
+        }
+        note.classList.remove('hide');
+      } else {
+        note.classList.add('hide');
+      }
+    }
+
+    function processRefund() {
+      const tx = state.history.find((h) => h.no === refundTxNo);
+      if (!tx || !canRefund()) return;
+      const qty = readRefundQty(tx);
+      const c = computeRefund(tx, qty);
+      if (c.units <= 0) {
+        $('#refundErr').textContent = 'Isi jumlah barang yang direfund.';
+        return;
+      }
+      let credit = 0;
+      let cashBack = c.amount;
+      let debt = null;
+      if (tx.method === 'Hutang') {
+        debt = findDebtForTx(tx);
+        if (!debt) {
+          $('#refundErr').textContent = 'Data hutang transaksi ini tidak ditemukan, refund dibatalkan.';
+          return;
+        }
+        credit = Math.min(c.amount, debtRemaining(debt));
+        cashBack = c.amount - credit;
+      }
+      if (debt) debt.credit = Number(debt.credit || 0) + credit;
+      const items = tx.items.filter((it) => qty[it.id] > 0).map((it) => ({ id: it.id, name: it.name, code: it.code, qty: qty[it.id], price: it.price }));
+      const restock = $('#refundRestock').checked;
+      if (restock) {
+        items.forEach((it) => {
+          const prod = getProductById(it.id);
+          if (prod) prod.stock = Number(prod.stock || 0) + it.qty;
+        });
+      }
+      tx.refundedQty = tx.refundedQty || {};
+      items.forEach((it) => { tx.refundedQty[it.id] = Number(tx.refundedQty[it.id] || 0) + it.qty; });
+      tx.refundedAmount = Number(tx.refundedAmount || 0) + c.amount;
+      const refund = {
+        no: 'RFD-' + String(state.rseq++).padStart(4, '0'),
+        txNo: tx.no,
+        date: nowLabel(),
+        day: localISODate(),
+        items,
+        itemsValue: c.itemsValue,
+        amount: c.amount,
+        creditApplied: credit,
+        cashBack,
+        method: $('#refundMethod').value,
+        reason: $('#refundReason').value.trim(),
+        restock,
+        memberName: tx.member ? tx.member.name : '',
+        memberPhone: tx.member ? tx.member.phone : '',
+        cashier: currentUser.name,
+        cashierId: currentUser.id
+      };
+      state.refunds.push(refund);
+      saveState();
+      $('#refundDialog').close();
+      renderHistory();
+      renderDebts();
+      renderReport();
+      renderProductGrid();
+      renderProductList();
+      showReceiptText(buildRefundReceiptText(refund), refund.memberPhone);
+    }
+
+    function openRefundReceipt(no) {
+      const r = state.refunds.find((x) => x.no === no);
+      if (r) showReceiptText(buildRefundReceiptText(r), r.memberPhone);
+    }
+
+    function onDebtListClick(e) {
+      const payBtn = e.target.closest('[data-pay-debt]');
+      if (payBtn) { openPayDebt(payBtn.dataset.payDebt); return; }
+      const rcpt = e.target.closest('[data-pay-receipt]');
+      if (rcpt) openPaymentReceipt(rcpt.dataset.payReceipt);
     }
 
     function clearCart() {
@@ -849,6 +1432,10 @@
         $('#pinMsg').textContent = 'PIN baru harus 4 - 12 angka.';
         return;
       }
+      if (state.users.some((u) => u.pin === newPin)) {
+        $('#pinMsg').textContent = 'PIN itu sudah dipakai kasir.';
+        return;
+      }
       if (oldPin !== state.ownerPin) {
         $('#pinMsg').textContent = 'PIN lama salah.';
         return;
@@ -866,14 +1453,145 @@
         $('#lockErr').textContent = 'PIN harus 4 sampai 12 angka.';
         return;
       }
+      let user = null;
       if (pin === state.ownerPin) {
-        $('#lockScreen').classList.add('hide');
-        $('#app').classList.remove('hide');
-        $('#lockErr').textContent = '';
-        $('#pinInput').value = '';
+        user = { role: 'owner', name: 'Owner', id: 'owner' };
       } else {
+        const c = state.users.find((u) => u.pin === pin);
+        if (c) {
+          if (c.active === false) {
+            $('#lockErr').textContent = 'Akun kasir ini dinonaktifkan.';
+            $('#pinInput').value = '';
+            return;
+          }
+          user = { role: 'kasir', name: c.name, id: c.id };
+        }
+      }
+      if (!user) {
         $('#lockErr').textContent = 'PIN salah.';
         $('#pinInput').value = '';
+        return;
+      }
+      currentUser = user;
+      $('#lockScreen').classList.add('hide');
+      $('#app').classList.remove('hide');
+      $('#lockErr').textContent = '';
+      $('#pinInput').value = '';
+      applyAccess();
+    }
+
+    function applyAccess() {
+      const owner = currentUser.role === 'owner';
+      document.querySelectorAll('nav button[role="tab"]').forEach((b) => {
+        b.classList.toggle('hide', !canAccess(b.dataset.tab));
+      });
+      $('#whoami').textContent = owner ? 'Owner' : currentUser.name + ' (Kasir)';
+      $('#allowCashierRefund').checked = !!state.kasirRefund;
+      renderHistory();
+      renderReport();
+      renderCashiers();
+      renderDebts();
+      document.querySelector('nav button[data-tab="kasir"]').click();
+    }
+
+    function lockApp() {
+      currentUser = null;
+      cart = {};
+      currentMember = null;
+      $('#memberSelected').classList.add('hide');
+      $('#memberSelected').innerHTML = '';
+      $('#whoami').textContent = '';
+      renderCart();
+      renderHistory();
+      $('#lockScreen').classList.remove('hide');
+      $('#app').classList.add('hide');
+      $('#pinInput').focus();
+    }
+
+    function pinTaken(pin, exceptId) {
+      return pin === state.ownerPin || state.users.some((u) => u.pin === pin && String(u.id) !== String(exceptId));
+    }
+
+    function renderCashiers() {
+      const html = state.users.map((u) => {
+        return '<div class="line">' +
+          '<div class="n"><b>' + escapeHtml(u.name) + '</b><small>' + (u.active === false ? 'Nonaktif' : 'Aktif') + '</small></div>' +
+          '<div class="q">' +
+          '<button class="action ghost" data-cashier-pin="' + u.id + '" style="padding:6px 10px;">Ganti PIN</button>' +
+          '<button class="action ghost" data-cashier-toggle="' + u.id + '" style="padding:6px 10px;">' + (u.active === false ? 'Aktifkan' : 'Nonaktifkan') + '</button>' +
+          '<button class="x" data-cashier-del="' + u.id + '">Hapus</button>' +
+          '</div></div>';
+      }).join('');
+      $('#cashierList').innerHTML = html || '<div class="muted">Belum ada kasir.</div>';
+    }
+
+    function addCashier() {
+      const name = $('#cashierName').value.trim();
+      const pin = $('#cashierPin').value.trim();
+      if (!name) {
+        $('#cashierMsg').textContent = 'Nama kasir wajib diisi.';
+        return;
+      }
+      if (state.users.some((u) => u.name.toLowerCase() === name.toLowerCase())) {
+        $('#cashierMsg').textContent = 'Nama kasir sudah ada.';
+        return;
+      }
+      if (!/^\d{4,12}$/.test(pin)) {
+        $('#cashierMsg').textContent = 'PIN harus 4 - 12 angka.';
+        return;
+      }
+      if (pinTaken(pin, null)) {
+        $('#cashierMsg').textContent = 'PIN sudah dipakai. Pilih PIN lain.';
+        return;
+      }
+      state.users.push({ id: Date.now(), name, pin, active: true });
+      saveState();
+      $('#cashierName').value = '';
+      $('#cashierPin').value = '';
+      $('#cashierMsg').textContent = '';
+      renderCashiers();
+    }
+
+    function onCashierListClick(e) {
+      if (!currentUser || currentUser.role !== 'owner') return;
+      const findUser = (id) => state.users.find((u) => String(u.id) === String(id));
+      const pinBtn = e.target.closest('[data-cashier-pin]');
+      if (pinBtn) {
+        const u = findUser(pinBtn.dataset.cashierPin);
+        if (!u) return;
+        const pin = prompt('PIN baru untuk ' + u.name + ' (4 - 12 angka):');
+        if (pin === null) return;
+        const clean = pin.trim();
+        if (!/^\d{4,12}$/.test(clean)) {
+          $('#cashierMsg').textContent = 'PIN harus 4 - 12 angka.';
+          return;
+        }
+        if (pinTaken(clean, u.id)) {
+          $('#cashierMsg').textContent = 'PIN sudah dipakai. Pilih PIN lain.';
+          return;
+        }
+        u.pin = clean;
+        $('#cashierMsg').textContent = 'PIN ' + u.name + ' berhasil diganti.';
+        saveState();
+        return;
+      }
+      const toggleBtn = e.target.closest('[data-cashier-toggle]');
+      if (toggleBtn) {
+        const u = findUser(toggleBtn.dataset.cashierToggle);
+        if (!u) return;
+        u.active = u.active === false;
+        saveState();
+        renderCashiers();
+        return;
+      }
+      const delBtn = e.target.closest('[data-cashier-del]');
+      if (delBtn) {
+        const u = findUser(delBtn.dataset.cashierDel);
+        if (!u) return;
+        if (!confirm('Hapus kasir ' + u.name + '? Riwayat transaksinya tetap tersimpan.')) return;
+        state.users = state.users.filter((x) => x !== u);
+        saveState();
+        renderCashiers();
       }
     }
 
@@ -914,7 +1632,25 @@
       });
 
       $('#addProductBtn').addEventListener('click', addProduct);
+      ['#listSearch', '#filterCategory', '#filterBrand'].forEach((sel) => {
+        $(sel).addEventListener('input', renderProductList);
+      });
       $('#productList').addEventListener('click', (e) => {
+        const editBtn = e.target.closest('[data-edit-product]');
+        if (editBtn) {
+          const prod = getProductById(editBtn.dataset.editProduct);
+          if (!prod) return;
+          const brand = prompt('Brand untuk ' + prod.name + ':', prod.brand || '');
+          if (brand === null) return;
+          const category = prompt('Kategori untuk ' + prod.name + ':', prod.category || '');
+          if (category === null) return;
+          prod.brand = brand.trim();
+          prod.category = category.trim();
+          saveState();
+          renderProductList();
+          renderProductGrid();
+          return;
+        }
         const btn = e.target.closest('[data-del-product]');
         if (!btn) return;
         const id = Number(btn.dataset.delProduct);
@@ -953,9 +1689,28 @@
       });
 
       $('#historyList').addEventListener('click', (e) => {
+        const rf = e.target.closest('[data-refund-tx]');
+        if (rf) { openRefund(rf.dataset.refundTx); return; }
         const btn = e.target.closest('[data-open-receipt]');
         if (!btn) return;
         openReceiptByNo(btn.dataset.openReceipt);
+      });
+      $('#refundList').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-open-refund]');
+        if (b) openRefundReceipt(b.dataset.openRefund);
+      });
+      $('#debtSearch').addEventListener('input', renderDebts);
+      $('#debtShowPaid').addEventListener('change', renderDebts);
+      $('#debtList').addEventListener('click', onDebtListClick);
+      $('#paySubmit').addEventListener('click', processPayDebt);
+      $('#payCancel').addEventListener('click', () => $('#payDebtDialog').close());
+      $('#refundItems').addEventListener('input', updateRefundPreview);
+      $('#refundSubmit').addEventListener('click', processRefund);
+      $('#refundCancel').addEventListener('click', () => $('#refundDialog').close());
+      $('#allowCashierRefund').addEventListener('change', () => {
+        state.kasirRefund = $('#allowCashierRefund').checked;
+        saveState();
+        renderHistory();
       });
       $('#closeReceiptBtn').addEventListener('click', () => $('#receiptDialog').close());
       $('#customerPhone').addEventListener('input', updateReceiptLink);
@@ -964,6 +1719,12 @@
       });
 
       $('#changePinBtn').addEventListener('click', changeOwnerPin);
+      $('#printReceiptBtn').addEventListener('click', printReceipt);
+      $('#receiptMode').addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-mode]');
+        if (btn) setReceiptMode(btn.dataset.mode);
+      });
+      $('#paperSize').addEventListener('change', () => { state.paper = $('#paperSize').value; saveState(); });
 
       $('#unlockBtn').addEventListener('click', unlockApp);
       $('#pinInput').addEventListener('keydown', (e) => {
@@ -973,27 +1734,28 @@
         state.store = $('#storeName').value || 'Alkaff Fragrances';
         saveState();
       });
-      $('#reportDate').value = new Date().toISOString().slice(0, 10);
+      $('#reportDate').value = localISODate();
       $('#reportDate').addEventListener('change', renderReport);
       $('#todayBtn').addEventListener('click', () => {
-        $('#reportDate').value = new Date().toISOString().slice(0, 10);
+        $('#reportDate').value = localISODate();
         renderReport();
       });
 
       document.querySelectorAll('nav button[role="tab"]').forEach((btn) => {
         btn.addEventListener('click', () => {
           const tab = btn.dataset.tab;
+          if (!canAccess(tab)) return;
           document.querySelectorAll('.view').forEach((v) => v.classList.toggle('on', v.id === tab));
           document.querySelectorAll('nav button').forEach((b) => b.setAttribute('aria-selected', String(b === btn)));
           if (tab === 'laporan') renderReport();
+          if (tab === 'pengaturan') renderCashiers();
+          if (tab === 'piutang') renderDebts();
         });
       });
 
-      $('#lockBtn').addEventListener('click', () => {
-        $('#lockScreen').classList.remove('hide');
-        $('#app').classList.add('hide');
-        $('#pinInput').focus();
-      });
+      $('#lockBtn').addEventListener('click', lockApp);
+      $('#addCashierBtn').addEventListener('click', addCashier);
+      $('#cashierList').addEventListener('click', onCashierListClick);
     }
 
     function renderAll() {
