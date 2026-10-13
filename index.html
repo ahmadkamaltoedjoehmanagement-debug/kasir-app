@@ -302,6 +302,7 @@
           <button id="addProductBtn" class="action">Simpan</button>
         </div>
         <div id="prodMsg" class="err"></div>
+        <button id="bulkProductBtn" class="action ghost" style="margin-top:8px;">Tambah produk massal</button>
         <h2 style="margin-top:18px;">Daftar produk</h2>
         <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:6px;">
           <input id="listSearch" class="search" placeholder="Cari nama, kode, brand, kategori" style="flex:2 1 200px;" />
@@ -325,6 +326,7 @@
           <input id="stockQty" type="number" min="1" placeholder="Qty" style="flex:1 1 80px;" />
           <input id="stockCost" type="number" min="0" placeholder="Harga beli per unit" style="flex:2 1 180px;" />
           <button id="addStockItemBtn" class="action">Tambah ke invoice</button>
+          <button id="bulkStockBtn" class="action ghost">Tambah item massal</button>
         </div>
         <div id="stockItems" style="margin-top:12px;"></div>
         <div id="stockMsg" class="err"></div>
@@ -424,6 +426,22 @@
       <button id="unlockBtn" class="action full">Buka</button>
     </div>
   </div>
+
+  <dialog id="bulkDialog">
+    <h2 id="bulkTitle">Tambah massal</h2>
+    <div id="bulkHelp" class="muted" style="margin-bottom:8px;"></div>
+    <textarea id="bulkText" rows="7" spellcheck="false" style="width:100%; font-family:'Courier New', monospace; font-size:12px;"></textarea>
+    <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">
+      <label for="bulkFile" class="action ghost" style="cursor:pointer;">Pilih file CSV</label>
+      <input id="bulkFile" type="file" accept=".csv,.tsv,.txt,text/csv,text/plain" class="hide" />
+      <button id="bulkTemplate" class="action ghost">Unduh template</button>
+    </div>
+    <button id="bulkReview" class="action full" style="margin-top:10px;">Tinjau data</button>
+    <div id="bulkSummary" style="font-weight:700; margin-top:10px;"></div>
+    <div id="bulkPreview" style="max-height:38vh; overflow:auto;"></div>
+    <button id="bulkCommit" class="action success full" style="margin-top:10px;" disabled>Tambahkan</button>
+    <button id="bulkCancel" class="action ghost full" style="margin-top:8px;">Tutup</button>
+  </dialog>
 
   <dialog id="payDebtDialog">
     <h2>Bayar hutang</h2>
@@ -848,7 +866,7 @@
       }
       const no = $('#stockNo').value.trim() || 'INV-' + Date.now();
       const supplier = $('#stockSupplier').value.trim();
-      const date = $('#stockDate').value || new Date().toISOString().slice(0, 10);
+      const date = $('#stockDate').value || localISODate();
       let total = 0;
       activeStockDraft.forEach((item) => {
         total += Number(item.qty) * Number(item.cost || 0);
@@ -910,6 +928,301 @@
       $('#prodCost').value = '';
       $('#prodPrice').value = '';
       $('#prodMsg').textContent = '';
+    }
+
+    // ===== Impor massal (produk & barang masuk) =====
+    let bulkMode = 'products';
+    let bulkRows = [];
+
+    const BULK_ALIASES = {
+      products: {
+        nama: ['nama', 'namaproduk', 'produk', 'name', 'product', 'namabarang'],
+        brand: ['brand', 'merek', 'merk'],
+        kategori: ['kategori', 'category', 'jenis'],
+        modal: ['modal', 'hargamodal', 'hargabeli', 'cost', 'hpp'],
+        harga: ['harga', 'hargajual', 'jual', 'price'],
+        stok: ['stok', 'stock', 'qty', 'jumlah', 'stokawal'],
+        kode: ['kode', 'kodebarang', 'sku', 'code']
+      },
+      stock: {
+        kode: ['kode', 'kodebarang', 'sku', 'code'],
+        nama: ['nama', 'namaproduk', 'produk', 'barang', 'item', 'namabarang', 'name'],
+        qty: ['qty', 'jumlah', 'masuk', 'quantity', 'stok'],
+        cost: ['harga', 'hargabeli', 'modal', 'cost', 'hpp', 'hargasatuan', 'hargabelisatuan']
+      }
+    };
+    const BULK_DEFAULT_ORDER = {
+      products: ['nama', 'brand', 'kategori', 'modal', 'harga', 'stok', 'kode'],
+      stock: ['ident', 'qty', 'cost']
+    };
+    const BULK_TEXT = {
+      products: {
+        title: 'Tambah produk massal',
+        help: 'Satu produk per baris. Urutan kolom: Nama, Brand, Kategori, Modal, Harga jual, Stok awal, Kode. Hanya Nama dan Harga jual yang wajib. Bisa tempel langsung dari Excel/Google Sheets, atau pilih file CSV. Kalau baris pertama berisi judul kolom, urutan bebas.',
+        sample: 'Nama;Brand;Kategori;Modal;Harga Jual;Stok;Kode\nOud Wood 50ml;Alkaff;Parfum;450000;750000;10;\nAmber Musk 30ml;Alkaff;Parfum;300000;520000;8;',
+        commit: (n) => 'Tambahkan ' + n + ' produk'
+      },
+      stock: {
+        title: 'Tambah item barang masuk massal',
+        help: 'Satu item per baris. Urutan kolom: Kode atau Nama produk, Qty, Harga beli per unit (boleh kosong). Produk harus sudah ada di daftar produk. Item akan masuk ke invoice yang sedang disusun, belum langsung menambah stok.',
+        sample: 'Produk;Qty;Harga Beli\nP001;5;850000\nParfum B;10;400000',
+        commit: (n) => 'Tambahkan ' + n + ' item ke invoice'
+      }
+    };
+
+    const bulkNorm = (v) => String(v || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    function parseDelimited(text, delim) {
+      const rows = [];
+      let row = [];
+      let cur = '';
+      let inQ = false;
+      for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        if (inQ) {
+          if (ch === '"') {
+            if (text[i + 1] === '"') { cur += '"'; i++; } else inQ = false;
+          } else cur += ch;
+        } else if (ch === '"' && cur === '') {
+          inQ = true;
+        } else if (ch === delim) {
+          row.push(cur); cur = '';
+        } else if (ch === '\n' || ch === '\r') {
+          if (ch === '\r' && text[i + 1] === '\n') i++;
+          row.push(cur); cur = '';
+          if (row.some((c) => c.trim() !== '')) rows.push(row);
+          row = [];
+        } else cur += ch;
+      }
+      row.push(cur);
+      if (row.some((c) => c.trim() !== '')) rows.push(row);
+      return rows.map((r) => r.map((c) => c.trim()));
+    }
+
+    function parseTable(text) {
+      text = String(text || '').replace(/^\uFEFF/, '');
+      let delim = ',';
+      if (text.includes('\t')) {
+        delim = '\t';
+      } else {
+        const first = (text.split(/\r?\n/).find((l) => l.trim()) || '');
+        const counts = [';', '|', ','].map((d) => [d, first.split(d).length - 1]);
+        counts.sort((a, b) => b[1] - a[1]);
+        if (counts[0][1] > 0) delim = counts[0][0];
+      }
+      return parseDelimited(text, delim);
+    }
+
+    function parseMoney(raw) {
+      let t = String(raw || '').trim().replace(/rp\.?/ig, '').replace(/\s/g, '');
+      if (!t) return 0;
+      if (!/^[\d.,]+$/.test(t)) return NaN;
+      if (t.includes('.') && t.includes(',')) {
+        t = t.lastIndexOf('.') > t.lastIndexOf(',') ? t.replace(/,/g, '') : t.replace(/\./g, '').replace(',', '.');
+      } else if (t.includes('.')) {
+        if (/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, '');
+      } else if (t.includes(',')) {
+        t = /^\d{1,3}(,\d{3})+$/.test(t) ? t.replace(/,/g, '') : t.replace(',', '.');
+      }
+      const n = Number(t);
+      return Number.isFinite(n) ? Math.round(n) : NaN;
+    }
+
+    function parseCount(raw) {
+      const t = String(raw || '').trim();
+      if (!t) return 0;
+      if (!/^\d+$/.test(t.replace(/[.,]/g, ''))) return NaN;
+      const n = Number(t.replace(/[.,]/g, ''));
+      return Number.isFinite(n) ? n : NaN;
+    }
+
+    function mapColumns(table, mode) {
+      const aliases = BULK_ALIASES[mode];
+      const head = table[0] || [];
+      const idx = {};
+      head.forEach((cell, i) => {
+        const key = bulkNorm(cell);
+        for (const field of Object.keys(aliases)) {
+          if (idx[field] === undefined && aliases[field].includes(key)) { idx[field] = i; break; }
+        }
+      });
+      const needed = mode === 'products' ? ['nama', 'harga'] : ['qty'];
+      const hasHeader = needed.every((f) => idx[f] !== undefined) || Object.keys(idx).length >= 2;
+      if (hasHeader) {
+        if (mode === 'stock' && idx.kode === undefined && idx.nama === undefined) return null;
+        return { idx, body: table.slice(1) };
+      }
+      const order = BULK_DEFAULT_ORDER[mode];
+      const map = {};
+      order.forEach((f, i) => { map[f] = i; });
+      return { idx: map, body: table, noHeader: true };
+    }
+
+    function reviewBulkProducts(body, idx) {
+      const get = (row, f) => (idx[f] !== undefined ? (row[idx[f]] || '').trim() : '');
+      const codes = new Set(state.products.map((p) => String(p.code).toLowerCase()));
+      const names = new Set(state.products.map((p) => (p.name + '|' + (p.brand || '')).toLowerCase()));
+      return body.map((row, i) => {
+        const item = {
+          line: i + 1,
+          name: get(row, 'nama'),
+          brand: get(row, 'brand'),
+          category: get(row, 'kategori'),
+          cost: parseMoney(get(row, 'modal')),
+          price: parseMoney(get(row, 'harga')),
+          stock: parseCount(get(row, 'stok')),
+          code: get(row, 'kode'),
+          error: ''
+        };
+        if (!item.name) item.error = 'Nama kosong';
+        else if (!(item.price > 0)) item.error = 'Harga jual tidak valid';
+        else if (Number.isNaN(item.cost)) item.error = 'Modal tidak valid';
+        else if (Number.isNaN(item.stock)) item.error = 'Stok tidak valid';
+        else if (item.code && codes.has(item.code.toLowerCase())) item.error = 'Kode sudah dipakai';
+        else if (names.has((item.name + '|' + item.brand).toLowerCase())) item.error = 'Produk sudah ada';
+        if (!item.error) {
+          if (item.code) codes.add(item.code.toLowerCase());
+          names.add((item.name + '|' + item.brand).toLowerCase());
+        }
+        return item;
+      });
+    }
+
+    function reviewBulkStock(body, idx) {
+      const get = (row, f) => (idx[f] !== undefined ? (row[idx[f]] || '').trim() : '');
+      return body.map((row, i) => {
+        const ident = get(row, 'ident') || get(row, 'kode') || get(row, 'nama');
+        const nameCell = get(row, 'nama');
+        const item = { line: i + 1, ident, qty: parseCount(get(row, 'qty')), cost: parseMoney(get(row, 'cost')), product: null, error: '' };
+        const lower = ident.toLowerCase();
+        const byCode = state.products.find((p) => String(p.code).toLowerCase() === lower)
+          || (get(row, 'kode') ? state.products.find((p) => String(p.code).toLowerCase() === get(row, 'kode').toLowerCase()) : null);
+        let found = byCode || null;
+        if (!found && nameCell) found = state.products.find((p) => p.name.toLowerCase() === nameCell.toLowerCase()) || null;
+        if (!found) found = state.products.find((p) => p.name.toLowerCase() === lower) || null;
+        if (!found && ident) {
+          const part = state.products.filter((p) => p.name.toLowerCase().includes(lower));
+          if (part.length === 1) found = part[0];
+          else if (part.length > 1) item.error = 'Nama ambigu (' + part.length + ' produk cocok)';
+        }
+        if (!ident) item.error = 'Produk kosong';
+        else if (!found && !item.error) item.error = 'Produk tidak ditemukan';
+        else if (found) item.product = found;
+        if (!item.error && !(item.qty > 0)) item.error = 'Qty harus angka lebih dari 0';
+        else if (!item.error && Number.isNaN(item.cost)) item.error = 'Harga beli tidak valid';
+        return item;
+      });
+    }
+
+    function openBulk(mode) {
+      bulkMode = mode;
+      bulkRows = [];
+      $('#bulkTitle').textContent = BULK_TEXT[mode].title;
+      $('#bulkHelp').textContent = BULK_TEXT[mode].help;
+      $('#bulkText').value = '';
+      $('#bulkText').placeholder = BULK_TEXT[mode].sample;
+      $('#bulkFile').value = '';
+      $('#bulkSummary').textContent = '';
+      $('#bulkPreview').innerHTML = '';
+      $('#bulkCommit').disabled = true;
+      $('#bulkCommit').textContent = 'Tambahkan';
+      $('#bulkDialog').showModal();
+    }
+
+    function reviewBulk() {
+      const table = parseTable($('#bulkText').value);
+      if (!table.length) {
+        $('#bulkSummary').textContent = 'Belum ada data. Tempel data atau pilih file.';
+        $('#bulkPreview').innerHTML = '';
+        $('#bulkCommit').disabled = true;
+        return;
+      }
+      const mapped = mapColumns(table, bulkMode);
+      if (!mapped) {
+        $('#bulkSummary').innerHTML = '<span class="low">Judul kolom tidak dikenali. Gunakan kolom Produk/Kode dan Qty.</span>';
+        $('#bulkPreview').innerHTML = '';
+        $('#bulkCommit').disabled = true;
+        return;
+      }
+      const rows = bulkMode === 'products' ? reviewBulkProducts(mapped.body, mapped.idx) : reviewBulkStock(mapped.body, mapped.idx);
+      bulkRows = rows.filter((r) => !r.error);
+      const bad = rows.length - bulkRows.length;
+      $('#bulkSummary').textContent = bulkRows.length + ' baris valid' + (bad ? ', ' + bad + ' dilewati' : '');
+      $('#bulkPreview').innerHTML = rows.map((r) => {
+        const mark = r.error ? '<b class="low">✗</b>' : '<b style="color:var(--accent);">✓</b>';
+        let main, sub;
+        if (bulkMode === 'products') {
+          main = r.name || '(tanpa nama)';
+          sub = [r.brand, r.category].filter(Boolean).join(' · ');
+          sub += (sub ? ' · ' : '') + 'Modal ' + formatRp(r.cost || 0) + ' · Jual ' + formatRp(r.price || 0) + ' · Stok ' + (r.stock || 0) + (r.code ? ' · Kode ' + r.code : '');
+        } else {
+          main = r.product ? r.product.name : (r.ident || '(kosong)');
+          sub = 'Qty ' + (Number.isNaN(r.qty) ? '-' : r.qty) + ' · Harga beli ' + (Number.isNaN(r.cost) ? '-' : formatRp(r.cost || 0));
+        }
+        return '<div class="line"><div class="n"><b>' + mark + ' ' + escapeHtml(main) + '</b><small>' + escapeHtml(sub) + '</small>' +
+          (r.error ? '<small class="low">Baris ' + r.line + ': ' + escapeHtml(r.error) + '</small>' : '') + '</div></div>';
+      }).join('');
+      $('#bulkCommit').disabled = bulkRows.length === 0;
+      $('#bulkCommit').textContent = bulkRows.length ? BULK_TEXT[bulkMode].commit(bulkRows.length) : 'Tambahkan';
+    }
+
+    function commitBulk() {
+      if (!bulkRows.length) return;
+      if (bulkMode === 'products') {
+        const used = new Set(state.products.map((p) => String(p.code).toLowerCase()));
+        bulkRows.forEach((r) => {
+          const id = state.pid++;
+          let code = r.code;
+          if (!code) {
+            let n = id;
+            do { code = 'P' + String(n).padStart(3, '0'); n++; } while (used.has(code.toLowerCase()));
+          }
+          used.add(code.toLowerCase());
+          state.products.push({ id, code, name: r.name, brand: r.brand, category: r.category, cost: r.cost || 0, price: r.price, stock: r.stock || 0, type: 'BNIB' });
+        });
+        saveState();
+        renderProductList();
+        renderProductGrid();
+        $('#prodMsg').textContent = '';
+        $('#bulkDialog').close();
+        $('#prodMsg').style.color = 'var(--accent)';
+        $('#prodMsg').textContent = bulkRows.length + ' produk ditambahkan.';
+        setTimeout(() => { $('#prodMsg').textContent = ''; $('#prodMsg').style.color = ''; }, 5000);
+      } else {
+        bulkRows.forEach((r) => {
+          const same = activeStockDraft.find((d) => d.id === r.product.id && Number(d.cost || 0) === Number(r.cost || 0));
+          if (same) {
+            same.qty = Number(same.qty) + r.qty;
+          } else {
+            activeStockDraft.push({ id: r.product.id, name: r.product.name, code: r.product.code, qty: r.qty, cost: r.cost || 0 });
+          }
+        });
+        $('#stockMsg').textContent = '';
+        renderStockDraft();
+        $('#bulkDialog').close();
+      }
+    }
+
+    function readBulkFile(file) {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        $('#bulkText').value = String(reader.result || '');
+        reviewBulk();
+      };
+      reader.readAsText(file);
+    }
+
+    function downloadBulkTemplate() {
+      const t = BULK_TEXT[bulkMode].sample;
+      const blob = new Blob(['\uFEFF' + t.replace(/\n/g, '\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = bulkMode === 'products' ? 'template-produk.csv' : 'template-barang-masuk.csv';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     }
 
     function addMember() {
@@ -1702,6 +2015,20 @@
       $('#debtSearch').addEventListener('input', renderDebts);
       $('#debtShowPaid').addEventListener('change', renderDebts);
       $('#debtList').addEventListener('click', onDebtListClick);
+      $('#bulkProductBtn').addEventListener('click', () => openBulk('products'));
+      $('#bulkStockBtn').addEventListener('click', () => openBulk('stock'));
+      $('#bulkReview').addEventListener('click', reviewBulk);
+      $('#bulkCommit').addEventListener('click', commitBulk);
+      $('#bulkCancel').addEventListener('click', () => $('#bulkDialog').close());
+      $('#bulkTemplate').addEventListener('click', downloadBulkTemplate);
+      $('#bulkFile').addEventListener('change', (e) => readBulkFile(e.target.files[0]));
+      $('#bulkText').addEventListener('input', () => {
+        bulkRows = [];
+        $('#bulkCommit').disabled = true;
+        $('#bulkCommit').textContent = 'Tambahkan';
+        $('#bulkSummary').textContent = '';
+        $('#bulkPreview').innerHTML = '';
+      });
       $('#paySubmit').addEventListener('click', processPayDebt);
       $('#payCancel').addEventListener('click', () => $('#payDebtDialog').close());
       $('#refundItems').addEventListener('input', updateRefundPreview);
