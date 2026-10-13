@@ -220,6 +220,25 @@
     }
     dialog { width: min(420px, calc(100vw - 28px)); border: 1px solid var(--line); border-radius: 14px; }
     dialog label.blk { display: block; margin: 8px 0 4px; }
+    .tbl { width: 100%; min-width: 640px; border-collapse: collapse; font-size: 13px; }
+    .tbl th, .tbl td { padding: 8px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; vertical-align: middle; }
+    .tbl th { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .02em; }
+    .tbl .num { text-align: right; }
+    @media (max-width: 560px) {
+      .tbl { min-width: 0; }
+      .tbl .hm { display: none; }
+      .tbl .sm-only { display: block !important; }
+      .tbl { font-size: 12px; }
+      .tbl th, .tbl td { padding: 8px 5px; }
+    }
+    .tbl .sm-only { display: none; font-size: 11px; color: var(--muted); }
+    .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .badge.ok { background: #dff3e6; color: #17623a; }
+    .badge.part { background: #fff1cf; color: #8a5a00; }
+    .badge.bad { background: #fde2e0; color: #a32018; }
+    img.pv { display: block; max-height: 90px; max-width: 100%; margin-top: 6px; border-radius: 8px; border: 1px solid var(--line); }
+    img.thumb { display: block; max-width: 100%; max-height: 200px; border-radius: 8px; border: 1px solid var(--line); cursor: zoom-in; background: #fff; }
+    img.thumb.sm { width: 40px; height: 40px; object-fit: cover; }
     .lnk { border: 0; background: transparent; color: var(--primary); cursor: pointer; font-weight: 700; padding: 0 4px; }
     @media (max-width: 560px){
       header { padding: 12px 12px; }
@@ -243,6 +262,7 @@
       <button role="tab" data-tab="pengaturan" aria-selected="false">Pengaturan</button>
     </nav>
     <div style="display:flex; gap:10px; align-items:center;">
+      <button id="syncBadge" class="action ghost hide" style="padding:6px 10px; font-size:12px;" title="Status arsip ke Google Sheets"></button>
       <span id="whoami" style="font-weight:700;"></span>
       <button id="lockBtn" class="action ghost">Kunci</button>
     </div>
@@ -321,6 +341,34 @@
           <input id="stockSupplier" placeholder="Supplier" style="flex:1 1 160px;" />
           <input id="stockDate" type="date" style="flex:1 1 160px;" />
         </div>
+        <div class="row" style="display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end; margin-top:10px;">
+          <label class="muted" style="flex:1 1 170px;">Pembayaran invoice
+            <select id="stockPayType">
+              <option value="lunas">Dibayar lunas</option>
+              <option value="sebagian">Bayar sebagian (DP)</option>
+              <option value="belum">Belum dibayar (tempo)</option>
+            </select>
+          </label>
+          <label id="stockPayAmountWrap" class="muted hide" style="flex:1 1 130px;">Jumlah dibayar
+            <input id="stockPayAmount" type="number" min="0" placeholder="0" />
+          </label>
+          <label id="stockPayMethodWrap" class="muted" style="flex:1 1 110px;">Metode
+            <select id="stockPayMethod"><option>Transfer</option><option>Tunai</option><option>QRIS</option></select>
+          </label>
+          <label id="stockDueWrap" class="muted hide" style="flex:1 1 150px;">Jatuh tempo
+            <input id="stockDue" type="date" />
+          </label>
+        </div>
+        <div class="row" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;">
+          <label class="muted" style="flex:1 1 200px;">Foto fisik invoice (wajib)
+            <input id="stockPhoto" type="file" accept="image/*" />
+            <img id="stockPhotoPrev" class="pv hide" alt="Pratinjau foto invoice" />
+          </label>
+          <label id="stockProofWrap" class="muted" style="flex:1 1 200px;">Bukti bayar (wajib)
+            <input id="stockProof" type="file" accept="image/*" />
+            <img id="stockProofPrev" class="pv hide" alt="Pratinjau bukti bayar" />
+          </label>
+        </div>
         <div class="row" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top: 10px;">
           <input id="stockProductSearch" placeholder="Cari produk" style="flex:2 1 180px;" />
           <input id="stockQty" type="number" min="1" placeholder="Qty" style="flex:1 1 80px;" />
@@ -332,8 +380,19 @@
         <div id="stockMsg" class="err"></div>
         <div class="row" style="margin-top: 12px;"><span>Total pembelian</span><b id="stockTotal">Rp0</b></div>
         <button id="saveStockBtn" class="action full" style="margin-top: 12px;">Simpan invoice dan tambah stok</button>
-        <h2 style="margin-top:18px;">Riwayat barang masuk</h2>
-        <div id="stockHistory"></div>
+        <h2 style="margin-top:18px;">Tabel invoice barang masuk</h2>
+        <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:6px;">
+          <input id="invSearch" class="search" placeholder="Cari no. invoice / supplier" style="flex:2 1 180px;" />
+          <select id="invFilter" style="flex:1 1 130px;">
+            <option value="">Semua status</option>
+            <option value="belum">Belum lunas</option>
+            <option value="telat">Terlambat</option>
+            <option value="lunas">Lunas</option>
+          </select>
+          <button id="invExportBtn" class="action ghost">Unduh CSV</button>
+        </div>
+        <div id="invSummary" style="font-weight:700; margin:6px 0;"></div>
+        <div id="stockHistory" style="overflow-x:auto;"></div>
       </div>
     </section>
 
@@ -400,6 +459,184 @@
         <div id="pinMsg" class="err"></div>
       </div>
       <div class="box" style="margin-top:18px;">
+        <h2>Arsip ke Google Sheets &amp; Drive</h2>
+        <div class="muted" style="margin-bottom:8px;">Mengirim penjualan, refund, pembayaran hutang, invoice barang masuk, dan foto bukti ke Google Sheets dan Drive milik Anda, supaya bisa dilihat dari mana saja. Isi di setiap perangkat yang dipakai.</div>
+        <input id="syncUrl" placeholder="URL aplikasi web (https://script.google.com/macros/s/.../exec)" autocomplete="off" />
+        <input id="syncToken" type="password" placeholder="Token rahasia (sama dengan di Code.gs)" autocomplete="off" style="margin-top:8px;" />
+        <input id="syncDevice" placeholder="Nama perangkat ini (mis. HP Kasir Sari)" autocomplete="off" style="margin-top:8px;" />
+        <label style="display:flex; align-items:center; gap:8px; margin-top:8px;"><input id="syncAuto" type="checkbox" checked style="width:auto;" /> Kirim otomatis setiap ada perubahan</label>
+        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;">
+          <button id="syncSaveBtn" class="action">Simpan &amp; tes koneksi</button>
+          <button id="syncNowBtn" class="action ghost">Kirim sekarang</button>
+          <button id="syncOffBtn" class="action ghost">Putuskan</button>
+        </div>
+        <div id="syncStatus" class="muted" style="margin-top:8px;"></div>
+        <div class="err" id="syncErr" role="alert"></div>
+        <details style="margin-top:10px;">
+          <summary style="cursor:pointer; font-weight:700;">Cara pasang (sekitar 5 menit)</summary>
+          <ol style="padding-left:20px; line-height:1.5;">
+            <li>Buka <b>sheets.new</b> untuk membuat Google Sheet baru, beri nama misalnya "Kasir Arsip".</li>
+            <li>Menu <b>Ekstensi → Apps Script</b>. Hapus semua kode di editor, lalu tempel kode dari tombol di bawah.</li>
+            <li>Di baris <code>const TOKEN</code>, ganti <code>GANTI_TOKEN_RAHASIA</code> dengan kode rahasia buatan Anda, lalu simpan.</li>
+            <li>Klik <b>Deploy → Deployment baru</b>, jenis <b>Aplikasi web</b>, "Jalankan sebagai" <b>Saya</b>, "Yang memiliki akses" <b>Siapa saja</b>, lalu Deploy. Setujui izin akses yang diminta.</li>
+            <li>Salin <b>URL aplikasi web</b> (berakhiran <code>/exec</code>), tempel di kolom atas bersama token yang sama, lalu klik <b>Simpan &amp; tes koneksi</b>.</li>
+            <li>Foto tersimpan di folder Drive "Kasir Arsip Foto", dan data muncul di tab-tab Google Sheet tadi.</li>
+          </ol>
+          <button id="syncCopyCode" class="action ghost">Salin kode Apps Script</button>
+          <textarea id="gsCode" readonly rows="6" style="width:100%; margin-top:8px; font-family:'Courier New', monospace; font-size:11px;">/**
+ * Kasir Arsip - Google Apps Script
+ * Menerima data dari aplikasi kasir dan menyimpannya ke Google Sheets,
+ * serta menyimpan foto invoice / bukti bayar ke Google Drive.
+ *
+ * LANGKAH WAJIB: ganti nilai TOKEN di bawah dengan kode rahasia buatan Anda
+ * (misalnya 16 karakter acak). Kode yang sama dimasukkan di aplikasi kasir.
+ */
+const TOKEN = 'GANTI_TOKEN_RAHASIA';
+const FOLDER_NAME = 'Kasir Arsip Foto';
+const MAX_PHOTO_BASE64 = 6 * 1024 * 1024;
+
+const SHEET_NAMES = {
+  penjualan: 'Penjualan',
+  refund: 'Refund',
+  bayar_hutang: 'Bayar Hutang',
+  invoice: 'Invoice Masuk',
+  bayar_invoice: 'Bayar Invoice'
+};
+
+const HEADERS = {
+  penjualan: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'Kasir', 'Member', 'Item', 'Subtotal', 'Diskon', 'Total', 'Metode', 'Dibayar saat transaksi'],
+  refund: ['Key', 'Perangkat', 'No', 'Ref Transaksi', 'Tanggal', 'Hari', 'Kasir', 'Member', 'Item', 'Nilai Barang', 'Total Refund', 'Potong Hutang', 'Dikembalikan', 'Metode', 'Alasan', 'Stok Dikembalikan'],
+  bayar_hutang: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'Kasir', 'Member', 'Telepon', 'Ref Transaksi', 'Jumlah', 'Metode', 'Sisa Sebelum', 'Sisa Sesudah'],
+  invoice: ['Key', 'Perangkat', 'No Invoice', 'Supplier', 'Tanggal', 'Jatuh Tempo', 'Total', 'Item', 'Foto Invoice'],
+  bayar_invoice: ['Key', 'Perangkat', 'No Invoice', 'Tanggal', 'Hari', 'Pencatat', 'Jumlah', 'Metode', 'Catatan', 'Sisa Sesudah', 'Bukti Bayar']
+};
+
+function doGet() {
+  return out_({ ok: true, name: 'Kasir Arsip', info: 'Gunakan aplikasi kasir untuk mengirim data.' });
+}
+
+function doPost(e) {
+  var body;
+  try {
+    body = JSON.parse(e.postData.contents);
+  } catch (err) {
+    return out_({ ok: false, error: 'Format permintaan tidak valid.' });
+  }
+  if (!TOKEN || TOKEN === 'GANTI_TOKEN_RAHASIA') {
+    return out_({ ok: false, error: 'TOKEN di Code.gs belum diganti.' });
+  }
+  if (body.token !== TOKEN) {
+    return out_({ ok: false, error: 'Token salah.' });
+  }
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(25000);
+  } catch (err) {
+    return out_({ ok: false, error: 'Server sibuk, coba lagi sebentar.' });
+  }
+  try {
+    switch (body.action) {
+      case 'ping':
+        return out_({ ok: true, name: 'Kasir Arsip', version: 1 });
+      case 'records':
+        return out_(saveRecords_(body.records || []));
+      case 'photo':
+        return out_(savePhoto_(body));
+      default:
+        return out_({ ok: false, error: 'Aksi tidak dikenal.' });
+    }
+  } catch (err) {
+    return out_({ ok: false, error: String((err &amp;&amp; err.message) || err) });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function out_(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function getSheet_(type) {
+  var ss = SpreadsheetApp.getActive();
+  var name = SHEET_NAMES[type];
+  var sh = ss.getSheetByName(name);
+  if (!sh) {
+    sh = ss.insertSheet(name);
+    var head = HEADERS[type];
+    sh.getRange(1, 1, 1, head.length).setValues([head]).setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function clean_(v) {
+  if (v === null || v === undefined) return '';
+  if (typeof v === 'string' &amp;&amp; /^[=+\-@]/.test(v)) return "'" + v;
+  return v;
+}
+
+function saveRecords_(records) {
+  var byType = {};
+  records.forEach(function (r) {
+    if (r &amp;&amp; HEADERS[r.type] &amp;&amp; r.key &amp;&amp; r.row) {
+      byType[r.type] = byType[r.type] || {};
+      byType[r.type][String(r.key)] = r;
+    }
+  });
+  var saved = 0;
+  Object.keys(byType).forEach(function (type) {
+    var head = HEADERS[type];
+    var sh = getSheet_(type);
+    var last = sh.getLastRow();
+    var index = {};
+    if (last &gt; 1) {
+      sh.getRange(2, 1, last - 1, 1).getValues().forEach(function (row, i) {
+        index[String(row[0])] = i + 2;
+      });
+    }
+    var fresh = [];
+    Object.keys(byType[type]).forEach(function (key) {
+      var r = byType[type][key];
+      var values = head.map(function (h) {
+        return h === 'Key' ? r.key : clean_(r.row[h]);
+      });
+      var at = index[key];
+      if (at) {
+        sh.getRange(at, 1, 1, head.length).setValues([values]);
+      } else {
+        fresh.push(values);
+      }
+      saved++;
+    });
+    if (fresh.length) {
+      sh.getRange(sh.getLastRow() + 1, 1, fresh.length, head.length).setValues(fresh);
+    }
+  });
+  return { ok: true, saved: saved };
+}
+
+function getFolder_() {
+  var it = DriveApp.getFoldersByName(FOLDER_NAME);
+  return it.hasNext() ? it.next() : DriveApp.createFolder(FOLDER_NAME);
+}
+
+function savePhoto_(body) {
+  if (!body.id || !body.data) throw new Error('Data foto tidak lengkap.');
+  if (String(body.data).length &gt; MAX_PHOTO_BASE64) throw new Error('Foto terlalu besar.');
+  var base = String(body.name || 'foto').replace(/\.[a-z0-9]+$/i, '').replace(/[^\w\-]+/g, '_').slice(0, 60);
+  var id = String(body.id).replace(/[^\w\-]+/g, '_').slice(0, 40);
+  var fileName = base + '__' + id + '.jpg';
+  var folder = getFolder_();
+  var existing = folder.getFilesByName(fileName);
+  if (existing.hasNext()) return { ok: true, url: existing.next().getUrl() };
+  var blob = Utilities.newBlob(Utilities.base64Decode(body.data), 'image/jpeg', fileName);
+  var file = folder.createFile(blob);
+  return { ok: true, url: file.getUrl() };
+}
+</textarea>
+        </details>
+      </div>
+      <div class="box" style="margin-top:18px;">
         <h2>Izin kasir</h2>
         <label style="display:flex; align-items:center; gap:8px;"><input id="allowCashierRefund" type="checkbox" style="width:auto;" /> Kasir boleh memproses refund</label>
         <div class="muted" style="margin-top:6px;">Menerima pembayaran hutang selalu boleh dilakukan kasir. Refund hanya untuk transaksi milik kasir itu sendiri.</div>
@@ -426,6 +663,34 @@
       <button id="unlockBtn" class="action full">Buka</button>
     </div>
   </div>
+
+  <input id="attachInput" type="file" accept="image/*" class="hide" />
+  <dialog id="photoDialog" style="width:min(720px, 96vw);">
+    <img id="photoFull" alt="Foto" style="width:100%; border-radius:8px;" />
+    <button id="photoClose" class="action ghost full" style="margin-top:8px;">Tutup</button>
+  </dialog>
+
+  <dialog id="invDetailDialog">
+    <h2 id="invDetailTitle">Invoice</h2>
+    <div id="invDetailBody" style="max-height:60vh; overflow:auto;"></div>
+    <button id="invDetailPay" class="action success full" style="margin-top:10px;">Bayar invoice</button>
+    <button id="invDetailClose" class="action ghost full" style="margin-top:8px;">Tutup</button>
+  </dialog>
+
+  <dialog id="invPayDialog">
+    <h2>Bayar invoice</h2>
+    <div id="invPayInfo" style="margin-bottom:6px;"></div>
+    <label class="blk" for="invPayAmount">Jumlah dibayar</label>
+    <input id="invPayAmount" type="number" min="0" placeholder="0" />
+    <label class="blk" for="invPayMethod">Metode</label>
+    <select id="invPayMethod"><option>Transfer</option><option>Tunai</option><option>QRIS</option></select>
+    <label class="blk" for="invPayProof">Bukti bayar (wajib)</label>
+    <input id="invPayProof" type="file" accept="image/*" />
+    <img id="invPayProofPrev" class="pv hide" alt="Pratinjau bukti bayar" />
+    <div class="err" id="invPayErr" role="alert"></div>
+    <button id="invPaySubmit" class="action success full">Catat pembayaran</button>
+    <button id="invPayCancel" class="action ghost full" style="margin-top:8px;">Batal</button>
+  </dialog>
 
   <dialog id="bulkDialog">
     <h2 id="bulkTitle">Tambah massal</h2>
@@ -551,6 +816,18 @@
     const memberOutstanding = (phone) => state.debts.filter((d) => d.memberPhone === phone).reduce((a, d) => a + debtRemaining(d), 0);
     const findDebtForTx = (tx) => state.debts.find((d) => d.txNo === tx.no) ||
       state.debts.find((d) => !d.txNo && tx.member && d.memberPhone === tx.member.phone && Number(d.total) === Number(tx.total) && Number(d.dp || 0) === Number(tx.cash || 0));
+    const invPaid = (e) => (e.legacy ? Number(e.total || 0) : (e.payments || []).reduce((a, p) => a + Number(p.amount || 0), 0));
+    const invRemaining = (e) => (e.legacy ? 0 : Math.max(0, Number(e.total || 0) - invPaid(e)));
+    const invIsLate = (e) => invRemaining(e) > 0 && !!e.dueDate && e.dueDate < localISODate();
+    function invStatus(e) {
+      if (e.legacy) return { label: 'Lunas (data lama)', cls: 'ok', key: 'lunas' };
+      const rem = invRemaining(e);
+      if (rem <= 0) return { label: 'Lunas', cls: 'ok', key: 'lunas' };
+      if (invIsLate(e)) return { label: 'Terlambat', cls: 'bad', key: 'telat' };
+      return invPaid(e) > 0 ? { label: 'Sebagian', cls: 'part', key: 'belum' } : { label: 'Belum dibayar', cls: 'part', key: 'belum' };
+    }
+    let invPayIdx = null;
+    let invDetailIdx = null;
     let payDebtId = null;
     let refundTxNo = null;
     let currentReceiptText = '';
@@ -581,14 +858,25 @@
         if (!Array.isArray(d.payments)) d.payments = [];
         d.credit = Number(d.credit || 0);
       });
+      state.stockHistory.forEach((e) => {
+        if (!Array.isArray(e.payments)) { e.payments = []; e.legacy = true; }
+      });
+      state.sync = Object.assign(makeSync(), (state.sync && typeof state.sync === 'object') ? state.sync : {});
+      if (!state.sync.sent || typeof state.sync.sent !== 'object') state.sync.sent = {};
+      if (!state.sync.photos || typeof state.sync.photos !== 'object') state.sync.photos = {};
       if (!state.bseq) state.bseq = 1;
       if (!state.rseq) state.rseq = 1;
       if (!state.lockSalt) state.lockSalt = Math.random().toString(36).slice(2, 12);
       if (!state.ownerPin) state.ownerPin = '1234';
     }
 
-    function saveState() {
+    function persistState() {
       localStorage.setItem('alkaff_kasir_v2', JSON.stringify(state));
+    }
+
+    function saveState() {
+      persistState();
+      scheduleSync();
     }
 
     async function hashPin(pin) {
@@ -742,11 +1030,195 @@
       $('#refundList').innerHTML = html || '<div class="muted">Belum ada refund.</div>';
     }
 
+    function invRows() {
+      const q = ($('#invSearch').value || '').toLowerCase();
+      const f = $('#invFilter').value;
+      return state.stockHistory
+        .map((e, idx) => ({ e, idx }))
+        .filter(({ e }) => {
+          if (f && invStatus(e).key !== f) return false;
+          return (String(e.no) + ' ' + (e.supplier || '')).toLowerCase().includes(q);
+        })
+        .sort((a, b) => String(b.e.date).localeCompare(String(a.e.date)) || b.idx - a.idx);
+    }
+
     function renderStockHistory() {
-      const html = state.stockHistory.slice().reverse().map((entry) => {
-        return '<div class="line"><div class="n"><b>' + escapeHtml(entry.no) + '</b><small>' + escapeHtml(entry.date) + ' · ' + escapeHtml(entry.supplier || '-') + '</small></div><b>' + formatRp(entry.total || 0) + '</b></div>';
+      let totalAll = 0, paidAll = 0, remAll = 0;
+      state.stockHistory.forEach((e) => {
+        totalAll += Number(e.total || 0);
+        paidAll += invPaid(e);
+        remAll += invRemaining(e);
+      });
+      $('#invSummary').textContent = 'Total pembelian ' + formatRp(totalAll) + ' · Dibayar ' + formatRp(paidAll) + ' · Hutang supplier ' + formatRp(remAll);
+      const rows = invRows();
+      if (!rows.length) {
+        $('#stockHistory').innerHTML = '<div class="muted">' + (state.stockHistory.length ? 'Invoice tidak ditemukan.' : 'Belum ada invoice barang masuk.') + '</div>';
+        return;
+      }
+      const body = rows.map(({ e, idx }) => {
+        const st = invStatus(e);
+        const rem = invRemaining(e);
+        return '<tr data-inv-detail="' + idx + '" style="cursor:pointer;">' +
+          '<td><b>' + escapeHtml(e.no) + '</b>' + (e.photoId ? ' <span title="Foto invoice terlampir">📎</span>' : '') + '<span class="sm-only">' + escapeHtml(e.date || '-') + '</span></td>' +
+          '<td class="hm">' + escapeHtml(e.supplier || '-') + '</td>' +
+          '<td class="hm">' + escapeHtml(e.date || '-') + '</td>' +
+          '<td class="hm">' + escapeHtml(e.dueDate || '-') + '</td>' +
+          '<td class="num">' + formatRp(e.total) + '</td>' +
+          '<td class="num hm">' + formatRp(invPaid(e)) + '</td>' +
+          '<td class="num"><b>' + formatRp(rem) + '</b></td>' +
+          '<td><span class="badge ' + st.cls + '">' + st.label + '</span></td>' +
+          '<td class="hm"><button class="lnk" data-inv-detail="' + idx + '">Detail</button>' +
+          (rem > 0 ? '<button class="lnk" data-inv-pay="' + idx + '">Bayar</button>' : '') + '</td>' +
+          '</tr>';
       }).join('');
-      $('#stockHistory').innerHTML = html || '<div class="muted">Belum ada stok masuk.</div>';
+      $('#stockHistory').innerHTML = '<table class="tbl"><thead><tr><th>No. Invoice</th><th class="hm">Supplier</th><th class="hm">Tanggal</th><th class="hm">Jatuh tempo</th>' +
+        '<th class="num">Total</th><th class="num hm">Dibayar</th><th class="num">Sisa</th><th>Status</th><th class="hm"></th></tr></thead><tbody>' + body + '</tbody></table>';
+    }
+
+    function openInvDetail(idx) {
+      const e = state.stockHistory[idx];
+      if (!e) return;
+      invDetailIdx = idx;
+      const st = invStatus(e);
+      const rem = invRemaining(e);
+      const items = (e.items || []).map((it) => '<tr><td>' + escapeHtml(it.name) + '</td><td class="num">' + it.qty + '</td><td class="num">' + formatRp(it.cost || 0) + '</td><td class="num">' + formatRp(Number(it.qty) * Number(it.cost || 0)) + '</td></tr>').join('');
+      const pays = (e.payments || []).map((p) => '<tr><td>' + escapeHtml(p.date) + '</td><td>' + escapeHtml(p.method) + '</td><td class="num">' + formatRp(p.amount) + '</td><td class="num">' + formatRp(p.after) + '</td><td>' +
+        (p.proofId ? '<img class="thumb sm" data-photo="' + p.proofId + '" alt="Bukti bayar" />' : '<button class="lnk" data-attach-pay="' + idx + ':' + p.id + '">Lampirkan</button>') + '</td></tr>').join('');
+      $('#invDetailTitle').textContent = 'Invoice ' + e.no;
+      $('#invDetailBody').innerHTML =
+        '<div class="muted">' + escapeHtml(e.supplier || 'Tanpa supplier') + ' · ' + escapeHtml(e.date || '-') + (e.dueDate ? ' · Jatuh tempo ' + escapeHtml(e.dueDate) : '') + '</div>' +
+        '<div style="margin:6px 0;"><span class="badge ' + st.cls + '">' + st.label + '</span></div>' +
+        '<h3 style="margin:10px 0 4px;">Foto invoice</h3>' +
+        (e.photoId ? '<img class="thumb" data-photo="' + e.photoId + '" alt="Foto invoice" />' : '<div class="muted">Belum ada foto invoice.</div><button class="lnk" data-attach-inv="' + idx + '">Lampirkan foto</button>') +
+        '<h3 style="margin:10px 0 4px;">Barang</h3>' +
+        '<div style="overflow-x:auto;"><table class="tbl" style="min-width:0;"><thead><tr><th>Produk</th><th class="num">Qty</th><th class="num">Harga</th><th class="num">Subtotal</th></tr></thead><tbody>' + items + '</tbody></table></div>' +
+        '<div class="row" style="margin-top:8px;"><span>Total</span><b>' + formatRp(e.total) + '</b></div>' +
+        '<div class="row"><span>Dibayar</span><b>' + formatRp(invPaid(e)) + '</b></div>' +
+        '<div class="row"><span>Sisa</span><b>' + formatRp(rem) + '</b></div>' +
+        '<h3 style="margin:12px 0 4px;">Pembayaran</h3>' +
+        (e.legacy
+          ? '<div class="muted">Invoice dari versi lama: pembayaran tidak tercatat, dianggap sudah lunas.</div>'
+          : (pays
+            ? '<div style="overflow-x:auto;"><table class="tbl" style="min-width:0;"><thead><tr><th>Tanggal</th><th>Metode</th><th class="num">Jumlah</th><th class="num">Sisa</th><th>Bukti</th></tr></thead><tbody>' + pays + '</tbody></table></div>'
+            : '<div class="muted">Belum ada pembayaran.</div>'));
+      $('#invDetailPay').classList.toggle('hide', rem <= 0);
+      revokePhotoUrls();
+      $('#invDetailDialog').showModal();
+      hydratePhotos($('#invDetailBody'));
+    }
+
+    function openInvPay(idx) {
+      const e = state.stockHistory[idx];
+      if (!e) return;
+      const rem = invRemaining(e);
+      if (rem <= 0) return;
+      invPayIdx = idx;
+      $('#invPayInfo').innerHTML = '<b>' + escapeHtml(e.no) + '</b><div class="muted">' + escapeHtml(e.supplier || 'Tanpa supplier') + '</div>' +
+        '<div class="row"><span>Sisa tagihan</span><b>' + formatRp(rem) + '</b></div>';
+      $('#invPayAmount').value = rem;
+      $('#invPayMethod').value = 'Transfer';
+      $('#invPayProof').value = '';
+      pendingPayProof = null;
+      setPreview('#invPayProofPrev', null);
+      $('#invPayErr').textContent = '';
+      if ($('#invDetailDialog').open) $('#invDetailDialog').close();
+      $('#invPayDialog').showModal();
+    }
+
+    async function processInvPay() {
+      if (savingPay) return;
+      const e = state.stockHistory[invPayIdx];
+      if (!e) return;
+      const rem = invRemaining(e);
+      const amount = Math.round(cleanNum($('#invPayAmount').value));
+      if (!(amount > 0)) {
+        $('#invPayErr').textContent = 'Masukkan jumlah pembayaran.';
+        return;
+      }
+      if (amount > rem) {
+        $('#invPayErr').textContent = 'Jumlah melebihi sisa tagihan (' + formatRp(rem) + ').';
+        return;
+      }
+      if (photoBusy) {
+        $('#invPayErr').textContent = 'Foto masih diproses, tunggu sebentar lalu coba lagi.';
+        return;
+      }
+      if (!pendingPayProof) {
+        $('#invPayErr').textContent = 'Bukti pembayaran wajib dilampirkan.';
+        return;
+      }
+      savingPay = true;
+      try {
+        const proofId = newPhotoId();
+        try {
+          await putPhoto(proofId, pendingPayProof);
+        } catch (err) {
+          $('#invPayErr').textContent = 'Foto gagal disimpan di perangkat ini. Pembayaran belum dicatat, coba lagi.';
+          return;
+        }
+        e.payments.push({
+          id: Date.now(),
+          date: nowLabel(),
+          day: localISODate(),
+          amount,
+          method: $('#invPayMethod').value,
+          before: rem,
+          after: rem - amount,
+          note: '',
+          proofId,
+          cashier: currentUser ? currentUser.name : '',
+          cashierId: currentUser ? currentUser.id : ''
+        });
+        saveState();
+        pendingPayProof = null;
+        $('#invPayDialog').close();
+        renderStockHistory();
+        renderReport();
+        openInvDetail(invPayIdx);
+      } finally {
+        savingPay = false;
+      }
+    }
+
+    async function attachFromInput(file) {
+      const t = attachTarget;
+      attachTarget = null;
+      if (!t || !file) return;
+      const e = state.stockHistory[t.idx];
+      if (!e) return;
+      try {
+        const blob = await compressImage(file);
+        const id = newPhotoId();
+        await putPhoto(id, blob);
+        if (t.kind === 'inv') {
+          e.photoId = id;
+        } else {
+          const pay = (e.payments || []).find((p) => String(p.id) === String(t.payId));
+          if (!pay) return;
+          pay.proofId = id;
+        }
+        saveState();
+        renderStockHistory();
+        openInvDetail(t.idx);
+      } catch (err) {
+        alert(err.message || 'Foto gagal dilampirkan.');
+      }
+    }
+
+    function exportInvoicesCsv() {
+      const q = (v) => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+      const lines = [['No Invoice', 'Supplier', 'Tanggal', 'Jatuh Tempo', 'Total', 'Dibayar', 'Sisa', 'Status', 'Foto Invoice'].map(q).join(';')];
+      invRows().forEach(({ e }) => {
+        lines.push([e.no, e.supplier || '', e.date || '', e.dueDate || '', e.total, invPaid(e), invRemaining(e), invStatus(e).label, e.photoId ? 'Ada' : 'Tidak ada'].map(q).join(';'));
+      });
+      const blob = new Blob(['\uFEFF' + lines.join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'invoice-barang-masuk.csv';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     }
 
     function renderDebts() {
@@ -785,7 +1257,7 @@
 
     function renderReport() {
       const date = $('#reportDate').value || localISODate();
-      let sales = 0, count = 0, refunds = 0, payments = 0, debt = 0;
+      let sales = 0, count = 0, refunds = 0, payments = 0, debt = 0, supPaid = 0, supDebt = 0;
       const by = {};
       const row = (name) => (by[name] = by[name] || { name, count: 0, sales: 0, refund: 0, pay: 0 });
       state.history.forEach((tx) => {
@@ -812,10 +1284,14 @@
           }
         });
       });
+      state.stockHistory.forEach((e) => {
+        supDebt += invRemaining(e);
+        (e.payments || []).forEach((p) => { if (p.day === date) supPaid += Number(p.amount || 0); });
+      });
       const stat = (label, value) => '<div class="stat"><span>' + label + '</span><b>' + value + '</b></div>';
       $('#reportStats').innerHTML = stat('Penjualan', formatRp(sales)) + stat('Refund', '-' + formatRp(refunds)) +
         stat('Penjualan bersih', formatRp(sales - refunds)) + stat('Transaksi', count) +
-        stat('Bayar hutang masuk', formatRp(payments)) + stat('Piutang aktif', formatRp(debt)) + stat('Member', state.members.length);
+        stat('Bayar hutang masuk', formatRp(payments)) + stat('Piutang aktif', formatRp(debt)) + stat('Bayar ke supplier', formatRp(supPaid)) + stat('Hutang supplier', formatRp(supDebt)) + stat('Member', state.members.length);
       const rows = Object.values(by);
       $('#reportCashier').innerHTML = rows.length
         ? '<h2>Per kasir</h2>' + rows.map((r) => '<div class="line"><div class="n"><b>' + escapeHtml(r.name) + '</b><small>' + r.count + ' transaksi' +
@@ -859,41 +1335,251 @@
       renderStockDraft();
     }
 
-    function saveStockEntry() {
+    // ===== Foto invoice & bukti bayar (disimpan di IndexedDB perangkat) =====
+    let pendingInvPhoto = null;
+    let pendingInvProof = null;
+    let pendingPayProof = null;
+    let attachTarget = null;
+    let photoBusy = 0;
+    let savingStock = false;
+    let savingPay = false;
+    const photoUrls = [];
+
+    function openPhotoDb() {
+      return new Promise((resolve, reject) => {
+        if (!window.indexedDB) { reject(new Error('IndexedDB tidak tersedia')); return; }
+        const req = indexedDB.open('alkaff_kasir_photos', 1);
+        req.onupgradeneeded = () => req.result.createObjectStore('photos');
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error || new Error('Gagal membuka penyimpanan foto'));
+      });
+    }
+
+    async function putPhoto(id, blob) {
+      const db = await openPhotoDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('photos', 'readwrite');
+        tx.objectStore('photos').put(blob, id);
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onerror = () => { db.close(); reject(tx.error); };
+        tx.onabort = () => { db.close(); reject(tx.error || new Error('Penyimpanan foto dibatalkan')); };
+      });
+    }
+
+    async function getPhoto(id) {
+      const db = await openPhotoDb();
+      return new Promise((resolve, reject) => {
+        const req = db.transaction('photos', 'readonly').objectStore('photos').get(id);
+        req.onsuccess = () => { db.close(); resolve(req.result || null); };
+        req.onerror = () => { db.close(); reject(req.error); };
+      });
+    }
+
+    const newPhotoId = () => 'ph-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+
+    function compressImage(file) {
+      return new Promise((resolve, reject) => {
+        if (!file || !(/^image\//.test(file.type || '') || /\.(jpe?g|png|webp|gif|bmp|heic|heif)$/i.test(file.name || ''))) {
+          reject(new Error('File harus berupa gambar (foto).'));
+          return;
+        }
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+          const scale = Math.min(1, 1280 / Math.max(img.naturalWidth, img.naturalHeight));
+          const w = Math.max(1, Math.round(img.naturalWidth * scale));
+          const h = Math.max(1, Math.round(img.naturalHeight * scale));
+          const c = document.createElement('canvas');
+          c.width = w; c.height = h;
+          const ctx = c.getContext('2d');
+          ctx.fillStyle = '#fff';
+          ctx.fillRect(0, 0, w, h);
+          ctx.drawImage(img, 0, 0, w, h);
+          URL.revokeObjectURL(url);
+          c.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Gagal memproses gambar.'))), 'image/jpeg', 0.75);
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          reject(new Error('Gambar tidak bisa dibaca. Coba foto ulang atau pilih file JPG/PNG.'));
+        };
+        img.src = url;
+      });
+    }
+
+    function setPreview(sel, blob) {
+      const img = $(sel);
+      if (img.dataset.url) URL.revokeObjectURL(img.dataset.url);
+      if (blob) {
+        const u = URL.createObjectURL(blob);
+        img.dataset.url = u;
+        img.src = u;
+        img.classList.remove('hide');
+      } else {
+        delete img.dataset.url;
+        img.removeAttribute('src');
+        img.classList.add('hide');
+      }
+    }
+
+    async function pickPhoto(inputSel, previewSel, msgSel, assign) {
+      const file = $(inputSel).files[0];
+      assign(null);
+      setPreview(previewSel, null);
+      if (!file) return;
+      photoBusy++;
+      try {
+        const blob = await compressImage(file);
+        assign(blob);
+        setPreview(previewSel, blob);
+        $(msgSel).textContent = '';
+      } catch (err) {
+        $(inputSel).value = '';
+        $(msgSel).textContent = err.message;
+      } finally {
+        photoBusy--;
+      }
+    }
+
+    function revokePhotoUrls() {
+      while (photoUrls.length) URL.revokeObjectURL(photoUrls.pop());
+    }
+
+    async function hydratePhotos(root) {
+      const imgs = Array.from(root.querySelectorAll('img[data-photo]'));
+      for (const img of imgs) {
+        try {
+          const blob = await getPhoto(img.dataset.photo);
+          if (blob) {
+            const u = URL.createObjectURL(blob);
+            photoUrls.push(u);
+            img.src = u;
+          } else {
+            img.replaceWith(Object.assign(document.createElement('span'), { className: 'muted', textContent: 'Foto tidak ditemukan di perangkat ini.' }));
+          }
+        } catch (err) {
+          img.replaceWith(Object.assign(document.createElement('span'), { className: 'muted', textContent: 'Foto tidak bisa dibuka.' }));
+        }
+      }
+    }
+
+    function showPhotoFull(src) {
+      $('#photoFull').src = src;
+      $('#photoDialog').showModal();
+    }
+
+    function updateStockPayUI() {
+      const type = $('#stockPayType').value;
+      $('#stockPayAmountWrap').classList.toggle('hide', type !== 'sebagian');
+      $('#stockPayMethodWrap').classList.toggle('hide', type === 'belum');
+      $('#stockDueWrap').classList.toggle('hide', type === 'lunas');
+      $('#stockProofWrap').classList.toggle('hide', type === 'belum');
+    }
+
+    async function saveStockEntry() {
+      if (savingStock) return;
       if (!activeStockDraft.length) {
         $('#stockMsg').textContent = 'Tambahkan item stok minimal satu.';
         return;
       }
       const no = $('#stockNo').value.trim() || 'INV-' + Date.now();
+      if (state.stockHistory.some((e) => String(e.no).toLowerCase() === no.toLowerCase())) {
+        $('#stockMsg').textContent = 'Nomor invoice sudah ada. Gunakan nomor lain.';
+        return;
+      }
       const supplier = $('#stockSupplier').value.trim();
       const date = $('#stockDate').value || localISODate();
       let total = 0;
-      activeStockDraft.forEach((item) => {
-        total += Number(item.qty) * Number(item.cost || 0);
-        const product = getProductById(item.id);
-        if (product) {
-          product.stock = Number(product.stock || 0) + Number(item.qty);
-          if (item.cost > 0) product.cost = Number(item.cost);
+      activeStockDraft.forEach((item) => { total += Number(item.qty) * Number(item.cost || 0); });
+      const type = $('#stockPayType').value;
+      let paidNow = 0;
+      if (type === 'lunas') paidNow = total;
+      if (type === 'sebagian') {
+        paidNow = Math.round(cleanNum($('#stockPayAmount').value));
+        if (!(paidNow > 0 && paidNow < total)) {
+          $('#stockMsg').textContent = 'Jumlah dibayar harus lebih dari 0 dan kurang dari total (' + formatRp(total) + ').';
+          return;
         }
-      });
-      const draft = {
-        no,
-        supplier,
-        date,
-        total,
-        items: activeStockDraft.map(item => ({ ...item }))
-      };
-      state.stockHistory.push(draft);
-      saveState();
-      activeStockDraft = [];
-      $('#stockNo').value = '';
-      $('#stockSupplier').value = '';
-      $('#stockDate').value = '';
-      renderStockDraft();
-      renderStockHistory();
-      renderProductList();
-      renderProductGrid();
-      $('#stockMsg').textContent = '';
+      }
+      if (photoBusy) {
+        $('#stockMsg').textContent = 'Foto masih diproses, tunggu sebentar lalu coba lagi.';
+        return;
+      }
+      if (!pendingInvPhoto) {
+        $('#stockMsg').textContent = 'Foto fisik invoice wajib dilampirkan.';
+        return;
+      }
+      if (paidNow > 0 && !pendingInvProof) {
+        $('#stockMsg').textContent = 'Bukti pembayaran wajib dilampirkan.';
+        return;
+      }
+      savingStock = true;
+      try {
+        const photoId = newPhotoId();
+        const proofId = paidNow > 0 ? newPhotoId() : '';
+        try {
+          await putPhoto(photoId, pendingInvPhoto);
+          if (proofId) await putPhoto(proofId, pendingInvProof);
+        } catch (err) {
+          $('#stockMsg').textContent = 'Foto gagal disimpan di perangkat ini. Invoice belum disimpan, coba lagi.';
+          return;
+        }
+        activeStockDraft.forEach((item) => {
+          const product = getProductById(item.id);
+          if (product) {
+            product.stock = Number(product.stock || 0) + Number(item.qty);
+            if (item.cost > 0) product.cost = Number(item.cost);
+          }
+        });
+        const payments = [];
+        if (paidNow > 0) {
+          payments.push({
+            id: Date.now(),
+            date: nowLabel(),
+            day: localISODate(),
+            amount: paidNow,
+            method: $('#stockPayMethod').value,
+            before: total,
+            after: total - paidNow,
+            note: type === 'lunas' ? 'Lunas saat invoice' : 'DP saat invoice',
+            proofId,
+            cashier: currentUser ? currentUser.name : '',
+            cashierId: currentUser ? currentUser.id : ''
+          });
+        }
+        state.stockHistory.push({
+          no,
+          supplier,
+          date,
+          total,
+          dueDate: type === 'lunas' ? '' : $('#stockDue').value,
+          photoId,
+          payments,
+          items: activeStockDraft.map((item) => ({ ...item }))
+        });
+        saveState();
+        activeStockDraft = [];
+        $('#stockNo').value = '';
+        $('#stockSupplier').value = '';
+        $('#stockDate').value = '';
+        $('#stockPayType').value = 'lunas';
+        $('#stockPayAmount').value = '';
+        $('#stockDue').value = '';
+        $('#stockPhoto').value = '';
+        $('#stockProof').value = '';
+        pendingInvPhoto = null;
+        pendingInvProof = null;
+        setPreview('#stockPhotoPrev', null);
+        setPreview('#stockProofPrev', null);
+        updateStockPayUI();
+        renderStockDraft();
+        renderStockHistory();
+        renderProductList();
+        renderProductGrid();
+        renderReport();
+        $('#stockMsg').textContent = '';
+      } finally {
+        savingStock = false;
+      }
     }
 
     function addProduct() {
@@ -928,6 +1614,249 @@
       $('#prodCost').value = '';
       $('#prodPrice').value = '';
       $('#prodMsg').textContent = '';
+    }
+
+    // ===== Arsip ke Google Sheets & Drive (Apps Script) =====
+    function makeSync() {
+      return { url: '', token: '', deviceId: '', deviceName: '', auto: true, lastUrl: '', sent: {}, photos: {}, lastOk: '', lastErr: '' };
+    }
+    let syncing = false;
+    let syncTimer = null;
+    const syncReady = () => !!(state.sync && state.sync.url && state.sync.token && state.sync.deviceId);
+    const hash8 = (str) => {
+      let h = 5381;
+      for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
+      return (h >>> 0).toString(36);
+    };
+    const safeName = (v) => String(v || '').replace(/[^\w\-]+/g, '_').slice(0, 40);
+    const syncPhotoUrl = (id) => {
+      if (!id) return '';
+      const p = state.sync.photos[id];
+      return p && p.url ? p.url : '';
+    };
+    const itemsText = (items, priceKey) => (items || []).map((i) => i.name + ' x' + i.qty + ' @' + Math.round(Number(i[priceKey] || 0))).join('; ');
+
+    function syncPhotoJobs() {
+      const jobs = [];
+      state.stockHistory.forEach((e) => {
+        if (e.photoId) jobs.push({ id: e.photoId, name: 'Invoice_' + safeName(e.no) });
+        (e.payments || []).forEach((p) => {
+          if (p.proofId) jobs.push({ id: p.proofId, name: 'Bukti_' + safeName(e.no) + '_' + p.id });
+        });
+      });
+      return jobs;
+    }
+
+    function syncRecords() {
+      const cfg = state.sync;
+      const dev = cfg.deviceName || cfg.deviceId;
+      const out = [];
+      const add = (type, id, row) => {
+        row.Perangkat = dev;
+        out.push({ key: cfg.deviceId + ':' + type + ':' + id, type, row, sig: hash8(JSON.stringify(row)) });
+      };
+      state.history.forEach((tx) => add('penjualan', tx.no, {
+        No: tx.no, Tanggal: tx.date, Hari: tx.day || '', Kasir: tx.cashier || '', Member: tx.member ? tx.member.name : '',
+        Item: itemsText(tx.items, 'price'), Subtotal: tx.sub, Diskon: tx.disc || 0, Total: tx.total, Metode: tx.method, 'Dibayar saat transaksi': tx.cash
+      }));
+      state.refunds.forEach((r) => add('refund', r.no, {
+        No: r.no, 'Ref Transaksi': r.txNo, Tanggal: r.date, Hari: r.day || '', Kasir: r.cashier || '', Member: r.memberName || '',
+        Item: itemsText(r.items, 'price'), 'Nilai Barang': r.itemsValue, 'Total Refund': r.amount, 'Potong Hutang': r.creditApplied || 0,
+        Dikembalikan: r.cashBack || 0, Metode: r.method, Alasan: r.reason || '', 'Stok Dikembalikan': r.restock ? 'Ya' : 'Tidak'
+      }));
+      state.debts.forEach((d) => (d.payments || []).forEach((p) => add('bayar_hutang', p.no || p.id, {
+        No: p.no || '', Tanggal: p.date, Hari: p.day || '', Kasir: p.cashier || '', Member: d.memberName, Telepon: d.memberPhone,
+        'Ref Transaksi': d.txNo || '', Jumlah: p.amount, Metode: p.method, 'Sisa Sebelum': p.before, 'Sisa Sesudah': p.after
+      })));
+      state.stockHistory.forEach((e, idx) => {
+        const base = idx + '-' + e.no;
+        add('invoice', base, {
+          'No Invoice': e.no, Supplier: e.supplier || '', Tanggal: e.date || '', 'Jatuh Tempo': e.dueDate || '', Total: e.total,
+          Item: itemsText(e.items, 'cost'), 'Foto Invoice': syncPhotoUrl(e.photoId)
+        });
+        (e.payments || []).forEach((p) => add('bayar_invoice', base + ':' + p.id, {
+          'No Invoice': e.no, Tanggal: p.date, Hari: p.day || '', Pencatat: p.cashier || '', Jumlah: p.amount, Metode: p.method,
+          Catatan: p.note || '', 'Sisa Sesudah': p.after, 'Bukti Bayar': syncPhotoUrl(p.proofId)
+        }));
+      });
+      return out;
+    }
+
+    function syncPending() {
+      if (!syncReady()) return { jobs: [], recs: [] };
+      const cfg = state.sync;
+      return {
+        jobs: syncPhotoJobs().filter((j) => !cfg.photos[j.id]),
+        recs: syncRecords().filter((r) => cfg.sent[r.key] !== r.sig)
+      };
+    }
+
+    function syncFriendly(err) {
+      if (err && err.name === 'AbortError') return 'Koneksi terlalu lama, coba lagi.';
+      if (err instanceof SyntaxError) return 'Balasan server tidak valid. Pastikan URL berakhiran /exec dan akses aplikasi web diatur ke "Siapa saja".';
+      if (err instanceof TypeError) return 'Tidak ada koneksi internet atau URL tidak bisa dijangkau.';
+      return (err && err.message) || 'Gagal mengirim.';
+    }
+
+    async function syncPost(payload) {
+      const cfg = state.sync;
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 90000);
+      try {
+        const res = await fetch(cfg.url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(Object.assign({ token: cfg.token }, payload)),
+          signal: ctl.signal
+        });
+        const data = await res.json();
+        if (!data || !data.ok) throw new Error((data && data.error) || 'Server menolak permintaan.');
+        return data;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    function blobToBase64(blob) {
+      return new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(String(r.result).split(',')[1] || '');
+        r.onerror = () => reject(r.error);
+        r.readAsDataURL(blob);
+      });
+    }
+
+    function updateSyncUI() {
+      const badge = $('#syncBadge');
+      if (!syncReady()) {
+        badge.classList.add('hide');
+        $('#syncStatus').textContent = 'Belum terhubung.';
+        $('#syncErr').textContent = '';
+        return;
+      }
+      const cfg = state.sync;
+      const p = syncPending();
+      const n = p.jobs.length + p.recs.length;
+      let text = '☁ Tersinkron';
+      if (syncing) text = '☁ Mengirim…';
+      else if (cfg.lastErr) text = '☁ Gagal';
+      else if (n > 0) text = '☁ ' + n + ' menunggu';
+      badge.textContent = text;
+      badge.classList.remove('hide');
+      $('#syncStatus').textContent = 'Terhubung sebagai "' + (cfg.deviceName || cfg.deviceId) + '" · ' +
+        (cfg.lastOk ? 'terakhir terkirim ' + cfg.lastOk : 'belum ada yang terkirim') + ' · ' + n + ' menunggu';
+      $('#syncErr').textContent = cfg.lastErr || '';
+    }
+
+    function renderSyncSettings() {
+      const cfg = state.sync;
+      $('#syncUrl').value = cfg.url || '';
+      $('#syncToken').value = cfg.token || '';
+      $('#syncDevice').value = cfg.deviceName || '';
+      $('#syncAuto').checked = cfg.auto !== false;
+      updateSyncUI();
+    }
+
+    function scheduleSync() {
+      if (!syncReady() || state.sync.auto === false) return;
+      clearTimeout(syncTimer);
+      syncTimer = setTimeout(() => runSync(), 2000);
+      updateSyncUI();
+    }
+
+    async function runSync(manual) {
+      if (!syncReady() || syncing) return;
+      const cfg = state.sync;
+      const first = syncPending();
+      if (!first.jobs.length && !first.recs.length) {
+        if (manual || cfg.lastErr) { cfg.lastErr = ''; cfg.lastOk = nowLabel(); persistState(); }
+        updateSyncUI();
+        return;
+      }
+      syncing = true;
+      updateSyncUI();
+      try {
+        for (const job of first.jobs) {
+          const blob = await getPhoto(job.id).catch(() => null);
+          if (!blob) {
+            cfg.photos[job.id] = { missing: true };
+          } else {
+            const res = await syncPost({ action: 'photo', id: cfg.deviceId + '_' + job.id, name: job.name, data: await blobToBase64(blob) });
+            cfg.photos[job.id] = { url: res.url };
+          }
+          persistState();
+        }
+        const recs = syncRecords().filter((r) => cfg.sent[r.key] !== r.sig);
+        for (let i = 0; i < recs.length; i += 25) {
+          const batch = recs.slice(i, i + 25);
+          await syncPost({ action: 'records', records: batch.map((r) => ({ type: r.type, key: r.key, row: r.row })) });
+          batch.forEach((r) => { cfg.sent[r.key] = r.sig; });
+          persistState();
+        }
+        cfg.lastOk = nowLabel();
+        cfg.lastErr = '';
+      } catch (err) {
+        cfg.lastErr = syncFriendly(err);
+      } finally {
+        syncing = false;
+        persistState();
+        updateSyncUI();
+      }
+    }
+
+    async function saveSyncConfig() {
+      const url = $('#syncUrl').value.trim();
+      const token = $('#syncToken').value.trim();
+      const name = $('#syncDevice').value.trim();
+      const err = $('#syncErr');
+      if (!/^https:\/\/script\.google\.com\/(macros\/s|a\/[^/]+\/macros\/s)\/[^/]+\/exec$/.test(url)) {
+        err.textContent = 'URL tidak valid. Gunakan URL aplikasi web yang berakhiran /exec.';
+        return;
+      }
+      if (!token) { err.textContent = 'Token wajib diisi.'; return; }
+      if (!name) { err.textContent = 'Beri nama perangkat ini supaya asal data terlihat di Sheet.'; return; }
+      const cfg = state.sync;
+      const prev = { url: cfg.url, token: cfg.token };
+      cfg.url = url;
+      cfg.token = token;
+      if (!cfg.deviceId) cfg.deviceId = 'D' + Math.random().toString(36).slice(2, 7).toUpperCase();
+      err.textContent = '';
+      $('#syncStatus').textContent = 'Menguji koneksi…';
+      try {
+        await syncPost({ action: 'ping' });
+      } catch (e) {
+        cfg.url = prev.url;
+        cfg.token = prev.token;
+        updateSyncUI();
+        err.textContent = syncFriendly(e);
+        return;
+      }
+      if (cfg.lastUrl && cfg.lastUrl !== url) { cfg.sent = {}; cfg.photos = {}; }
+      cfg.lastUrl = url;
+      cfg.deviceName = name;
+      cfg.auto = $('#syncAuto').checked;
+      cfg.lastErr = '';
+      persistState();
+      updateSyncUI();
+      runSync(true);
+    }
+
+    function disconnectSync() {
+      state.sync.url = '';
+      state.sync.token = '';
+      persistState();
+      renderSyncSettings();
+    }
+
+    function copyGsCode() {
+      const text = $('#gsCode').value;
+      const done = () => { $('#syncCopyCode').textContent = 'Kode tersalin ✓'; setTimeout(() => { $('#syncCopyCode').textContent = 'Salin kode Apps Script'; }, 2500); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, () => { $('#gsCode').select(); });
+      } else {
+        $('#gsCode').select();
+        try { document.execCommand('copy'); done(); } catch (e) { /* pilih manual */ }
+      }
     }
 
     // ===== Impor massal (produk & barang masuk) =====
@@ -1800,6 +2729,8 @@
       });
       $('#whoami').textContent = owner ? 'Owner' : currentUser.name + ' (Kasir)';
       $('#allowCashierRefund').checked = !!state.kasirRefund;
+      renderSyncSettings();
+      runSync();
       renderHistory();
       renderReport();
       renderCashiers();
@@ -2015,6 +2946,55 @@
       $('#debtSearch').addEventListener('input', renderDebts);
       $('#debtShowPaid').addEventListener('change', renderDebts);
       $('#debtList').addEventListener('click', onDebtListClick);
+      $('#syncSaveBtn').addEventListener('click', saveSyncConfig);
+      $('#syncNowBtn').addEventListener('click', () => runSync(true));
+      $('#syncOffBtn').addEventListener('click', disconnectSync);
+      $('#syncCopyCode').addEventListener('click', copyGsCode);
+      $('#syncBadge').addEventListener('click', () => runSync(true));
+      $('#syncAuto').addEventListener('change', () => {
+        if (!syncReady()) return;
+        state.sync.auto = $('#syncAuto').checked;
+        persistState();
+        scheduleSync();
+      });
+      window.addEventListener('online', () => runSync());
+      setInterval(() => runSync(), 5 * 60 * 1000);
+      $('#stockPayType').addEventListener('change', updateStockPayUI);
+      $('#stockPhoto').addEventListener('change', () => pickPhoto('#stockPhoto', '#stockPhotoPrev', '#stockMsg', (b) => { pendingInvPhoto = b; }));
+      $('#stockProof').addEventListener('change', () => pickPhoto('#stockProof', '#stockProofPrev', '#stockMsg', (b) => { pendingInvProof = b; }));
+      $('#invPayProof').addEventListener('change', () => pickPhoto('#invPayProof', '#invPayProofPrev', '#invPayErr', (b) => { pendingPayProof = b; }));
+      $('#attachInput').addEventListener('change', (ev) => {
+        const f = ev.target.files[0];
+        ev.target.value = '';
+        attachFromInput(f);
+      });
+      $('#invDetailBody').addEventListener('click', (ev) => {
+        const img = ev.target.closest('img[data-photo]');
+        if (img && img.src) { showPhotoFull(img.src); return; }
+        const a = ev.target.closest('[data-attach-inv]');
+        if (a) { attachTarget = { kind: 'inv', idx: Number(a.dataset.attachInv) }; $('#attachInput').click(); return; }
+        const b = ev.target.closest('[data-attach-pay]');
+        if (b) {
+          const parts = b.dataset.attachPay.split(':');
+          attachTarget = { kind: 'pay', idx: Number(parts[0]), payId: parts[1] };
+          $('#attachInput').click();
+        }
+      });
+      $('#photoClose').addEventListener('click', () => $('#photoDialog').close());
+      $('#invDetailDialog').addEventListener('close', revokePhotoUrls);
+      $('#invSearch').addEventListener('input', renderStockHistory);
+      $('#invFilter').addEventListener('change', renderStockHistory);
+      $('#invExportBtn').addEventListener('click', exportInvoicesCsv);
+      $('#stockHistory').addEventListener('click', (e) => {
+        const p = e.target.closest('[data-inv-pay]');
+        if (p) { openInvPay(Number(p.dataset.invPay)); return; }
+        const d = e.target.closest('[data-inv-detail]');
+        if (d) openInvDetail(Number(d.dataset.invDetail));
+      });
+      $('#invDetailClose').addEventListener('click', () => $('#invDetailDialog').close());
+      $('#invDetailPay').addEventListener('click', () => openInvPay(invDetailIdx));
+      $('#invPaySubmit').addEventListener('click', processInvPay);
+      $('#invPayCancel').addEventListener('click', () => $('#invPayDialog').close());
       $('#bulkProductBtn').addEventListener('click', () => openBulk('products'));
       $('#bulkStockBtn').addEventListener('click', () => openBulk('stock'));
       $('#bulkReview').addEventListener('click', reviewBulk);
