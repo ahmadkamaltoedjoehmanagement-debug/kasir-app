@@ -239,6 +239,13 @@
     img.pv { display: block; max-height: 90px; max-width: 100%; margin-top: 6px; border-radius: 8px; border: 1px solid var(--line); }
     img.thumb { display: block; max-width: 100%; max-height: 200px; border-radius: 8px; border: 1px solid var(--line); cursor: zoom-in; background: #fff; }
     img.thumb.sm { width: 40px; height: 40px; object-fit: cover; }
+    #printArea .doc { font: 12px/1.4 Arial, Helvetica, sans-serif; color: #000; }
+    #printArea .doc h1 { font-size: 18px; margin: 0 0 2px; }
+    #printArea .doc h2 { font-size: 14px; margin: 12px 0 4px; }
+    #printArea .doc table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+    #printArea .doc th, #printArea .doc td { border: 1px solid #888; padding: 4px 6px; text-align: left; }
+    #printArea .doc .num { text-align: right; }
+    #printArea .doc .meta { color: #444; margin-bottom: 8px; }
     .lnk { border: 0; background: transparent; color: var(--primary); cursor: pointer; font-weight: 700; padding: 0 4px; }
     @media (max-width: 560px){
       header { padding: 12px 12px; }
@@ -258,6 +265,7 @@
       <button role="tab" data-tab="riwayat" aria-selected="false">Riwayat</button>
       <button role="tab" data-tab="member" aria-selected="false">Member</button>
       <button role="tab" data-tab="piutang" aria-selected="false">Piutang</button>
+      <button role="tab" data-tab="tutup" aria-selected="false">Tutup Kasir</button>
       <button role="tab" data-tab="laporan" aria-selected="false">Laporan</button>
       <button role="tab" data-tab="pengaturan" aria-selected="false">Pengaturan</button>
     </nav>
@@ -436,15 +444,62 @@
       </div>
     </section>
 
+    <section id="tutup" class="view">
+      <div class="box">
+        <h2>Shift berjalan</h2>
+        <div id="shiftInfo" class="muted"></div>
+        <div id="shiftSummary" class="stats" style="margin-top:8px;"></div>
+        <div id="shiftDetail" style="margin-top:10px;"></div>
+        <button id="closeShiftBtn" class="action success full" style="margin-top:12px;">Tutup kasir</button>
+      </div>
+      <div class="box" style="margin-top:18px;">
+        <h2>Riwayat tutup kasir saya</h2>
+        <div id="closingList"></div>
+      </div>
+    </section>
+
     <section id="laporan" class="view">
       <div class="box">
-        <div class="row" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
-          <label for="reportDate" class="muted" style="font-weight:700;">Tanggal</label>
-          <input id="reportDate" type="date" style="max-width:220px;" />
-          <button id="todayBtn" class="action ghost">Hari ini</button>
+        <div class="seg" id="reportMode" style="margin-bottom:12px;">
+          <button data-rmode="harian" aria-pressed="true">Harian</button>
+          <button data-rmode="tutup" aria-pressed="false">Tutup kasir</button>
+          <button data-rmode="supplier" aria-pressed="false">Supplier</button>
         </div>
-        <div id="reportStats" class="stats"></div>
-        <div id="reportCashier" style="margin-top:14px;"></div>
+
+        <div id="rpDaily">
+          <div class="row" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+            <label for="reportDate" class="muted" style="font-weight:700;">Tanggal</label>
+            <input id="reportDate" type="date" style="max-width:220px;" />
+            <button id="todayBtn" class="action ghost">Hari ini</button>
+          </div>
+          <div id="reportStats" class="stats"></div>
+          <div id="reportCashier" style="margin-top:14px;"></div>
+        </div>
+
+        <div id="rpClosings" class="hide">
+          <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end;">
+            <label class="muted" style="flex:1 1 130px;">Dari<input id="clFrom" type="date" /></label>
+            <label class="muted" style="flex:1 1 130px;">Sampai<input id="clTo" type="date" /></label>
+            <label class="muted" style="flex:1 1 130px;">Kasir<select id="clUser"></select></label>
+            <button id="clExport" class="action ghost">Unduh CSV</button>
+          </div>
+          <div id="clSummary" style="font-weight:700; margin:10px 0 6px;"></div>
+          <div id="clList"></div>
+        </div>
+
+        <div id="rpSuppliers" class="hide">
+          <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end;">
+            <label class="muted" style="flex:1 1 130px;">Dari<input id="spFrom" type="date" /></label>
+            <label class="muted" style="flex:1 1 130px;">Sampai<input id="spTo" type="date" /></label>
+            <input id="spSearch" class="search" placeholder="Cari supplier" style="flex:1 1 150px;" />
+          </div>
+          <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">
+            <button id="spExport" class="action ghost">Unduh CSV</button>
+            <button id="spPrint" class="action ghost">Cetak</button>
+          </div>
+          <div id="spSummary" style="font-weight:700; margin:10px 0 6px;"></div>
+          <div id="spTable" style="overflow-x:auto;"></div>
+        </div>
       </div>
     </section>
 
@@ -500,7 +555,8 @@ const SHEET_NAMES = {
   refund: 'Refund',
   bayar_hutang: 'Bayar Hutang',
   invoice: 'Invoice Masuk',
-  bayar_invoice: 'Bayar Invoice'
+  bayar_invoice: 'Bayar Invoice',
+  tutup_kasir: 'Tutup Kasir'
 };
 
 const HEADERS = {
@@ -508,7 +564,8 @@ const HEADERS = {
   refund: ['Key', 'Perangkat', 'No', 'Ref Transaksi', 'Tanggal', 'Hari', 'Kasir', 'Member', 'Item', 'Nilai Barang', 'Total Refund', 'Potong Hutang', 'Dikembalikan', 'Metode', 'Alasan', 'Stok Dikembalikan'],
   bayar_hutang: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'Kasir', 'Member', 'Telepon', 'Ref Transaksi', 'Jumlah', 'Metode', 'Sisa Sebelum', 'Sisa Sesudah'],
   invoice: ['Key', 'Perangkat', 'No Invoice', 'Supplier', 'Tanggal', 'Jatuh Tempo', 'Total', 'Item', 'Foto Invoice'],
-  bayar_invoice: ['Key', 'Perangkat', 'No Invoice', 'Tanggal', 'Hari', 'Pencatat', 'Jumlah', 'Metode', 'Catatan', 'Sisa Sesudah', 'Bukti Bayar']
+  bayar_invoice: ['Key', 'Perangkat', 'No Invoice', 'Tanggal', 'Hari', 'Pencatat', 'Jumlah', 'Metode', 'Catatan', 'Sisa Sesudah', 'Bukti Bayar'],
+  tutup_kasir: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'Kasir', 'Periode Dari', 'Modal Awal', 'Penjualan Tunai', 'Penjualan QRIS', 'Penjualan Transfer', 'Penjualan Hutang', 'DP Hutang Tunai', 'Diskon', 'Refund', 'Refund Tunai', 'Bayar Hutang Tunai', 'Bayar Hutang Non-Tunai', 'Kas Seharusnya', 'Uang Fisik', 'Selisih', 'Setoran', 'Dibawa Shift Berikut', 'Catatan']
 };
 
 function doGet() {
@@ -537,7 +594,7 @@ function doPost(e) {
   try {
     switch (body.action) {
       case 'ping':
-        return out_({ ok: true, name: 'Kasir Arsip', version: 1 });
+        return out_({ ok: true, name: 'Kasir Arsip', version: 2 });
       case 'records':
         return out_(saveRecords_(body.records || []));
       case 'photo':
@@ -670,6 +727,33 @@ function savePhoto_(body) {
     <button id="photoClose" class="action ghost full" style="margin-top:8px;">Tutup</button>
   </dialog>
 
+  <dialog id="closeDialog">
+    <h2>Tutup kasir</h2>
+    <div id="closeInfo" class="muted"></div>
+    <label class="blk" for="clOpening">Modal awal laci</label>
+    <input id="clOpening" type="number" min="0" placeholder="0" />
+    <div id="closeCalc" style="margin-top:8px;"></div>
+    <label class="blk" for="clCounted">Uang fisik di laci (hasil hitung)</label>
+    <input id="clCounted" type="number" min="0" placeholder="0" />
+    <div class="row" style="margin-top:6px;"><span>Selisih</span><b id="clDiff">-</b></div>
+    <label class="blk" for="clDeposit">Setoran ke owner (opsional)</label>
+    <input id="clDeposit" type="number" min="0" placeholder="0" />
+    <label class="blk" for="clNote">Catatan (opsional)</label>
+    <input id="clNote" placeholder="Contoh: selisih karena salah kembalian" />
+    <div class="err" id="clErr" role="alert"></div>
+    <button id="clSubmit" class="action success full">Simpan tutup kasir</button>
+    <button id="clCancel" class="action ghost full" style="margin-top:8px;">Batal</button>
+  </dialog>
+
+  <dialog id="spDialog" style="width:min(720px, 96vw);">
+    <h2 id="spDetailTitle">Supplier</h2>
+    <div id="spDetailBody" style="max-height:62vh; overflow:auto;"></div>
+    <div style="display:flex; gap:8px; margin-top:10px;">
+      <button id="spDetailPrint" class="action ghost" style="flex:1;">Cetak</button>
+      <button id="spDetailClose" class="action" style="flex:1;">Tutup</button>
+    </div>
+  </dialog>
+
   <dialog id="invDetailDialog">
     <h2 id="invDetailTitle">Invoice</h2>
     <div id="invDetailBody" style="max-height:60vh; overflow:auto;"></div>
@@ -795,6 +879,8 @@ function savePhoto_(body) {
       paper: '58',
       kasirRefund: false,
       refunds: [],
+      closings: [],
+      cseq: 1,
       bseq: 1,
       rseq: 1,
       receiptMode: 'wa',
@@ -808,7 +894,7 @@ function savePhoto_(body) {
     let activeStockDraft = [];
     let currentUser = null;
     let currentReceiptTx = null;
-    const KASIR_TABS = ['kasir', 'riwayat', 'member', 'piutang'];
+    const KASIR_TABS = ['kasir', 'riwayat', 'member', 'piutang', 'tutup'];
     const canRefund = () => !!currentUser && (currentUser.role === 'owner' || !!state.kasirRefund);
     const nowLabel = () => new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
     const debtPaid = (d) => (d.payments || []).reduce((a, p) => a + Number(p.amount || 0), 0);
@@ -850,6 +936,7 @@ function savePhoto_(body) {
           if (!Array.isArray(state.debts)) state.debts = [];
           if (!Array.isArray(state.users)) state.users = [];
           if (!Array.isArray(parsed.refunds)) state.refunds = [];
+          if (!Array.isArray(parsed.closings)) state.closings = [];
         }
       } catch (e) {
         state = structuredClone(defaultState);
@@ -864,6 +951,7 @@ function savePhoto_(body) {
       state.sync = Object.assign(makeSync(), (state.sync && typeof state.sync === 'object') ? state.sync : {});
       if (!state.sync.sent || typeof state.sync.sent !== 'object') state.sync.sent = {};
       if (!state.sync.photos || typeof state.sync.photos !== 'object') state.sync.photos = {};
+      if (!state.cseq) state.cseq = 1;
       if (!state.bseq) state.bseq = 1;
       if (!state.rseq) state.rseq = 1;
       if (!state.lockSalt) state.lockSalt = Math.random().toString(36).slice(2, 12);
@@ -1668,6 +1756,16 @@ function savePhoto_(body) {
         No: p.no || '', Tanggal: p.date, Hari: p.day || '', Kasir: p.cashier || '', Member: d.memberName, Telepon: d.memberPhone,
         'Ref Transaksi': d.txNo || '', Jumlah: p.amount, Metode: p.method, 'Sisa Sebelum': p.before, 'Sisa Sesudah': p.after
       })));
+      state.closings.forEach((c) => {
+        const s = c.summary;
+        add('tutup_kasir', c.no, {
+          No: c.no, Tanggal: c.date, Hari: c.day, Kasir: c.userName, 'Periode Dari': c.from || '', 'Modal Awal': c.opening,
+          'Penjualan Tunai': s.byMethod.Tunai || 0, 'Penjualan QRIS': s.byMethod.QRIS || 0, 'Penjualan Transfer': s.byMethod.Transfer || 0,
+          'Penjualan Hutang': s.byMethod.Hutang || 0, 'DP Hutang Tunai': s.dp, Diskon: s.disc, Refund: s.refundTotal, 'Refund Tunai': s.refundCashOut,
+          'Bayar Hutang Tunai': s.payByMethod.Tunai || 0, 'Bayar Hutang Non-Tunai': (s.payTotal || 0) - (s.payByMethod.Tunai || 0),
+          'Kas Seharusnya': c.expected, 'Uang Fisik': c.counted, Selisih: c.diff, Setoran: c.deposit, 'Dibawa Shift Berikut': c.carry, Catatan: c.note || ''
+        });
+      });
       state.stockHistory.forEach((e, idx) => {
         const base = idx + '-' + e.no;
         add('invoice', base, {
@@ -1789,7 +1887,10 @@ function savePhoto_(body) {
         const recs = syncRecords().filter((r) => cfg.sent[r.key] !== r.sig);
         for (let i = 0; i < recs.length; i += 25) {
           const batch = recs.slice(i, i + 25);
-          await syncPost({ action: 'records', records: batch.map((r) => ({ type: r.type, key: r.key, row: r.row })) });
+          const res = await syncPost({ action: 'records', records: batch.map((r) => ({ type: r.type, key: r.key, row: r.row })) });
+          if (Number(res.saved) !== batch.length) {
+            throw new Error('Kode Apps Script di Google belum versi terbaru. Salin kode terbaru dari Pengaturan, tempel ulang, lalu Deploy → Kelola deployment → Edit → Versi baru.');
+          }
           batch.forEach((r) => { cfg.sent[r.key] = r.sig; });
           persistState();
         }
@@ -1857,6 +1958,397 @@ function savePhoto_(body) {
         $('#gsCode').select();
         try { document.execCommand('copy'); done(); } catch (e) { /* pilih manual */ }
       }
+    }
+
+    // ===== Tutup kasir =====
+    let closeData = null;
+    const METHODS = ['Tunai', 'QRIS', 'Transfer', 'Hutang'];
+
+    function lastClosingOf(userId) {
+      for (let i = state.closings.length - 1; i >= 0; i--) {
+        if (state.closings[i].userId === userId) return state.closings[i];
+      }
+      return null;
+    }
+
+    function computeShift(user) {
+      const last = lastClosingOf(user.id);
+      const h0 = last ? last.hIdx : 0;
+      const r0 = last ? last.rIdx : 0;
+      const t0 = last ? last.ts : 0;
+      const mine = (cid) => cid === user.id || (user.role === 'owner' && !cid);
+      const s = {
+        count: 0, gross: 0, disc: 0, byMethod: { Tunai: 0, QRIS: 0, Transfer: 0, Hutang: 0 }, dp: 0,
+        refundCount: 0, refundTotal: 0, refundCashOut: 0, refundNonCash: 0, refundCredit: 0,
+        payCount: 0, payTotal: 0, payByMethod: { Tunai: 0, QRIS: 0, Transfer: 0 }, items: []
+      };
+      const itemMap = {};
+      state.history.slice(h0).filter((tx) => mine(tx.cashierId)).forEach((tx) => {
+        s.count++;
+        s.gross += Number(tx.total || 0);
+        s.disc += Number(tx.disc || 0);
+        s.byMethod[tx.method] = (s.byMethod[tx.method] || 0) + Number(tx.total || 0);
+        if (tx.method === 'Hutang') s.dp += Number(tx.cash || 0);
+        (tx.items || []).forEach((it) => { itemMap[it.name] = (itemMap[it.name] || 0) + Number(it.qty || 0); });
+      });
+      state.refunds.slice(r0).filter((r) => mine(r.cashierId)).forEach((r) => {
+        s.refundCount++;
+        s.refundTotal += Number(r.amount || 0);
+        s.refundCredit += Number(r.creditApplied || 0);
+        if (r.method === 'Tunai') s.refundCashOut += Number(r.cashBack || 0);
+        else s.refundNonCash += Number(r.cashBack || 0);
+      });
+      state.debts.forEach((d) => (d.payments || []).forEach((p) => {
+        if (mine(p.cashierId) && Number(p.id) > t0) {
+          s.payCount++;
+          s.payTotal += Number(p.amount || 0);
+          s.payByMethod[p.method] = (s.payByMethod[p.method] || 0) + Number(p.amount || 0);
+        }
+      }));
+      s.items = Object.keys(itemMap).map((name) => ({ name, qty: itemMap[name] })).sort((a, b) => b.qty - a.qty);
+      s.netSales = s.gross - s.refundTotal;
+      s.cashIn = s.byMethod.Tunai + s.dp + (s.payByMethod.Tunai || 0);
+      s.cashOut = s.refundCashOut;
+      s.nonCash = s.byMethod.QRIS + s.byMethod.Transfer + (s.payByMethod.QRIS || 0) + (s.payByMethod.Transfer || 0) - s.refundNonCash;
+      return { last, s, opening: last ? Number(last.carry || 0) : 0 };
+    }
+
+    const diffText = (d) => (d === 0 ? 'Pas' : (d > 0 ? 'Lebih ' : 'Kurang ') + formatRp(Math.abs(d)));
+
+    function renderShift() {
+      if (!currentUser) return;
+      const { last, s } = computeShift(currentUser);
+      $('#shiftInfo').textContent = 'Kasir: ' + currentUser.name + ' · Sejak: ' + (last ? last.date : 'awal pemakaian');
+      const stat = (label, value) => '<div class="stat"><span>' + label + '</span><b>' + value + '</b></div>';
+      $('#shiftSummary').innerHTML = stat('Penjualan', formatRp(s.gross)) + stat('Refund', '-' + formatRp(s.refundTotal)) +
+        stat('Penjualan bersih', formatRp(s.netSales)) + stat('Transaksi', s.count) +
+        stat('Kas tunai masuk', formatRp(s.cashIn)) + stat('Non-tunai masuk', formatRp(s.nonCash));
+      const row = (a, b) => '<div class="row"><span>' + a + '</span><b>' + b + '</b></div>';
+      $('#shiftDetail').innerHTML =
+        METHODS.map((m) => row('Penjualan ' + m, formatRp(s.byMethod[m] || 0))).join('') +
+        row('DP hutang (tunai)', formatRp(s.dp)) +
+        row('Bayar hutang diterima (' + s.payCount + ')', formatRp(s.payTotal)) +
+        row('Refund tunai dikeluarkan', formatRp(s.refundCashOut));
+      const mine = state.closings.filter((c) => c.userId === currentUser.id).slice().reverse();
+      $('#closingList').innerHTML = mine.map((c) => closingRowHtml(c, false)).join('') || '<div class="muted">Belum ada tutup kasir.</div>';
+    }
+
+    function closingRowHtml(c, showUser) {
+      const bad = c.diff !== 0;
+      return '<div class="line"><div class="n"><b>' + escapeHtml(c.no) + (showUser ? ' · ' + escapeHtml(c.userName) : '') + '</b>' +
+        '<small>' + escapeHtml(c.date) + ' · Penjualan bersih ' + formatRp(c.summary.netSales) + '</small>' +
+        '<small>Kas seharusnya ' + formatRp(c.expected) + ' · Fisik ' + formatRp(c.counted) + ' · <span class="' + (bad ? 'low' : '') + '">' + diffText(c.diff) + '</span></small></div>' +
+        '<div class="q"><button class="action ghost" data-open-closing="' + c.no + '" style="padding:8px 10px;">Buka</button></div></div>';
+    }
+
+    function openClose() {
+      if (!currentUser) return;
+      closeData = computeShift(currentUser);
+      $('#closeInfo').textContent = 'Kasir: ' + currentUser.name + ' · Sejak: ' + (closeData.last ? closeData.last.date : 'awal pemakaian');
+      $('#clOpening').value = closeData.opening;
+      $('#clCounted').value = '';
+      $('#clDeposit').value = '';
+      $('#clNote').value = '';
+      $('#clErr').textContent = '';
+      updateCloseCalc();
+      $('#closeDialog').showModal();
+    }
+
+    function updateCloseCalc() {
+      if (!closeData) return;
+      const s = closeData.s;
+      const opening = Math.round(cleanNum($('#clOpening').value));
+      const expected = opening + s.cashIn - s.cashOut;
+      const row = (a, b) => '<div class="row"><span>' + a + '</span><b>' + b + '</b></div>';
+      $('#closeCalc').innerHTML = row('Penjualan tunai', formatRp(s.byMethod.Tunai)) + row('DP hutang tunai', formatRp(s.dp)) +
+        row('Bayar hutang tunai', formatRp(s.payByMethod.Tunai || 0)) + row('Refund tunai', '-' + formatRp(s.cashOut)) +
+        row('Kas seharusnya', formatRp(expected));
+      const raw = $('#clCounted').value.trim();
+      const diffEl = $('#clDiff');
+      if (raw === '') {
+        diffEl.textContent = '-';
+        diffEl.className = '';
+      } else {
+        const diff = Math.round(cleanNum(raw)) - expected;
+        diffEl.textContent = diffText(diff);
+        diffEl.className = diff === 0 ? '' : 'low';
+      }
+    }
+
+    function submitClose() {
+      if (!currentUser) return;
+      const fresh = computeShift(currentUser);
+      const s = fresh.s;
+      const opening = Math.round(cleanNum($('#clOpening').value));
+      const rawCounted = $('#clCounted').value.trim();
+      if (rawCounted === '') {
+        $('#clErr').textContent = 'Isi uang fisik di laci hasil hitung.';
+        return;
+      }
+      const counted = Math.round(cleanNum(rawCounted));
+      const deposit = Math.round(cleanNum($('#clDeposit').value));
+      if (opening < 0 || counted < 0 || deposit < 0) {
+        $('#clErr').textContent = 'Angka tidak boleh negatif.';
+        return;
+      }
+      if (deposit > counted) {
+        $('#clErr').textContent = 'Setoran tidak boleh lebih besar dari uang fisik.';
+        return;
+      }
+      const expected = opening + s.cashIn - s.cashOut;
+      const c = {
+        no: 'TK-' + String(state.cseq++).padStart(4, '0'),
+        userId: currentUser.id,
+        userName: currentUser.name,
+        role: currentUser.role,
+        date: nowLabel(),
+        day: localISODate(),
+        ts: Date.now(),
+        from: fresh.last ? fresh.last.date : '',
+        hIdx: state.history.length,
+        rIdx: state.refunds.length,
+        summary: s,
+        opening,
+        expected,
+        counted,
+        diff: counted - expected,
+        deposit,
+        carry: counted - deposit,
+        note: $('#clNote').value.trim()
+      };
+      state.closings.push(c);
+      saveState();
+      $('#closeDialog').close();
+      renderShift();
+      showReceiptText(buildClosingText(c), '');
+    }
+
+    function buildClosingText(c) {
+      const k = receiptKit();
+      const s = c.summary;
+      const L = [];
+      k.wrap(state.store.toUpperCase()).forEach((l) => L.push(k.center(l)));
+      L.push(k.center('LAPORAN TUTUP KASIR'));
+      L.push(k.center(c.no));
+      L.push(k.center(c.date));
+      k.wrap('Kasir: ' + c.userName).forEach((l) => L.push(l));
+      k.wrap('Sejak: ' + (c.from || 'awal pemakaian')).forEach((l) => L.push(l));
+      L.push(k.dash);
+      L.push(k.lr('Transaksi', s.count));
+      L.push(k.lr('Penjualan', formatRp(s.gross)));
+      METHODS.forEach((m) => L.push(k.lr('  ' + m, formatRp(s.byMethod[m] || 0))));
+      if (s.disc) L.push(k.lr('Total diskon', formatRp(s.disc)));
+      L.push(k.lr('Refund (' + s.refundCount + ')', '-' + formatRp(s.refundTotal)));
+      L.push(k.lr('PENJUALAN BERSIH', formatRp(s.netSales)));
+      L.push(k.dash);
+      L.push(k.lr('Bayar hutang (' + s.payCount + ')', formatRp(s.payTotal)));
+      L.push(k.lr('  Tunai', formatRp(s.payByMethod.Tunai || 0)));
+      L.push(k.lr('  Non-tunai', formatRp((s.payTotal || 0) - (s.payByMethod.Tunai || 0))));
+      L.push(k.dash);
+      L.push(k.center('KAS TUNAI'));
+      L.push(k.lr('Modal awal', formatRp(c.opening)));
+      L.push(k.lr('+ Penjualan tunai', formatRp(s.byMethod.Tunai || 0)));
+      if (s.dp) L.push(k.lr('+ DP hutang', formatRp(s.dp)));
+      if (s.payByMethod.Tunai) L.push(k.lr('+ Bayar hutang tunai', formatRp(s.payByMethod.Tunai)));
+      if (s.refundCashOut) L.push(k.lr('- Refund tunai', formatRp(s.refundCashOut)));
+      L.push(k.lr('Kas seharusnya', formatRp(c.expected)));
+      L.push(k.lr('Uang fisik', formatRp(c.counted)));
+      L.push(k.lr('Selisih', c.diff === 0 ? 'Pas' : (c.diff > 0 ? 'Lebih ' : 'Kurang ') + formatRp(Math.abs(c.diff))));
+      if (c.deposit) L.push(k.lr('Setoran ke owner', formatRp(c.deposit)));
+      L.push(k.lr('Dibawa shift berikut', formatRp(c.carry)));
+      L.push(k.dash);
+      L.push(k.lr('Non-tunai masuk', formatRp(s.nonCash)));
+      if (s.items.length) {
+        L.push(k.dash);
+        L.push(k.center('BARANG TERJUAL'));
+        s.items.forEach((it) => {
+          const q = 'x' + it.qty;
+          if (it.name.length <= RECEIPT_W - q.length - 1) L.push(k.lr(it.name, q));
+          else { k.wrap(it.name).forEach((l) => L.push(l)); L.push(k.lr('', q)); }
+        });
+      }
+      if (c.note) {
+        L.push(k.dash);
+        k.wrap('Catatan: ' + c.note).forEach((l) => L.push(l));
+      }
+      L.push(k.dash);
+      L.push('TTD Kasir          TTD Owner');
+      L.push('');
+      L.push('');
+      return L.join('\n');
+    }
+
+    function openClosingReceipt(no) {
+      const c = state.closings.find((x) => x.no === no);
+      if (c) showReceiptText(buildClosingText(c), '');
+    }
+
+    // ----- Laporan: daftar tutup kasir (owner) -----
+    function closingFilter() {
+      const from = $('#clFrom').value;
+      const to = $('#clTo').value;
+      const u = $('#clUser').value;
+      return state.closings.filter((c) => (!from || c.day >= from) && (!to || c.day <= to) && (!u || String(c.userId) === u));
+    }
+
+    function renderClosingsReport() {
+      const sel = $('#clUser');
+      const keep = sel.value;
+      const seen = {};
+      state.closings.forEach((c) => { seen[c.userId] = c.userName; });
+      sel.innerHTML = '<option value="">Semua kasir</option>' + Object.keys(seen).map((id) => '<option value="' + escapeHtml(id) + '">' + escapeHtml(seen[id]) + '</option>').join('');
+      sel.value = seen[keep] !== undefined ? keep : '';
+      const list = closingFilter();
+      let net = 0, diff = 0, dep = 0;
+      list.forEach((c) => { net += c.summary.netSales; diff += c.diff; dep += c.deposit; });
+      $('#clSummary').textContent = list.length + ' tutup kasir · Penjualan bersih ' + formatRp(net) + ' · Setoran ' + formatRp(dep) + ' · Total selisih ' + (diff === 0 ? 'Rp0' : (diff > 0 ? '+' : '-') + formatRp(Math.abs(diff)));
+      $('#clList').innerHTML = list.slice().reverse().map((c) => closingRowHtml(c, true)).join('') || '<div class="muted">Belum ada tutup kasir pada filter ini.</div>';
+    }
+
+    function downloadCsv(name, lines) {
+      const blob = new Blob(['\uFEFF' + lines.join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    }
+    const csvQ = (v) => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+
+    function exportClosingsCsv() {
+      const head = ['No', 'Tanggal', 'Kasir', 'Modal Awal', 'Penjualan', 'Penjualan Tunai', 'Penjualan QRIS', 'Penjualan Transfer', 'Penjualan Hutang', 'Refund', 'Penjualan Bersih', 'Bayar Hutang', 'Kas Seharusnya', 'Uang Fisik', 'Selisih', 'Setoran', 'Dibawa', 'Catatan'];
+      const lines = [head.map(csvQ).join(';')];
+      closingFilter().forEach((c) => {
+        const s = c.summary;
+        lines.push([c.no, c.date, c.userName, c.opening, s.gross, s.byMethod.Tunai, s.byMethod.QRIS, s.byMethod.Transfer, s.byMethod.Hutang, s.refundTotal, s.netSales, s.payTotal, c.expected, c.counted, c.diff, c.deposit, c.carry, c.note || ''].map(csvQ).join(';'));
+      });
+      downloadCsv('laporan-tutup-kasir.csv', lines);
+    }
+
+    // ===== Laporan supplier =====
+    let spDetailKey = null;
+
+    function supplierGroups() {
+      const from = $('#spFrom').value;
+      const to = $('#spTo').value;
+      const q = ($('#spSearch').value || '').trim().toLowerCase();
+      const map = {};
+      state.stockHistory.forEach((e, idx) => {
+        if (from && String(e.date) < from) return;
+        if (to && String(e.date) > to) return;
+        const name = String(e.supplier || '').trim() || 'Tanpa supplier';
+        if (q && !name.toLowerCase().includes(q)) return;
+        const key = name.toLowerCase();
+        const g = map[key] = map[key] || { key, name, invoices: [], total: 0, paid: 0, rem: 0, late: 0, last: '' };
+        g.invoices.push({ e, idx });
+        g.total += Number(e.total || 0);
+        g.paid += invPaid(e);
+        g.rem += invRemaining(e);
+        if (invIsLate(e)) g.late++;
+        if (String(e.date) > g.last) g.last = String(e.date);
+      });
+      return Object.values(map).sort((a, b) => b.rem - a.rem || b.total - a.total);
+    }
+
+    function supplierTableHtml(groups, print) {
+      const hm = print ? '' : ' hm';
+      let tInv = 0, tTotal = 0, tPaid = 0, tRem = 0, tLate = 0;
+      const body = groups.map((g) => {
+        tInv += g.invoices.length; tTotal += g.total; tPaid += g.paid; tRem += g.rem; tLate += g.late;
+        return '<tr' + (print ? '' : ' data-sp="' + escapeHtml(g.key) + '" style="cursor:pointer;"') + '><td><b>' + escapeHtml(g.name) + '</b></td><td class="num">' + g.invoices.length + '</td>' +
+          '<td class="num">' + formatRp(g.total) + '</td><td class="num' + hm + '">' + formatRp(g.paid) + '</td><td class="num"><b>' + formatRp(g.rem) + '</b></td>' +
+          '<td class="num">' + (g.late || '-') + '</td><td class="' + hm.trim() + '">' + escapeHtml(g.last || '-') + '</td></tr>';
+      }).join('');
+      const foot = '<tr><td><b>Total</b></td><td class="num"><b>' + tInv + '</b></td><td class="num"><b>' + formatRp(tTotal) + '</b></td><td class="num' + hm + '"><b>' + formatRp(tPaid) +
+        '</b></td><td class="num"><b>' + formatRp(tRem) + '</b></td><td class="num"><b>' + (tLate || '-') + '</b></td><td class="' + hm.trim() + '"></td></tr>';
+      return '<table' + (print ? '' : ' class="tbl"') + '><thead><tr><th>Supplier</th><th class="num">Invoice</th><th class="num">Pembelian</th><th class="num' + hm + '">Dibayar</th><th class="num">Sisa</th><th class="num">Telat</th><th class="' + hm.trim() + '">Terakhir</th></tr></thead><tbody>' + body + foot + '</tbody></table>';
+    }
+
+    function renderSupplierReport() {
+      const groups = supplierGroups();
+      let total = 0, rem = 0, inv = 0;
+      groups.forEach((g) => { total += g.total; rem += g.rem; inv += g.invoices.length; });
+      $('#spSummary').textContent = groups.length + ' supplier · ' + inv + ' invoice · Pembelian ' + formatRp(total) + ' · Hutang ' + formatRp(rem);
+      $('#spTable').innerHTML = groups.length ? supplierTableHtml(groups, false) : '<div class="muted">Belum ada data supplier pada filter ini.</div>';
+    }
+
+    function supplierDetailHtml(g, print) {
+      const tbl = print ? '<table>' : '<table class="tbl" style="min-width:0;">';
+      const inv = g.invoices.slice().sort((a, b) => String(b.e.date).localeCompare(String(a.e.date))).map(({ e }) => {
+        const st = invStatus(e);
+        return '<tr><td>' + escapeHtml(e.no) + '</td><td>' + escapeHtml(e.date || '-') + '</td><td>' + escapeHtml(e.dueDate || '-') + '</td><td class="num">' + formatRp(e.total) +
+          '</td><td class="num">' + formatRp(invPaid(e)) + '</td><td class="num">' + formatRp(invRemaining(e)) + '</td><td>' + (print ? st.label : '<span class="badge ' + st.cls + '">' + st.label + '</span>') + '</td></tr>';
+      }).join('');
+      const itemMap = {};
+      g.invoices.forEach(({ e }) => (e.items || []).forEach((it) => {
+        const m = itemMap[it.name] = itemMap[it.name] || { qty: 0, total: 0 };
+        m.qty += Number(it.qty || 0);
+        m.total += Number(it.qty || 0) * Number(it.cost || 0);
+      }));
+      const items = Object.keys(itemMap).sort((a, b) => itemMap[b].total - itemMap[a].total).map((n) => '<tr><td>' + escapeHtml(n) + '</td><td class="num">' + itemMap[n].qty + '</td><td class="num">' + formatRp(itemMap[n].total) + '</td></tr>').join('');
+      const pays = [];
+      g.invoices.forEach(({ e }) => (e.payments || []).forEach((p) => pays.push({ no: e.no, p })));
+      pays.sort((a, b) => Number(b.p.id) - Number(a.p.id));
+      const payRows = pays.map(({ no, p }) => '<tr><td>' + escapeHtml(p.date) + '</td><td>' + escapeHtml(no) + '</td><td>' + escapeHtml(p.method) + '</td><td class="num">' + formatRp(p.amount) + '</td></tr>').join('');
+      const h = print ? 'h2' : 'h3';
+      const style = print ? '' : ' style="margin:12px 0 4px;"';
+      const wrap = (t) => print ? t : '<div style="overflow-x:auto;">' + t + '</div>';
+      return '<' + h + style + '>Invoice</' + h + '>' + wrap(tbl + '<thead><tr><th>No</th><th>Tanggal</th><th>Jatuh tempo</th><th class="num">Total</th><th class="num">Dibayar</th><th class="num">Sisa</th><th>Status</th></tr></thead><tbody>' + inv + '</tbody></table>') +
+        '<' + h + style + '>Barang dibeli</' + h + '>' + wrap(tbl + '<thead><tr><th>Produk</th><th class="num">Qty</th><th class="num">Nilai</th></tr></thead><tbody>' + items + '</tbody></table>') +
+        '<' + h + style + '>Pembayaran</' + h + '>' + (payRows ? wrap(tbl + '<thead><tr><th>Tanggal</th><th>Invoice</th><th>Metode</th><th class="num">Jumlah</th></tr></thead><tbody>' + payRows + '</tbody></table>') : '<div class="muted">Belum ada pembayaran tercatat.</div>');
+    }
+
+    function openSupplierDetail(key) {
+      const g = supplierGroups().find((x) => x.key === key);
+      if (!g) return;
+      spDetailKey = key;
+      $('#spDetailTitle').textContent = g.name;
+      $('#spDetailBody').innerHTML =
+        '<div class="row"><span>Pembelian</span><b>' + formatRp(g.total) + '</b></div>' +
+        '<div class="row"><span>Dibayar</span><b>' + formatRp(g.paid) + '</b></div>' +
+        '<div class="row"><span>Sisa hutang</span><b>' + formatRp(g.rem) + '</b></div>' + supplierDetailHtml(g, false);
+      $('#spDialog').showModal();
+    }
+
+    function printDoc(title, bodyHtml) {
+      const area = $('#printArea');
+      area.style.width = '100%';
+      area.innerHTML = '<div class="doc"><h1>' + escapeHtml(title) + '</h1><div class="meta">' + escapeHtml(state.store) + ' · dicetak ' + escapeHtml(nowLabel()) + '</div>' + bodyHtml + '</div>';
+      $('#pageStyle').textContent = '@page { size: A4; margin: 12mm; }';
+      window.print();
+    }
+
+    function rangeLabel(from, to) {
+      return from || to ? 'Periode: ' + (from || 'awal') + ' s/d ' + (to || 'sekarang') : 'Periode: semua';
+    }
+
+    function printSupplierReport() {
+      const groups = supplierGroups();
+      if (!groups.length) return;
+      printDoc('Laporan Supplier', '<div class="meta">' + escapeHtml(rangeLabel($('#spFrom').value, $('#spTo').value)) + '</div>' + supplierTableHtml(groups, true));
+    }
+
+    function printSupplierDetail() {
+      const g = supplierGroups().find((x) => x.key === spDetailKey);
+      if (!g) return;
+      printDoc('Laporan Supplier: ' + g.name, '<div class="meta">' + escapeHtml(rangeLabel($('#spFrom').value, $('#spTo').value)) + ' · Pembelian ' + formatRp(g.total) + ' · Dibayar ' + formatRp(g.paid) + ' · Sisa ' + formatRp(g.rem) + '</div>' + supplierDetailHtml(g, true));
+    }
+
+    function exportSuppliersCsv() {
+      const lines = [['Supplier', 'Jumlah Invoice', 'Pembelian', 'Dibayar', 'Sisa', 'Invoice Terlambat', 'Invoice Terakhir'].map(csvQ).join(';')];
+      supplierGroups().forEach((g) => lines.push([g.name, g.invoices.length, g.total, g.paid, g.rem, g.late, g.last].map(csvQ).join(';')));
+      downloadCsv('laporan-supplier.csv', lines);
+    }
+
+    function setReportMode(mode) {
+      document.querySelectorAll('#reportMode button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.rmode === mode)));
+      $('#rpDaily').classList.toggle('hide', mode !== 'harian');
+      $('#rpClosings').classList.toggle('hide', mode !== 'tutup');
+      $('#rpSuppliers').classList.toggle('hide', mode !== 'supplier');
+      if (mode === 'tutup') renderClosingsReport();
+      if (mode === 'supplier') renderSupplierReport();
     }
 
     // ===== Impor massal (produk & barang masuk) =====
@@ -2730,6 +3222,8 @@ function savePhoto_(body) {
       $('#whoami').textContent = owner ? 'Owner' : currentUser.name + ' (Kasir)';
       $('#allowCashierRefund').checked = !!state.kasirRefund;
       renderSyncSettings();
+      renderShift();
+      setReportMode('harian');
       runSync();
       renderHistory();
       renderReport();
@@ -2946,6 +3440,30 @@ function savePhoto_(body) {
       $('#debtSearch').addEventListener('input', renderDebts);
       $('#debtShowPaid').addEventListener('change', renderDebts);
       $('#debtList').addEventListener('click', onDebtListClick);
+      $('#closeShiftBtn').addEventListener('click', openClose);
+      $('#clOpening').addEventListener('input', updateCloseCalc);
+      $('#clCounted').addEventListener('input', updateCloseCalc);
+      $('#clSubmit').addEventListener('click', submitClose);
+      $('#clCancel').addEventListener('click', () => $('#closeDialog').close());
+      ['#closingList', '#clList'].forEach((sel) => $(sel).addEventListener('click', (e) => {
+        const b = e.target.closest('[data-open-closing]');
+        if (b) openClosingReceipt(b.dataset.openClosing);
+      }));
+      $('#reportMode').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-rmode]');
+        if (b) setReportMode(b.dataset.rmode);
+      });
+      ['#clFrom', '#clTo', '#clUser'].forEach((sel) => $(sel).addEventListener('input', renderClosingsReport));
+      $('#clExport').addEventListener('click', exportClosingsCsv);
+      ['#spFrom', '#spTo', '#spSearch'].forEach((sel) => $(sel).addEventListener('input', renderSupplierReport));
+      $('#spTable').addEventListener('click', (e) => {
+        const tr = e.target.closest('tr[data-sp]');
+        if (tr) openSupplierDetail(tr.dataset.sp);
+      });
+      $('#spExport').addEventListener('click', exportSuppliersCsv);
+      $('#spPrint').addEventListener('click', printSupplierReport);
+      $('#spDetailPrint').addEventListener('click', printSupplierDetail);
+      $('#spDetailClose').addEventListener('click', () => $('#spDialog').close());
       $('#syncSaveBtn').addEventListener('click', saveSyncConfig);
       $('#syncNowBtn').addEventListener('click', () => runSync(true));
       $('#syncOffBtn').addEventListener('click', disconnectSync);
@@ -3057,6 +3575,7 @@ function savePhoto_(body) {
           if (tab === 'laporan') renderReport();
           if (tab === 'pengaturan') renderCashiers();
           if (tab === 'piutang') renderDebts();
+          if (tab === 'tutup') renderShift();
         });
       });
 
