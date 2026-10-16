@@ -3742,7 +3742,8 @@ function savePhoto_(body) {
         modal: ['modal', 'hargamodal', 'hargabeli', 'cost', 'hpp'],
         harga: ['harga', 'hargajual', 'jual', 'price', 'hargaecerantertinggi', 'ecerantertinggi', 'het', 'hettertinggi'],
         hargamin: ['hargaeceranterendah', 'eceranterendah', 'hargaterendah', 'hargamin', 'minimum', 'min', 'hetterendah'],
-        kode: ['kode', 'kodebarang', 'sku', 'code']
+        kode: ['kode', 'kodebarang', 'sku', 'code'],
+        stokmin: ['stokminimum', 'minimumstok', 'stokmin', 'minstok', 'minimumstock', 'minstock', 'stockmin', 'stockminimum', 'batasstok', 'stokminimal']
       },
       stock: {
         kode: ['kode', 'kodebarang', 'sku', 'code'],
@@ -3752,14 +3753,14 @@ function savePhoto_(body) {
       }
     };
     const BULK_DEFAULT_ORDER = {
-      products: ['nama', 'brand', 'kategori', 'modal', 'harga', 'kode', 'hargamin'],
+      products: ['nama', 'brand', 'kategori', 'modal', 'harga', 'kode', 'hargamin', 'stokmin'],
       stock: ['ident', 'qty', 'cost']
     };
     const BULK_TEXT = {
       products: {
         title: 'Tambah produk massal',
-        help: 'Satu produk per baris. Urutan kolom: Nama, Brand, Kategori, Modal, Harga eceran tertinggi, Kode, Harga eceran terendah. Stok tidak diisi di sini; stok awal produk selalu 0 dan ditambah lewat menu Stok Masuk atau Stok Opname. Hanya Nama dan Harga eceran tertinggi yang wajib; kalau harga eceran terendah kosong, dianggap sama dengan harga tertinggi (tanpa ruang diskon). Bisa tempel langsung dari Excel/Google Sheets, atau pilih file CSV. Kalau baris pertama berisi judul kolom, urutan bebas.',
-        sample: 'Nama;Brand;Kategori;Modal;Harga Eceran Tertinggi;Kode;Harga Eceran Terendah\nOud Wood 50ml;Alkaff;Parfum;450000;750000;;700000\nAmber Musk 30ml;Alkaff;Parfum;300000;520000;;480000',
+        help: 'Satu produk per baris. Urutan kolom: Nama, Brand, Kategori, Modal, Harga eceran tertinggi, Kode, Harga eceran terendah, Stok minimum (boleh kosong = tanpa alert). Stok awal tidak diisi di sini; stok awal produk selalu 0 dan ditambah lewat menu Stok Masuk atau Stok Opname. Hanya Nama dan Harga eceran tertinggi yang wajib; kalau harga eceran terendah kosong, dianggap sama dengan harga tertinggi (tanpa ruang diskon). Bisa tempel langsung dari Excel/Google Sheets, atau pilih file CSV. Kalau baris pertama berisi judul kolom, urutan bebas.',
+        sample: 'Nama;Brand;Kategori;Modal;Harga Eceran Tertinggi;Kode;Harga Eceran Terendah;Stok Minimum\nOud Wood 50ml;Alkaff;Parfum;450000;750000;;700000;5\nAmber Musk 30ml;Alkaff;Parfum;300000;520000;;480000;3',
         commit: (n) => 'Tambahkan ' + n + ' produk'
       },
       stock: {
@@ -3872,12 +3873,14 @@ function savePhoto_(body) {
           price: parseMoney(get(row, 'harga')),
           minPrice: parseMoney(get(row, 'hargamin')),
           code: get(row, 'kode'),
+          minStock: parseCount(get(row, 'stokmin')),
           error: ''
         };
         if (!item.name) item.error = 'Nama kosong';
         else if (!(item.price > 0)) item.error = 'Harga eceran tertinggi tidak valid';
         else if (Number.isNaN(item.minPrice) || item.minPrice > item.price) item.error = 'Harga eceran terendah tidak valid (melebihi harga tertinggi)';
         else if (Number.isNaN(item.cost)) item.error = 'Modal tidak valid';
+        else if (Number.isNaN(item.minStock)) item.error = 'Stok minimum tidak valid';
         else if (item.code && codes.has(item.code.toLowerCase())) item.error = 'Kode sudah dipakai';
         else if (names.has((item.name + '|' + item.brand).toLowerCase())) item.error = 'Produk sudah ada';
         if (!item.error) {
@@ -3954,7 +3957,7 @@ function savePhoto_(body) {
         if (bulkMode === 'products') {
           main = r.name || '(tanpa nama)';
           sub = [r.brand, r.category].filter(Boolean).join(' · ');
-          sub += (sub ? ' · ' : '') + 'Modal ' + formatRp(r.cost || 0) + ' · Eceran ' + formatRp(r.minPrice || r.price || 0) + ' - ' + formatRp(r.price || 0) + (r.code ? ' · Kode ' + r.code : '');
+          sub += (sub ? ' · ' : '') + 'Modal ' + formatRp(r.cost || 0) + ' · Eceran ' + formatRp(r.minPrice || r.price || 0) + ' - ' + formatRp(r.price || 0) + (r.minStock ? ' · Min ' + r.minStock : '') + (r.code ? ' · Kode ' + r.code : '');
         } else {
           main = r.product ? r.product.name : (r.ident || '(kosong)');
           sub = 'Qty ' + (Number.isNaN(r.qty) ? '-' : r.qty) + ' · Harga beli ' + (Number.isNaN(r.cost) ? '-' : formatRp(r.cost || 0));
@@ -3978,7 +3981,7 @@ function savePhoto_(body) {
             do { code = 'P' + String(n).padStart(3, '0'); n++; } while (used.has(code.toLowerCase()));
           }
           used.add(code.toLowerCase());
-          state.products.push({ id, code, name: r.name, brand: r.brand, category: r.category, cost: r.cost || 0, price: r.price, minPrice: r.minPrice || r.price, stock: 0, type: 'BNIB' });
+          state.products.push({ id, code, name: r.name, brand: r.brand, category: r.category, cost: r.cost || 0, price: r.price, minPrice: r.minPrice || r.price, minStock: r.minStock || 0, stock: 0, type: 'BNIB' });
         });
         saveState();
         renderProductList();
