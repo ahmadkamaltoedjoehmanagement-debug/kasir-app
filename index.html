@@ -901,7 +901,9 @@ const SHEET_NAMES = {
   request_produk: 'Request Produk',
   katalog: 'Katalog',
   pesanan_online: 'Pesanan Online',
-  member: 'Member'
+  member: 'Member',
+  biaya: 'Biaya',
+  jurnal_manual: 'Jurnal Manual'
 };
 
 const HEADERS = {
@@ -919,7 +921,9 @@ const HEADERS = {
   request_produk: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'Kasir', 'Pelanggan', 'Telepon', 'Produk', 'Brand', 'Qty', 'Budget', 'Status', 'Catatan'],
   katalog: ['Key', 'Perangkat', 'Kode', 'Produk', 'Brand', 'Kategori', 'Tipe', 'Harga', 'Stok'],
   pesanan_online: ['Key', 'No', 'Tanggal', 'Pelanggan', 'Telepon', 'Item', 'Total', 'Layanan', 'Alamat', 'Ongkir', 'Pembayaran', 'Bukti Bayar', 'Status', 'Catatan'],
-  member: ['Key', 'Perangkat', 'Nama', 'Telepon', 'Tgl Lahir', 'Batas Hutang', 'Poin']
+  member: ['Key', 'Perangkat', 'Nama', 'Telepon', 'Tgl Lahir', 'Batas Hutang', 'Poin'],
+  biaya: ['Key', 'Perangkat', 'No', 'Tanggal', 'Kategori', 'Dibayar dari', 'Jumlah', 'Catatan', 'Dicatat oleh'],
+  jurnal_manual: ['Key', 'Perangkat', 'No', 'Tanggal', 'Memo', 'Akun', 'Debit', 'Kredit', 'Dicatat oleh']
 };
 
 function doGet(e) {
@@ -1222,6 +1226,16 @@ function updateOrder_(b) {
     <div class="err" id="dobErr" role="alert"></div>
     <button id="dobSave" class="action success full">Simpan</button>
     <button id="dobCancel" class="action ghost full" style="margin-top:8px;">Batal</button>
+  </dialog>
+
+  <dialog id="delDialog">
+    <h2 id="delTitle"></h2>
+    <div id="delBody" class="muted" style="white-space:pre-line; margin-bottom:8px;"></div>
+    <div id="delCheckWrap" class="hide"><label style="display:flex; gap:8px; align-items:center; margin:8px 0;"><input id="delCheck" type="checkbox" style="width:auto;" /><span id="delCheckLabel"></span></label></div>
+    <div id="delTypeWrap" class="hide"><label class="blk" for="delType">Ketik HAPUS untuk melanjutkan</label><input id="delType" autocomplete="off" /></div>
+    <div class="err" id="delErr" role="alert"></div>
+    <button id="delYes" class="action danger full">Hapus</button>
+    <button id="delNo" class="action ghost full" style="margin-top:8px;">Batal</button>
   </dialog>
 
   <dialog id="memEditDialog">
@@ -2140,6 +2154,35 @@ function updateOrder_(b) {
       renderRefunds();
     }
 
+    // Dialog konfirmasi di dalam aplikasi (confirm/prompt bawaan browser sering diblokir di WebView/iframe).
+    let delYesFn = null, delNeedType = false;
+    function askDel(o) {
+      $('#delTitle').textContent = o.title;
+      $('#delBody').textContent = o.body || '';
+      $('#delCheckWrap').classList.toggle('hide', !o.check);
+      $('#delCheckLabel').textContent = o.check || '';
+      $('#delCheck').checked = !!o.checked;
+      $('#delTypeWrap').classList.toggle('hide', !o.type);
+      $('#delType').value = '';
+      $('#delErr').textContent = '';
+      const yes = $('#delYes');
+      yes.classList.toggle('hide', !!o.info);
+      yes.classList.toggle('danger', !o.safe);
+      yes.classList.toggle('success', !!o.safe);
+      yes.textContent = o.yes || 'Hapus';
+      $('#delNo').textContent = o.info ? 'Tutup' : 'Batal';
+      delYesFn = o.onYes || null;
+      delNeedType = !!o.type;
+      $('#delDialog').showModal();
+    }
+
+    function delConfirm() {
+      if (delNeedType && $('#delType').value.trim().toUpperCase() !== 'HAPUS') { $('#delErr').textContent = 'Ketik HAPUS dengan benar.'; return; }
+      const fn = delYesFn, checked = $('#delCheck').checked;
+      $('#delDialog').close();
+      if (fn) fn(checked);
+    }
+
     function deleteTx(no) {
       if (!currentUser || currentUser.role !== 'owner') return;
       const idx = state.history.findIndex((t) => t.no === no);
@@ -2147,36 +2190,50 @@ function updateOrder_(b) {
       const tx = state.history[idx];
       const debt = state.debts.find((d) => d.txNo === no);
       if (debt && (debt.payments || []).length) {
-        alert('Transaksi ini punya hutang yang sudah dicicil, jadi tidak bisa dihapus. Selesaikan hutangnya di tab Piutang dulu.');
+        askDel({ title: 'Tidak bisa dihapus', body: 'Transaksi ' + no + ' punya hutang yang sudah dicicil. Selesaikan hutangnya di tab Piutang dulu.', info: true });
         return;
       }
-      if (!confirm('Hapus transaksi ' + no + ' (' + formatRp(tx.total) + ')?\n\nTidak bisa dibatalkan. Riwayat dan laporan ikut berubah. Data yang sudah terkirim ke Google Sheets tetap ada di sana sebagai arsip.')) return;
       const hasRefund = state.refunds.some((r) => r.txNo === no);
-      if (!hasRefund && confirm('Kembalikan stok barang transaksi ini ke produk?\n\nOK = kembalikan stok. Batal = stok tidak diubah.')) {
-        (tx.items || []).forEach((it) => {
-          const p = getProductById(it.id);
-          if (p) p.stock = Number(p.stock || 0) + Number(it.qty);
-        });
-      }
-      const mem = tx.member ? (state.members || []).find((m) => m.phone === tx.member.phone) : null;
-      const delta = Number(tx.pointsUsed || 0) - Number(tx.pointsEarned || 0);
-      if (mem && delta) addPoints(mem, delta, 'void', no, 'Transaksi dihapus');
-      if (debt) state.debts = state.debts.filter((d) => d !== debt);
-      state.refunds = state.refunds.filter((r) => r.txNo !== no);
-      state.history.splice(idx, 1);
-      saveState();
-      renderAll();
+      askDel({
+        title: 'Hapus transaksi ' + no + '?',
+        body: formatRp(tx.total) + '\n\nTidak bisa dibatalkan. Riwayat dan laporan ikut berubah. Data yang sudah terkirim ke Google Sheets tetap ada di sana sebagai arsip.',
+        check: hasRefund ? '' : 'Kembalikan stok barang ke produk',
+        checked: !hasRefund,
+        onYes: (restock) => {
+          if (!hasRefund && restock) {
+            (tx.items || []).forEach((it) => {
+              const p = getProductById(it.id);
+              if (p) p.stock = Number(p.stock || 0) + Number(it.qty);
+            });
+          }
+          const mem = tx.member ? (state.members || []).find((m) => m.phone === tx.member.phone) : null;
+          const delta = Number(tx.pointsUsed || 0) - Number(tx.pointsEarned || 0);
+          if (mem && delta) addPoints(mem, delta, 'void', no, 'Transaksi dihapus');
+          if (debt) state.debts = state.debts.filter((d) => d !== debt);
+          state.refunds = state.refunds.filter((r) => r.txNo !== no);
+          const i = state.history.indexOf(tx);
+          if (i >= 0) state.history.splice(i, 1);
+          saveState();
+          renderAll();
+        }
+      });
     }
 
     function clearHistory() {
       if (!currentUser || currentUser.role !== 'owner') return;
-      if (!state.history.length) { alert('Belum ada transaksi.'); return; }
-      const t = prompt('Ini menghapus SEMUA ' + state.history.length + ' transaksi dan semua refund. Stok, poin member, dan piutang tidak diubah. Tidak bisa dibatalkan. Data di Google Sheets tetap ada.\n\nKetik HAPUS untuk melanjutkan:');
-      if (t !== 'HAPUS') return;
-      state.history = [];
-      state.refunds = [];
-      saveState();
-      renderAll();
+      if (!state.history.length) { askDel({ title: 'Belum ada transaksi', body: 'Riwayat transaksi masih kosong.', info: true }); return; }
+      askDel({
+        title: 'Hapus SEMUA riwayat transaksi?',
+        body: 'Ini menghapus ' + state.history.length + ' transaksi dan semua refund. Stok, poin member, dan piutang tidak diubah. Tidak bisa dibatalkan. Data di Google Sheets tetap ada.',
+        type: true,
+        yes: 'Hapus semua',
+        onYes: () => {
+          state.history = [];
+          state.refunds = [];
+          saveState();
+          renderAll();
+        }
+      });
     }
 
     function reverseRefund(r, adjustStock) {
@@ -2210,22 +2267,36 @@ function updateOrder_(b) {
       if (!currentUser || currentUser.role !== 'owner') return;
       const r = state.refunds.find((x) => x.no === no);
       if (!r) return;
-      if (!confirm('Hapus refund ' + no + ' (-' + formatRp(r.amount) + ')?\n\nRefund dibatalkan: transaksi aslinya kembali tercatat tanpa refund, dan laporan ikut berubah. Tidak bisa dibatalkan. Data di Google Sheets tetap ada sebagai arsip.')) return;
-      const adj = r.restock ? confirm('Refund ini mengembalikan stok. Kurangi stok lagi sebesar barang yang direfund?\n\nOK = kurangi stok. Batal = stok tidak diubah.') : false;
-      reverseRefund(r, adj);
-      saveState();
-      renderAll();
+      askDel({
+        title: 'Hapus refund ' + no + '?',
+        body: '-' + formatRp(r.amount) + '\n\nRefund dibatalkan: transaksi aslinya kembali tercatat tanpa refund, dan laporan ikut berubah. Tidak bisa dibatalkan. Data di Google Sheets tetap ada sebagai arsip.',
+        check: r.restock ? 'Kurangi stok lagi (refund ini mengembalikan stok)' : '',
+        checked: !!r.restock,
+        onYes: (adj) => {
+          reverseRefund(r, adj);
+          saveState();
+          renderAll();
+        }
+      });
     }
 
     function clearRefunds() {
       if (!currentUser || currentUser.role !== 'owner') return;
-      if (!state.refunds.length) { alert('Belum ada refund.'); return; }
-      const t = prompt('Ini membatalkan dan menghapus SEMUA ' + state.refunds.length + ' refund. Transaksi aslinya kembali tercatat tanpa refund. Tidak bisa dibatalkan. Data di Google Sheets tetap ada.\n\nKetik HAPUS untuk melanjutkan:');
-      if (t !== 'HAPUS') return;
-      const adj = state.refunds.some((r) => r.restock) ? confirm('Sebagian refund mengembalikan stok. Kurangi stok lagi sebesar barang yang direfund?\n\nOK = kurangi stok. Batal = stok tidak diubah.') : false;
-      state.refunds.slice().forEach((r) => reverseRefund(r, adj));
-      saveState();
-      renderAll();
+      if (!state.refunds.length) { askDel({ title: 'Belum ada refund', body: 'Riwayat refund masih kosong.', info: true }); return; }
+      const anyRestock = state.refunds.some((r) => r.restock);
+      askDel({
+        title: 'Hapus SEMUA riwayat refund?',
+        body: 'Ini membatalkan dan menghapus ' + state.refunds.length + ' refund. Transaksi aslinya kembali tercatat tanpa refund. Tidak bisa dibatalkan. Data di Google Sheets tetap ada.',
+        check: anyRestock ? 'Kurangi stok lagi untuk refund yang mengembalikan stok' : '',
+        checked: anyRestock,
+        type: true,
+        yes: 'Hapus semua',
+        onYes: (adj) => {
+          state.refunds.slice().forEach((r) => reverseRefund(r, adj));
+          saveState();
+          renderAll();
+        }
+      });
     }
 
     function renderRefunds() {
@@ -2554,8 +2625,8 @@ function updateOrder_(b) {
         meth[m] = (meth[m] || 0) + t;
         (tx.items || []).forEach((it) => {
           cost += Number(it.cost || 0) * Number(it.qty);
-          const p = (prod[it.name] = prod[it.name] || { qty: 0, rev: 0 });
-          p.qty += Number(it.qty); p.rev += Number(it.qty) * Number(it.price || 0);
+          const p = (prod[it.name] = prod[it.name] || { qty: 0, rev: 0, cost: 0 });
+          p.qty += Number(it.qty); p.rev += Number(it.qty) * Number(it.price || 0); p.cost += Number(it.qty) * Number(it.cost || 0);
         });
       });
       state.refunds.forEach((r) => { if (set.has(r.day)) { per[r.day].refund += Number(r.amount || 0); refund += Number(r.amount || 0); } });
@@ -2565,7 +2636,13 @@ function updateOrder_(b) {
     function rankBlocks(d) {
       const prods = Object.entries(d.prod).sort((a, b) => b[1].rev - a[1].rev).slice(0, 5).map(([n, p]) => [n, p.rev, formatRp(p.rev) + ' · ' + p.qty + ' pcs']);
       const meths = Object.entries(d.meth).sort((a, b) => b[1] - a[1]).map(([n, v]) => [n, v, formatRp(v)]);
-      return '<div class="layout" style="margin-top:14px;"><div><h2>Produk terlaris</h2>' + hBars(prods) + '</div><div><h2>Per metode pembayaran</h2>' + hBars(meths) + '</div></div>';
+      const mp = Object.entries(d.prod).filter(([, p]) => p.cost > 0 && p.rev > 0)
+        .map(([n, p]) => ({ n, pct: (p.rev - p.cost) / p.rev * 100, laba: p.rev - p.cost })).sort((a, b) => b.pct - a.pct);
+      const mrow = (x) => [x.n, Math.max(0, x.pct), x.pct.toFixed(1).replace('.', ',') + '% · ' + formatRp(x.laba)];
+      const best = mp.slice(0, 3).map(mrow), worst = mp.length >= 2 ? mp.slice().reverse().slice(0, 3).map(mrow) : [];
+      return '<div class="layout" style="margin-top:14px;"><div><h2>Produk terlaris</h2>' + hBars(prods) + '</div><div><h2>Per metode pembayaran</h2>' + hBars(meths) + '</div></div>' +
+        '<div class="layout" style="margin-top:14px;"><div><h2>Margin tertinggi</h2>' + hBars(best) + '</div><div><h2>Margin terendah</h2>' + (worst.length ? hBars(worst) : '<div class="muted">Perlu minimal 2 produk terjual.</div>') + '</div></div>' +
+        '<div class="muted" style="margin-top:6px;">Margin = (penjualan − modal) ÷ penjualan. Produk tanpa data modal tidak ikut dihitung.</div>';
     }
 
     function renderDailyCharts(date) {
@@ -3126,6 +3203,13 @@ function updateOrder_(b) {
       };
       state.products.forEach((p) => {
         if (Number(p.price) > 0) add('katalog', p.code || p.id, { Kode: p.code || String(p.id), Produk: p.name, Brand: p.brand || '', Kategori: p.category || '', Tipe: p.type || '', Harga: Number(p.price), Stok: (p.type === 'Decant' && !Number(p.stock)) ? 'ada' : Number(p.stock || 0) });
+      });
+      state.journals.forEach((j) => {
+        if (j.kind === 'biaya') {
+          add('biaya', j.id, { No: j.no, Tanggal: j.date, Kategori: BIAYA_CATS[j.cat] || j.cat || '', 'Dibayar dari': accName(j.from), Jumlah: Number(j.amount || 0), Catatan: j.memo || '', 'Dicatat oleh': j.by || '' });
+        } else {
+          (j.lines || []).forEach((l, i) => add('jurnal_manual', j.id + ':' + i, { No: j.no, Tanggal: j.date, Memo: j.memo || '', Akun: accName(l.acc), Debit: Number(l.debit || 0), Kredit: Number(l.credit || 0), 'Dicatat oleh': j.by || '' }));
+        }
       });
       state.members.forEach((m) => add('member', m.id, { Nama: m.name, Telepon: m.phone, 'Tgl Lahir': m.dob || '', 'Batas Hutang': Number(m.limit || 0), Poin: Number(m.points || 0) }));
       state.history.forEach((tx) => add('penjualan', tx.no, {
@@ -6949,6 +7033,8 @@ function updateOrder_(b) {
       initBirthdayFilters();
       ['#mbMonth', '#mbDay'].forEach((sel) => $(sel).addEventListener('change', () => { bdWeek = false; renderMembers(); }));
       document.querySelectorAll('[data-bd-preset]').forEach((b) => b.addEventListener('click', () => setBirthdayPreset(b.dataset.bdPreset)));
+      $('#delYes').addEventListener('click', delConfirm);
+      $('#delNo').addEventListener('click', () => $('#delDialog').close());
       $('#meSave').addEventListener('click', saveMemberEdit);
       $('#meCancel').addEventListener('click', () => $('#memEditDialog').close());
       $('#dobSave').addEventListener('click', saveDob);
@@ -7074,10 +7160,13 @@ function updateOrder_(b) {
       $('#syncNowBtn').addEventListener('click', () => runSync(true));
       $('#syncAllBtn').addEventListener('click', () => {
         if (!syncReady()) { $('#syncErr').textContent = 'Hubungkan Google Sheets dulu (simpan URL dan token).'; return; }
-        if (!confirm('Kirim ulang SEMUA transaksi dan data ke Google Sheets? Baris yang sudah ada akan diperbarui, bukan digandakan. Bisa lama bila datanya banyak.')) return;
-        state.sync.sent = {};
-        persistState();
-        runSync(true);
+        askDel({
+          title: 'Kirim ulang SEMUA data ke Google Sheets?',
+          body: 'Baris yang sudah ada akan diperbarui, bukan digandakan. Bisa lama bila datanya banyak.',
+          yes: 'Kirim ulang',
+          safe: true,
+          onYes: () => { state.sync.sent = {}; persistState(); runSync(true); }
+        });
       });
       $('#syncOffBtn').addEventListener('click', disconnectSync);
       $('#syncCopyCode').addEventListener('click', copyGsCode);
