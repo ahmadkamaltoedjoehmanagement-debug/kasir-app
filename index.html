@@ -524,11 +524,17 @@
     </section>
     <section id="riwayat" class="view">
       <div class="box">
-        <h2>Riwayat transaksi</h2>
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+          <h2>Riwayat transaksi</h2>
+          <button id="histClearBtn" class="action ghost hide" style="padding:8px 10px;">Hapus semua riwayat</button>
+        </div>
         <div id="historyList"></div>
       </div>
       <div class="box" style="margin-top:18px;">
-        <h2>Riwayat refund</h2>
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+          <h2>Riwayat refund</h2>
+          <button id="refClearBtn" class="action ghost hide" style="padding:8px 10px;">Hapus semua riwayat refund</button>
+        </div>
         <div id="refundList"></div>
       </div>
     </section>
@@ -894,7 +900,8 @@ const SHEET_NAMES = {
   opname: 'Stok Opname',
   request_produk: 'Request Produk',
   katalog: 'Katalog',
-  pesanan_online: 'Pesanan Online'
+  pesanan_online: 'Pesanan Online',
+  member: 'Member'
 };
 
 const HEADERS = {
@@ -911,7 +918,8 @@ const HEADERS = {
   opname: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'User', 'Produk Dihitung', 'Produk Selisih', 'Nilai Selisih', 'Catatan', 'Detail Selisih'],
   request_produk: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'Kasir', 'Pelanggan', 'Telepon', 'Produk', 'Brand', 'Qty', 'Budget', 'Status', 'Catatan'],
   katalog: ['Key', 'Perangkat', 'Kode', 'Produk', 'Brand', 'Kategori', 'Tipe', 'Harga', 'Stok'],
-  pesanan_online: ['Key', 'No', 'Tanggal', 'Pelanggan', 'Telepon', 'Item', 'Total', 'Layanan', 'Alamat', 'Ongkir', 'Pembayaran', 'Bukti Bayar', 'Status', 'Catatan']
+  pesanan_online: ['Key', 'No', 'Tanggal', 'Pelanggan', 'Telepon', 'Item', 'Total', 'Layanan', 'Alamat', 'Ongkir', 'Pembayaran', 'Bukti Bayar', 'Status', 'Catatan'],
+  member: ['Key', 'Perangkat', 'Nama', 'Telepon', 'Tgl Lahir', 'Batas Hutang', 'Poin']
 };
 
 function doGet(e) {
@@ -984,7 +992,7 @@ function getSheet_(type) {
 
 function clean_(v) {
   if (v === null || v === undefined) return '';
-  if (typeof v === 'string' &amp;&amp; /^[=+\-@]/.test(v)) return "'" + v;
+  if (typeof v === 'string' &amp;&amp; (/^[=+\-@]/.test(v) || /^0\d/.test(v))) return "'" + v;
   return v;
 }
 
@@ -1214,6 +1222,22 @@ function updateOrder_(b) {
     <div class="err" id="dobErr" role="alert"></div>
     <button id="dobSave" class="action success full">Simpan</button>
     <button id="dobCancel" class="action ghost full" style="margin-top:8px;">Batal</button>
+  </dialog>
+
+  <dialog id="memEditDialog">
+    <h2>Ubah data member</h2>
+    <label class="blk" for="meName">Nama</label>
+    <input id="meName" autocomplete="off" />
+    <label class="blk" for="mePhone">No. telp / WhatsApp</label>
+    <input id="mePhone" inputmode="tel" autocomplete="off" />
+    <label class="blk" for="meDob">Tanggal lahir</label>
+    <input id="meDob" type="date" />
+    <label class="blk" for="meLimit">Batas hutang</label>
+    <input id="meLimit" type="number" min="0" />
+    <div class="muted" id="meNote" style="margin-top:6px;"></div>
+    <div class="err" id="meErr" role="alert"></div>
+    <button id="meSave" class="action success full">Simpan</button>
+    <button id="meCancel" class="action ghost full" style="margin-top:8px;">Batal</button>
   </dialog>
 
   <dialog id="poNotifyDialog" style="width:min(460px, calc(100vw - 28px));">
@@ -1982,7 +2006,8 @@ function updateOrder_(b) {
           dobTxt = '<span class="muted">Tanggal lahir belum diisi</span>';
         }
         return '<div class="line"><div class="n"><b>' + escapeHtml(m.name) + '</b><small>' + escapeHtml(m.phone) + ' · Limit ' + formatRp(m.limit || 0) + ' · <b>Poin ' + (m.points || 0) + '</b></small><small>' + dobTxt + '</small></div>' +
-          '<div class="q"><button class="action ghost" data-dob-edit="' + escapeHtml(m.phone) + '" style="padding:6px 10px;">' + (b ? 'Ubah tgl lahir' : 'Isi tgl lahir') + '</button>' +
+          '<div class="q"><button class="action ghost" data-mem-edit="' + escapeHtml(m.phone) + '" style="padding:6px 10px;">Ubah data</button>' +
+          '<button class="action ghost" data-dob-edit="' + escapeHtml(m.phone) + '" style="padding:6px 10px;">' + (b ? 'Ubah tgl lahir' : 'Isi tgl lahir') + '</button>' +
           '<button class="action ghost" data-pt-hist="' + escapeHtml(m.phone) + '" style="padding:6px 10px;">Riwayat poin</button>' +
           (isAdmin ? '<button class="action ghost" data-pt-adj="' + escapeHtml(m.phone) + '" style="padding:6px 10px;">Sesuaikan</button>' : '') + '</div></div>';
       }).join('');
@@ -1990,6 +2015,49 @@ function updateOrder_(b) {
     }
 
     let dobTarget = null;
+    let memEditTarget = null;
+
+    function openMemberEdit(phone) {
+      const m = state.members.find((x) => x.phone === phone);
+      if (!m) return;
+      memEditTarget = phone;
+      const owner = !!currentUser && currentUser.role === 'owner';
+      $('#meName').value = m.name || '';
+      $('#mePhone').value = m.phone || '';
+      $('#meDob').value = m.dob || '';
+      $('#meDob').max = localISODate();
+      $('#meLimit').value = m.limit || '';
+      $('#meLimit').disabled = !owner;
+      $('#meNote').textContent = owner ? 'Bila nomor diganti, piutang, poin, dan riwayat member ikut diperbarui.' : 'Batas hutang hanya bisa diubah oleh pemilik. Bila nomor diganti, piutang, poin, dan riwayat member ikut diperbarui.';
+      $('#meErr').textContent = '';
+      $('#memEditDialog').showModal();
+    }
+
+    function saveMemberEdit() {
+      const m = state.members.find((x) => x.phone === memEditTarget);
+      if (!m) { $('#memEditDialog').close(); return; }
+      const name = $('#meName').value.trim();
+      const phone = $('#mePhone').value.replace(/\D/g, '');
+      const dob = $('#meDob').value;
+      const err = $('#meErr');
+      if (!name || !phone) { err.textContent = 'Nama dan nomor harus diisi.'; return; }
+      if (state.members.some((x) => x !== m && x.phone === phone)) { err.textContent = 'Nomor itu sudah dipakai member lain.'; return; }
+      if (dob && (!dobParts({ dob }) || dob > localISODate())) { err.textContent = 'Tanggal lahir tidak valid.'; return; }
+      const old = m.phone;
+      m.name = name;
+      m.phone = phone;
+      m.dob = dob;
+      if (currentUser && currentUser.role === 'owner') m.limit = cleanNum($('#meLimit').value);
+      [state.debts, state.preorders, state.refunds].forEach((arr) => (arr || []).forEach((x) => {
+        if (x.memberPhone === old) { x.memberPhone = phone; if ('memberName' in x) x.memberName = name; }
+      }));
+      (state.pointLog || []).forEach((l) => { if (l.phone === old) { l.phone = phone; l.name = name; } });
+      state.history.forEach((tx) => { if (tx.member && tx.member.phone === old) tx.member = { name, phone }; });
+      saveState();
+      $('#memEditDialog').close();
+      renderAll();
+      if (currentMember === m) setMember(phone);
+    }
 
     function saveDob() {
       const m = state.members.find((x) => x.phone === dobTarget);
@@ -2005,6 +2073,8 @@ function updateOrder_(b) {
     }
 
     function onMemberListClick(e) {
+      const me = e.target.closest('[data-mem-edit]');
+      if (me) { openMemberEdit(me.dataset.memEdit); return; }
       const de = e.target.closest('[data-dob-edit]');
       if (de) {
         const m = state.members.find((x) => x.phone === de.dataset.dobEdit);
@@ -2062,10 +2132,100 @@ function updateOrder_(b) {
           '<div class="q"><b>' + formatRp(tx.total) + '</b>' +
           '<button class="action ghost" data-open-receipt="' + tx.no + '" style="padding:8px 10px;">Buka</button>' +
           (canBtn ? '<button class="action ghost" data-refund-tx="' + tx.no + '" style="padding:8px 10px;">Refund</button>' : '') +
+          (isOwner ? '<button class="action ghost" data-del-tx="' + tx.no + '" style="padding:8px 10px; color:#b34036;">Hapus</button>' : '') +
           '</div></div>';
       }).join('');
       $('#historyList').innerHTML = html || '<div class="muted">Belum ada transaksi.</div>';
+      $('#histClearBtn').classList.toggle('hide', !isOwner);
       renderRefunds();
+    }
+
+    function deleteTx(no) {
+      if (!currentUser || currentUser.role !== 'owner') return;
+      const idx = state.history.findIndex((t) => t.no === no);
+      if (idx < 0) return;
+      const tx = state.history[idx];
+      const debt = state.debts.find((d) => d.txNo === no);
+      if (debt && (debt.payments || []).length) {
+        alert('Transaksi ini punya hutang yang sudah dicicil, jadi tidak bisa dihapus. Selesaikan hutangnya di tab Piutang dulu.');
+        return;
+      }
+      if (!confirm('Hapus transaksi ' + no + ' (' + formatRp(tx.total) + ')?\n\nTidak bisa dibatalkan. Riwayat dan laporan ikut berubah. Data yang sudah terkirim ke Google Sheets tetap ada di sana sebagai arsip.')) return;
+      const hasRefund = state.refunds.some((r) => r.txNo === no);
+      if (!hasRefund && confirm('Kembalikan stok barang transaksi ini ke produk?\n\nOK = kembalikan stok. Batal = stok tidak diubah.')) {
+        (tx.items || []).forEach((it) => {
+          const p = getProductById(it.id);
+          if (p) p.stock = Number(p.stock || 0) + Number(it.qty);
+        });
+      }
+      const mem = tx.member ? (state.members || []).find((m) => m.phone === tx.member.phone) : null;
+      const delta = Number(tx.pointsUsed || 0) - Number(tx.pointsEarned || 0);
+      if (mem && delta) addPoints(mem, delta, 'void', no, 'Transaksi dihapus');
+      if (debt) state.debts = state.debts.filter((d) => d !== debt);
+      state.refunds = state.refunds.filter((r) => r.txNo !== no);
+      state.history.splice(idx, 1);
+      saveState();
+      renderAll();
+    }
+
+    function clearHistory() {
+      if (!currentUser || currentUser.role !== 'owner') return;
+      if (!state.history.length) { alert('Belum ada transaksi.'); return; }
+      const t = prompt('Ini menghapus SEMUA ' + state.history.length + ' transaksi dan semua refund. Stok, poin member, dan piutang tidak diubah. Tidak bisa dibatalkan. Data di Google Sheets tetap ada.\n\nKetik HAPUS untuk melanjutkan:');
+      if (t !== 'HAPUS') return;
+      state.history = [];
+      state.refunds = [];
+      saveState();
+      renderAll();
+    }
+
+    function reverseRefund(r, adjustStock) {
+      const tx = state.history.find((t) => t.no === r.txNo);
+      if (tx) {
+        tx.refundedQty = tx.refundedQty || {};
+        (r.items || []).forEach((it) => {
+          tx.refundedQty[it.id] = Math.max(0, Number(tx.refundedQty[it.id] || 0) - Number(it.qty));
+          if (!tx.refundedQty[it.id]) delete tx.refundedQty[it.id];
+        });
+        tx.refundedAmount = Math.max(0, Number(tx.refundedAmount || 0) - Number(r.amount || 0));
+        if (tx.refundedItemsValue !== undefined) tx.refundedItemsValue = Math.max(0, Number(tx.refundedItemsValue) - Number(r.itemsValue || 0));
+        tx.pointsUsedBack = Math.max(0, Number(tx.pointsUsedBack || 0) - Number(r.pointsBack || 0));
+        tx.pointsEarnedBack = Math.max(0, Number(tx.pointsEarnedBack || 0) - Number(r.pointsDeducted || 0));
+        const debt = state.debts.find((d) => d.txNo === tx.no);
+        if (debt && r.creditApplied) debt.credit = Math.max(0, Number(debt.credit || 0) - Number(r.creditApplied));
+      }
+      if (adjustStock && r.restock) {
+        (r.items || []).forEach((it) => {
+          const p = getProductById(it.id);
+          if (p) p.stock = Math.max(0, Number(p.stock || 0) - Number(it.qty));
+        });
+      }
+      const mem = r.memberPhone ? state.members.find((m) => m.phone === r.memberPhone) : null;
+      const delta = Number(r.pointsBack || 0) - Number(r.pointsDeducted || 0);
+      if (mem && delta) addPoints(mem, -delta, 'adjust', r.no, 'Refund dihapus');
+      state.refunds = state.refunds.filter((x) => x !== r);
+    }
+
+    function deleteRefund(no) {
+      if (!currentUser || currentUser.role !== 'owner') return;
+      const r = state.refunds.find((x) => x.no === no);
+      if (!r) return;
+      if (!confirm('Hapus refund ' + no + ' (-' + formatRp(r.amount) + ')?\n\nRefund dibatalkan: transaksi aslinya kembali tercatat tanpa refund, dan laporan ikut berubah. Tidak bisa dibatalkan. Data di Google Sheets tetap ada sebagai arsip.')) return;
+      const adj = r.restock ? confirm('Refund ini mengembalikan stok. Kurangi stok lagi sebesar barang yang direfund?\n\nOK = kurangi stok. Batal = stok tidak diubah.') : false;
+      reverseRefund(r, adj);
+      saveState();
+      renderAll();
+    }
+
+    function clearRefunds() {
+      if (!currentUser || currentUser.role !== 'owner') return;
+      if (!state.refunds.length) { alert('Belum ada refund.'); return; }
+      const t = prompt('Ini membatalkan dan menghapus SEMUA ' + state.refunds.length + ' refund. Transaksi aslinya kembali tercatat tanpa refund. Tidak bisa dibatalkan. Data di Google Sheets tetap ada.\n\nKetik HAPUS untuk melanjutkan:');
+      if (t !== 'HAPUS') return;
+      const adj = state.refunds.some((r) => r.restock) ? confirm('Sebagian refund mengembalikan stok. Kurangi stok lagi sebesar barang yang direfund?\n\nOK = kurangi stok. Batal = stok tidak diubah.') : false;
+      state.refunds.slice().forEach((r) => reverseRefund(r, adj));
+      saveState();
+      renderAll();
     }
 
     function renderRefunds() {
@@ -2073,9 +2233,10 @@ function updateOrder_(b) {
       const list = currentUser ? state.refunds.filter((r) => isOwner || r.cashierId === currentUser.id) : [];
       const html = list.slice().reverse().map((r) => {
         return '<div class="line"><div class="n"><b>' + escapeHtml(r.no) + '</b><small>' + escapeHtml(r.date) + ' · ' + escapeHtml(r.txNo) + (r.cashier ? ' · Kasir ' + escapeHtml(r.cashier) : '') + (r.reason ? ' · ' + escapeHtml(r.reason) : '') + '</small></div>' +
-          '<div class="q"><b>-' + formatRp(r.amount) + '</b><button class="action ghost" data-open-refund="' + r.no + '" style="padding:8px 10px;">Buka</button></div></div>';
+          '<div class="q"><b>-' + formatRp(r.amount) + '</b><button class="action ghost" data-open-refund="' + r.no + '" style="padding:8px 10px;">Buka</button>' + (isOwner ? '<button class="action ghost" data-del-refund="' + r.no + '" style="padding:8px 10px; color:#b34036;">Hapus</button>' : '') + '</div></div>';
       }).join('');
       $('#refundList').innerHTML = html || '<div class="muted">Belum ada refund.</div>';
+      $('#refClearBtn').classList.toggle('hide', !isOwner);
     }
 
     function invRows() {
@@ -2966,6 +3127,7 @@ function updateOrder_(b) {
       state.products.forEach((p) => {
         if (Number(p.price) > 0) add('katalog', p.code || p.id, { Kode: p.code || String(p.id), Produk: p.name, Brand: p.brand || '', Kategori: p.category || '', Tipe: p.type || '', Harga: Number(p.price), Stok: (p.type === 'Decant' && !Number(p.stock)) ? 'ada' : Number(p.stock || 0) });
       });
+      state.members.forEach((m) => add('member', m.id, { Nama: m.name, Telepon: m.phone, 'Tgl Lahir': m.dob || '', 'Batas Hutang': Number(m.limit || 0), Poin: Number(m.points || 0) }));
       state.history.forEach((tx) => add('penjualan', tx.no, {
         No: tx.no, Tanggal: tx.date, Hari: tx.day || '', Kasir: tx.cashier || '', Member: tx.member ? tx.member.name : '',
         Item: itemsText(tx.items, 'price'), Subtotal: tx.sub, Diskon: tx.disc || 0, Total: tx.total, Metode: tx.method, 'Dibayar saat transaksi': tx.cash
@@ -6787,6 +6949,8 @@ function updateOrder_(b) {
       initBirthdayFilters();
       ['#mbMonth', '#mbDay'].forEach((sel) => $(sel).addEventListener('change', () => { bdWeek = false; renderMembers(); }));
       document.querySelectorAll('[data-bd-preset]').forEach((b) => b.addEventListener('click', () => setBirthdayPreset(b.dataset.bdPreset)));
+      $('#meSave').addEventListener('click', saveMemberEdit);
+      $('#meCancel').addEventListener('click', () => $('#memEditDialog').close());
       $('#dobSave').addEventListener('click', saveDob);
       $('#dobCancel').addEventListener('click', () => $('#dobDialog').close());
       $('#pointUse').addEventListener('input', renderCart);
@@ -6814,13 +6978,19 @@ function updateOrder_(b) {
       });
 
       $('#historyList').addEventListener('click', (e) => {
+        const del = e.target.closest('[data-del-tx]');
+        if (del) { deleteTx(del.dataset.delTx); return; }
         const rf = e.target.closest('[data-refund-tx]');
         if (rf) { openRefund(rf.dataset.refundTx); return; }
         const btn = e.target.closest('[data-open-receipt]');
         if (!btn) return;
         openReceiptByNo(btn.dataset.openReceipt);
       });
+      $('#histClearBtn').addEventListener('click', clearHistory);
+      $('#refClearBtn').addEventListener('click', clearRefunds);
       $('#refundList').addEventListener('click', (e) => {
+        const dr = e.target.closest('[data-del-refund]');
+        if (dr) { deleteRefund(dr.dataset.delRefund); return; }
         const b = e.target.closest('[data-open-refund]');
         if (b) openRefundReceipt(b.dataset.openRefund);
       });
