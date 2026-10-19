@@ -1199,6 +1199,15 @@ function updateOrder_(b) {
         <div id="cashierMsg" class="err"></div>
         <div id="cashierList"></div>
       </div>
+    
+      <div class="box" style="border:1px solid #e3b4af;">
+        <h2 style="color:#b34036;">Zona berbahaya</h2>
+        <div class="muted" style="margin-bottom:10px;">Master reset menghapus semua data di perangkat ini: produk, stok, transaksi, member, piutang, biaya, dan lainnya. Data yang sudah terkirim ke Google Sheets tidak ikut terhapus. Unduh cadangan dulu bila perlu (berisi PIN dan token, simpan baik-baik).</div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button id="backupBtn" class="action ghost">Unduh cadangan data</button>
+          <button id="resetBtn" class="action danger">Master reset</button>
+        </div>
+      </div>
     </section>
   </main>
 
@@ -1268,7 +1277,7 @@ function updateOrder_(b) {
     <h2 id="delTitle"></h2>
     <div id="delBody" class="muted" style="white-space:pre-line; margin-bottom:8px;"></div>
     <div id="delCheckWrap" class="hide"><label style="display:flex; gap:8px; align-items:center; margin:8px 0;"><input id="delCheck" type="checkbox" style="width:auto;" /><span id="delCheckLabel"></span></label></div>
-    <div id="delTypeWrap" class="hide"><label class="blk" for="delType">Ketik HAPUS untuk melanjutkan</label><input id="delType" autocomplete="off" /></div>
+    <div id="delTypeWrap" class="hide"><label class="blk" for="delType" id="delTypeLbl">Ketik HAPUS untuk melanjutkan</label><input id="delType" autocomplete="off" /></div>
     <div class="err" id="delErr" role="alert"></div>
     <button id="delYes" class="action danger full">Hapus</button>
     <button id="delNo" class="action ghost full" style="margin-top:8px;">Batal</button>
@@ -2191,7 +2200,7 @@ function updateOrder_(b) {
     }
 
     // Dialog konfirmasi di dalam aplikasi (confirm/prompt bawaan browser sering diblokir di WebView/iframe).
-    let delYesFn = null, delNeedType = false;
+    let delYesFn = null, delWord = '';
     function askDel(o) {
       $('#delTitle').textContent = o.title;
       $('#delBody').textContent = o.body || '';
@@ -2208,12 +2217,13 @@ function updateOrder_(b) {
       yes.textContent = o.yes || 'Hapus';
       $('#delNo').textContent = o.info ? 'Tutup' : 'Batal';
       delYesFn = o.onYes || null;
-      delNeedType = !!o.type;
+      delWord = o.type ? (typeof o.type === 'string' ? o.type : 'HAPUS') : '';
+      $('#delTypeLbl').textContent = 'Ketik ' + (delWord || 'HAPUS') + ' untuk melanjutkan';
       $('#delDialog').showModal();
     }
 
     function delConfirm() {
-      if (delNeedType && $('#delType').value.trim().toUpperCase() !== 'HAPUS') { $('#delErr').textContent = 'Ketik HAPUS dengan benar.'; return; }
+      if (delWord && $('#delType').value.trim().toUpperCase() !== delWord) { $('#delErr').textContent = 'Ketik ' + delWord + ' dengan benar.'; return; }
       const fn = delYesFn, checked = $('#delCheck').checked;
       $('#delDialog').close();
       if (fn) fn(checked);
@@ -2332,6 +2342,42 @@ function updateOrder_(b) {
           saveState();
           renderAll();
         }
+      });
+    }
+
+    function downloadBackup() {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([JSON.stringify(state)], { type: 'application/json' }));
+      a.download = 'cadangan-kasir-' + localISODate() + '.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    }
+
+    function masterReset(keep) {
+      const old = state;
+      const next = structuredClone(defaultState);
+      next.products = [];
+      if (keep) {
+        ['store', 'ownerPin', 'ownerUser', 'users', 'lockSalt', 'paper', 'receiptMode', 'kasirRefund', 'pointCfg'].forEach((k) => { if (old[k] !== undefined) next[k] = structuredClone(old[k]); });
+        if (old.sync) { next.sync = structuredClone(old.sync); next.sync.sent = {}; next.sync.photos = {}; }
+      }
+      state = next;
+      persistState();
+      setTimeout(() => location.reload(), 150);
+    }
+
+    function askMasterReset() {
+      if (!currentUser || currentUser.role !== 'owner') return;
+      askDel({
+        title: 'Master reset: hapus SEMUA data?',
+        body: 'Semua produk, stok, transaksi, refund, member, piutang, biaya, jurnal, invoice, pre order, dan lainnya di perangkat ini akan dihapus. Tidak bisa dibatalkan. Data yang sudah ada di Google Sheets tetap ada.\n\nAplikasi akan dimuat ulang setelah reset.',
+        check: 'Pertahankan pengaturan toko, PIN, akun kasir, dan koneksi Google Sheets',
+        checked: true,
+        type: 'RESET',
+        yes: 'Hapus semua data',
+        onYes: (keep) => masterReset(keep)
       });
     }
 
@@ -7139,6 +7185,8 @@ function updateOrder_(b) {
         if (c.checked) delete bcOff[c.dataset.bcPick]; else bcOff[c.dataset.bcPick] = true;
         renderBroadcast();
       });
+      $('#backupBtn').addEventListener('click', downloadBackup);
+      $('#resetBtn').addEventListener('click', askMasterReset);
       $('#delYes').addEventListener('click', delConfirm);
       $('#delNo').addEventListener('click', () => $('#delDialog').close());
       $('#meSave').addEventListener('click', saveMemberEdit);
