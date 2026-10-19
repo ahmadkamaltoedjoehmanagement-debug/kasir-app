@@ -114,6 +114,7 @@
     .pill { display: inline-block; border-radius: 10px; padding: 1px 8px; font-size: 11px; font-weight: 700; color: #fff; }
     .pill.y { background: #d99a2a; }
     .pill.r { background: #b34036; }
+    .pill.g { background: #5c726f; }
     .item span.pill { display: inline-block; color: #fff; font-size: 11px; }
     .line {
       display: flex;
@@ -269,6 +270,36 @@
       nav { width: 100%; }
       nav button { flex: 1 1 30%; }
     }
+
+    /* ---- Perapian tampilan ---- */
+    header { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "brand user" "nav nav"; gap: 6px 12px; padding: 10px 16px 6px; }
+    header > .brand { grid-area: brand; min-width: 0; width: 100%; border-bottom: 1px dashed rgba(255,255,255,.35); }
+    header > div:last-child { grid-area: user; flex-wrap: nowrap; }
+    nav { grid-area: nav; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; gap: 2px; margin: 0 -16px; padding: 0 16px; -webkit-overflow-scrolling: touch; }
+    nav::-webkit-scrollbar { display: none; }
+    nav button { flex: 0 0 auto !important; white-space: nowrap; border-radius: 8px 8px 0 0; padding: 9px 12px; border-bottom: 3px solid transparent; }
+    nav button[aria-selected="true"] { background: rgba(255,255,255,.14); border-bottom-color: #fff; }
+    nav button:hover { opacity: 1; }
+    .action, .item, nav button, .seg button { transition: filter .12s, transform .06s; }
+    .action:hover, .item:hover { filter: brightness(.96); }
+    .action:active, .item:active { transform: scale(.98); }
+    .action { min-height: 40px; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(15,93,84,.15); }
+    .box { padding: 18px; }
+    dialog { max-height: 90vh; overflow: auto; box-shadow: 0 20px 50px rgba(0,0,0,.25); padding: 18px; }
+    dialog::backdrop { background: rgba(10,30,26,.5); }
+    @media (max-width: 560px) {
+      header { padding: 8px 12px 4px; }
+      nav { margin: 0 -12px; padding: 0 12px; }
+      main { padding: 12px 10px 24px; }
+      .box { padding: 14px; border-radius: 12px; }
+      input, select, textarea { font-size: 16px; }
+      #whoami { max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+      .grid { grid-template-columns: repeat(2, 1fr); }
+      .row .field { width: 120px; }
+      dialog { width: calc(100vw - 16px); }
+    }
   </style>
 </head>
 <body>
@@ -283,9 +314,11 @@
       <button role="tab" data-tab="member" aria-selected="false">Member</button>
       <button role="tab" data-tab="preorder" aria-selected="false">Pre Order <span id="poBadge" class="hide" style="background:#e53935; color:#fff; border-radius:10px; padding:1px 7px; font-size:11px; margin-left:4px;">0</span></button>
       <button role="tab" data-tab="request" aria-selected="false">Request Produk</button>
+      <button role="tab" data-tab="online" aria-selected="false">Pesanan Online</button>
       <button role="tab" data-tab="piutang" aria-selected="false">Piutang</button>
       <button role="tab" data-tab="produktivitas" aria-selected="false">Produktivitas</button>
       <button role="tab" data-tab="tutup" aria-selected="false">Tutup Kasir</button>
+      <button role="tab" data-tab="biaya" aria-selected="false">Biaya</button>
       <button role="tab" data-tab="jurnal" aria-selected="false">Jurnal</button>
       <button role="tab" data-tab="laporan" aria-selected="false">Laporan</button>
       <button role="tab" data-tab="pengaturan" aria-selected="false">Pengaturan</button>
@@ -358,6 +391,7 @@
     <section id="produk" class="view">
       <div class="box">
         <h2>Tambah produk</h2>
+        <div class="muted" style="margin-bottom:8px;">Cukup nama produk. Harga beli dan harga jual diisi nanti saat Stok Masuk.</div>
         <div class="row" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
           <input id="prodCode" placeholder="Kode barang" style="flex:1 1 120px;" />
           <input id="prodName" placeholder="Nama produk" style="flex:2 1 180px;" />
@@ -365,20 +399,25 @@
           <input id="prodCategory" list="categoryOptions" placeholder="Kategori" style="flex:1 1 130px;" autocomplete="off" />
           <datalist id="brandOptions"></datalist>
           <datalist id="categoryOptions"></datalist>
-          <input id="prodCost" type="number" min="0" placeholder="Harga modal" style="flex:1 1 120px;" />
-          <input id="prodPrice" type="number" min="0" placeholder="Harga eceran tertinggi" style="flex:1 1 150px;" />
-          <input id="prodMinPrice" type="number" min="0" placeholder="Harga eceran terendah" style="flex:1 1 150px;" />
           <input id="prodMinStock" type="number" min="0" step="1" placeholder="Stok minimum (alert)" style="flex:1 1 150px;" />
           <button id="addProductBtn" class="action">Simpan</button>
         </div>
         <div id="prodMsg" class="err"></div>
-        <button id="bulkProductBtn" class="action ghost" style="margin-top:8px;">Tambah produk massal</button>
+        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">
+          <button id="bulkProductBtn" class="action ghost">Tambah produk massal</button>
+          <button id="bulkUpdateBtn" class="action ghost">Update produk massal</button>
+          <button id="exportProductsBtn" class="action ghost">Unduh produk (CSV)</button>
+        </div>
         <h2 style="margin-top:18px;">Daftar produk</h2>
         <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:6px;">
           <input id="listSearch" class="search" placeholder="Cari nama, kode, brand, kategori" style="flex:2 1 200px;" />
           <select id="filterCategory" style="flex:1 1 140px;"></select>
           <select id="filterBrand" style="flex:1 1 140px;"></select>
           <select id="filterStock" style="flex:1 1 140px;"><option value="">Semua stok</option><option value="low">Menipis &amp; habis</option></select>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin:6px 0;">
+          <label class="muted" style="display:flex; align-items:center; gap:6px;"><input id="prodSelAll" type="checkbox" style="width:auto;" /> Pilih semua hasil</label>
+          <button id="prodDelSelected" class="action danger" style="padding:6px 10px;" disabled>Hapus terpilih (0)</button>
         </div>
         <div id="productList"></div>
       </div>
@@ -414,19 +453,24 @@
           <label class="muted" style="flex:1 1 200px;">Foto fisik invoice (wajib)
             <input id="stockPhoto" type="file" accept="image/*" />
             <img id="stockPhotoPrev" class="pv hide" alt="Pratinjau foto invoice" />
+            <div id="stockPhotoStatus" class="muted" style="margin-top:4px;" role="status">Belum ada foto. Ketuk untuk memotret atau pilih dari galeri.</div>
           </label>
           <label id="stockProofWrap" class="muted" style="flex:1 1 200px;">Bukti bayar (wajib)
             <input id="stockProof" type="file" accept="image/*" />
             <img id="stockProofPrev" class="pv hide" alt="Pratinjau bukti bayar" />
+            <div id="stockProofStatus" class="muted" style="margin-top:4px;" role="status">Belum ada foto.</div>
           </label>
         </div>
         <div class="row" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top: 10px;">
           <input id="stockProductSearch" placeholder="Cari produk" style="flex:2 1 180px;" />
           <input id="stockQty" type="number" min="1" placeholder="Qty" style="flex:1 1 80px;" />
           <input id="stockCost" type="number" min="0" placeholder="Harga beli per unit" style="flex:2 1 180px;" />
+          <input id="stockPrice" type="number" min="0" placeholder="Harga eceran tertinggi" style="flex:2 1 170px;" />
+          <input id="stockMinPrice" type="number" min="0" placeholder="Harga eceran terendah" style="flex:2 1 170px;" />
           <button id="addStockItemBtn" class="action">Tambah ke invoice</button>
           <button id="bulkStockBtn" class="action ghost">Tambah item massal</button>
         </div>
+        <div id="stockPriceHint" class="muted" style="margin-top:4px;"></div>
         <div id="stockItems" style="margin-top:12px;"></div>
         <div id="stockMsg" class="err"></div>
         <div class="row" style="margin-top: 12px;"><span>Total pembelian</span><b id="stockTotal">Rp0</b></div>
@@ -471,6 +515,7 @@
           <button id="opApply" class="action success" style="flex:1;">Terapkan opname</button>
           <button id="opReset" class="action ghost">Kosongkan hitungan</button>
         </div>
+        <button id="opBulkBtn" class="action ghost full" style="margin-top:8px;">Upload hitungan massal (CSV / tempel dari Excel)</button>
       </div>
       <div class="box" style="margin-top:18px;">
         <h2>Riwayat opname</h2>
@@ -560,6 +605,16 @@
         <div id="poList"></div>
       </div>
     </section>
+    <section id="online" class="view">
+      <div class="box">
+        <h2>Pesanan online</h2>
+        <div class="muted" style="margin-bottom:8px;">Pesanan dari halaman toko online. Untuk pesanan kirim, isi ongkir lalu hubungi pelanggan lewat WhatsApp.</div>
+        <button id="onRefresh" class="action ghost">Muat ulang</button>
+        <div id="onMsg" class="err"></div>
+        <div id="onList"></div>
+      </div>
+    </section>
+
     <section id="request" class="view">
       <div class="box">
         <h2>Request produk baru</h2>
@@ -635,6 +690,41 @@
       </div>
     </section>
 
+    <section id="biaya" class="view">
+      <div class="box">
+        <h2>Catat biaya operasional</h2>
+        <div class="muted" style="margin-bottom:8px;">Untuk pengeluaran toko seperti sewa, listrik, gaji, atau ongkir. Otomatis masuk ke Jurnal dan mengurangi laba di laporan laba rugi. Pembelian stok parfum tidak dicatat di sini, pakai menu Stok Masuk.</div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+          <label class="muted" style="flex:1 1 140px;">Tanggal<input id="byDate" type="date" /></label>
+          <label class="muted" style="flex:1 1 200px;">Kategori
+            <select id="byCat">
+              <option value="6-1200">Sewa</option>
+              <option value="6-1300">Listrik, air &amp; internet</option>
+              <option value="6-1100">Gaji</option>
+              <option value="6-1400">Transportasi &amp; kirim</option>
+              <option value="6-1500">Pemasaran / iklan</option>
+              <option value="6-1900">Operasional lain</option>
+            </select>
+          </label>
+          <label class="muted" style="flex:1 1 140px;">Nominal (Rp)<input id="byAmount" type="number" min="1" step="1" inputmode="numeric" placeholder="0" /></label>
+          <label class="muted" style="flex:1 1 180px;">Dibayar dari
+            <select id="byFrom">
+              <option value="1-1100">Kas (tunai)</option>
+              <option value="1-1200">Bank / e-wallet</option>
+            </select>
+          </label>
+        </div>
+        <input id="byMemo" placeholder="Keterangan (opsional), contoh: Listrik Oktober" autocomplete="off" style="margin-top:8px;" />
+        <div id="byMsg" class="err" role="alert"></div>
+        <button id="bySave" class="action success full">Simpan biaya</button>
+      </div>
+      <div class="box" style="margin-top:18px;">
+        <h2>Daftar biaya</h2>
+        <label class="muted" style="display:block; max-width:220px;">Bulan<input id="byMonth" type="month" /></label>
+        <div id="bySummary" style="margin-top:10px;"></div>
+        <div id="byList" style="margin-top:8px;"></div>
+      </div>
+    </section>
     <section id="jurnal" class="view">
       <div class="box">
         <div class="seg" id="jrMode" style="margin-bottom:12px;">
@@ -675,6 +765,8 @@
       <div class="box">
         <div class="seg" id="reportMode" style="margin-bottom:12px;">
           <button data-rmode="harian" aria-pressed="true">Harian</button>
+          <button data-rmode="mingguan" aria-pressed="false">Mingguan</button>
+          <button data-rmode="bulanan" aria-pressed="false">Bulanan</button>
           <button data-rmode="tutup" aria-pressed="false">Tutup kasir</button>
           <button data-rmode="supplier" aria-pressed="false">Supplier</button>
         </div>
@@ -686,7 +778,19 @@
             <button id="todayBtn" class="action ghost">Hari ini</button>
           </div>
           <div id="reportStats" class="stats"></div>
+          <div id="reportChart" style="margin-top:14px;"></div>
           <div id="reportCashier" style="margin-top:14px;"></div>
+        </div>
+
+        <div id="rpPeriod" class="hide">
+          <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+            <button id="pdPrev" class="action ghost" aria-label="Sebelumnya">&lsaquo;</button>
+            <span id="pdWeekWrap"><input id="pdWeek" type="date" style="max-width:190px;" /></span>
+            <span id="pdMonthWrap" class="hide"><input id="pdMonth" type="month" style="max-width:190px;" /></span>
+            <button id="pdNext" class="action ghost" aria-label="Berikutnya">&rsaquo;</button>
+            <button id="pdNow" class="action ghost">Saat ini</button>
+          </div>
+          <div id="pdOut"></div>
         </div>
 
         <div id="rpClosings" class="hide">
@@ -748,6 +852,7 @@
         <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;">
           <button id="syncSaveBtn" class="action">Simpan &amp; tes koneksi</button>
           <button id="syncNowBtn" class="action ghost">Kirim sekarang</button>
+          <button id="syncAllBtn" class="action ghost">Arsipkan ulang semua</button>
           <button id="syncOffBtn" class="action ghost">Putuskan</button>
         </div>
         <div id="syncStatus" class="muted" style="margin-top:8px;"></div>
@@ -787,7 +892,9 @@ const SHEET_NAMES = {
   pre_order: 'Pre Order',
   dp_preorder: 'DP Pre Order',
   opname: 'Stok Opname',
-  request_produk: 'Request Produk'
+  request_produk: 'Request Produk',
+  katalog: 'Katalog',
+  pesanan_online: 'Pesanan Online'
 };
 
 const HEADERS = {
@@ -802,10 +909,15 @@ const HEADERS = {
   pre_order: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'Kasir', 'Pelanggan', 'Telepon', 'Item', 'Total', 'DP Tersimpan', 'Perkiraan Datang', 'Status', 'Catatan', 'No Transaksi', 'Alasan Batal', 'DP Hangus'],
   dp_preorder: ['Key', 'Perangkat', 'No', 'No PO', 'Tanggal', 'Hari', 'Kasir', 'Jenis', 'Jumlah', 'Metode'],
   opname: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'User', 'Produk Dihitung', 'Produk Selisih', 'Nilai Selisih', 'Catatan', 'Detail Selisih'],
-  request_produk: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'Kasir', 'Pelanggan', 'Telepon', 'Produk', 'Brand', 'Qty', 'Budget', 'Status', 'Catatan']
+  request_produk: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'Kasir', 'Pelanggan', 'Telepon', 'Produk', 'Brand', 'Qty', 'Budget', 'Status', 'Catatan'],
+  katalog: ['Key', 'Perangkat', 'Kode', 'Produk', 'Brand', 'Kategori', 'Tipe', 'Harga', 'Stok'],
+  pesanan_online: ['Key', 'No', 'Tanggal', 'Pelanggan', 'Telepon', 'Item', 'Total', 'Layanan', 'Alamat', 'Ongkir', 'Pembayaran', 'Bukti Bayar', 'Status', 'Catatan']
 };
 
-function doGet() {
+function doGet(e) {
+  if (e &amp;&amp; e.parameter &amp;&amp; e.parameter.action === 'katalog') {
+    return out_({ ok: true, items: readSheet_('katalog') });
+  }
   return out_({ ok: true, name: 'Kasir Arsip', info: 'Gunakan aplikasi kasir untuk mengirim data.' });
 }
 
@@ -815,6 +927,9 @@ function doPost(e) {
     body = JSON.parse(e.postData.contents);
   } catch (err) {
     return out_({ ok: false, error: 'Format permintaan tidak valid.' });
+  }
+  if (body.action === 'order') {
+    return out_(withLock_(function () { return saveOrder_(body); }));
   }
   if (!TOKEN || TOKEN === 'GANTI_TOKEN_RAHASIA') {
     return out_({ ok: false, error: 'TOKEN di Code.gs belum diganti.' });
@@ -831,11 +946,15 @@ function doPost(e) {
   try {
     switch (body.action) {
       case 'ping':
-        return out_({ ok: true, name: 'Kasir Arsip', version: 4 });
+        return out_({ ok: true, name: 'Kasir Arsip', version: 5 });
       case 'records':
         return out_(saveRecords_(body.records || []));
       case 'photo':
         return out_(savePhoto_(body));
+      case 'orders':
+        return out_({ ok: true, orders: readSheet_('pesanan_online') });
+      case 'orderupdate':
+        return out_(updateOrder_(body));
       default:
         return out_({ ok: false, error: 'Aksi tidak dikenal.' });
     }
@@ -926,6 +1045,93 @@ function savePhoto_(body) {
   var blob = Utilities.newBlob(Utilities.base64Decode(body.data), 'image/jpeg', fileName);
   var file = folder.createFile(blob);
   return { ok: true, url: file.getUrl() };
+}
+
+function withLock_(fn) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(25000);
+  } catch (err) {
+    return { ok: false, error: 'Server sibuk, coba lagi sebentar.' };
+  }
+  try {
+    return fn();
+  } catch (err) {
+    return { ok: false, error: String((err &amp;&amp; err.message) || err) };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function readSheet_(type) {
+  var sh = getSheet_(type);
+  var last = sh.getLastRow();
+  if (last &lt; 2) return [];
+  var head = HEADERS[type];
+  var tz = Session.getScriptTimeZone();
+  return sh.getRange(2, 1, last - 1, head.length).getValues().map(function (row) {
+    var o = {};
+    head.forEach(function (h, i) {
+      o[h] = row[i] instanceof Date ? Utilities.formatDate(row[i], tz, 'yyyy-MM-dd HH:mm') : row[i];
+    });
+    return o;
+  });
+}
+
+function saveOrder_(b) {
+  var items = b.items || [];
+  if (!items.length || items.length &gt; 30) throw new Error('Pesanan tidak valid.');
+  var cat = {};
+  readSheet_('katalog').forEach(function (p) { cat[String(p.Kode)] = p; });
+  var total = 0, lines = [];
+  items.forEach(function (it) {
+    var p = cat[String(it.code)];
+    var q = Math.floor(Number(it.qty));
+    if (!p || !(q &gt; 0) || q &gt; 99) throw new Error('Produk tidak ditemukan: ' + it.code);
+    if (p.Stok !== 'ada' &amp;&amp; Number(p.Stok) &lt; q) throw new Error('Stok ' + p.Produk + ' tidak cukup.');
+    total += q * Number(p.Harga);
+    lines.push(p.Produk + ' x' + q + ' @' + p.Harga);
+  });
+  var name = String(b.name || '').slice(0, 80);
+  var phone = String(b.phone || '').slice(0, 20);
+  if (!name || phone.length &lt; 8) throw new Error('Nama dan nomor WhatsApp wajib diisi.');
+  var now = new Date();
+  var tz = Session.getScriptTimeZone();
+  var no = 'ON-' + Utilities.formatDate(now, tz, 'yyMMdd-HHmmss') + '-' + Math.floor(Math.random() * 90 + 10);
+  var proof = '';
+  if (b.pay === 'transfer') {
+    if (!b.proof) throw new Error('Bukti transfer wajib diunggah.');
+    proof = savePhoto_({ id: no, name: 'BuktiOnline', data: b.proof }).url;
+  }
+  var ship = b.ful === 'kirim';
+  if (ship &amp;&amp; !String(b.addr || '').trim()) throw new Error('Alamat pengiriman wajib diisi.');
+  var row = {
+    No: no, Tanggal: Utilities.formatDate(now, tz, 'yyyy-MM-dd HH:mm'), Pelanggan: name, Telepon: "'" + phone,
+    Item: lines.join('; '), Total: total, Layanan: ship ? 'Kirim' : 'Ambil di toko', Alamat: String(b.addr || '').slice(0, 300),
+    Ongkir: 0, Pembayaran: b.pay === 'transfer' ? 'Transfer bank' : 'Bayar saat ambil/COD', 'Bukti Bayar': proof,
+    Status: 'Baru', Catatan: String(b.note || '').slice(0, 300)
+  };
+  getSheet_('pesanan_online').appendRow(HEADERS.pesanan_online.map(function (h) {
+    return h === 'Key' ? no : clean_(row[h]);
+  }));
+  return { ok: true, no: no, total: total };
+}
+
+function updateOrder_(b) {
+  var sh = getSheet_('pesanan_online');
+  var last = sh.getLastRow();
+  var head = HEADERS.pesanan_online;
+  if (last &lt; 2) return { ok: false, error: 'Pesanan tidak ditemukan.' };
+  var keys = sh.getRange(2, 1, last - 1, 1).getValues();
+  for (var i = 0; i &lt; keys.length; i++) {
+    if (String(keys[i][0]) === String(b.no)) {
+      var r = i + 2;
+      if (b.status) sh.getRange(r, head.indexOf('Status') + 1).setValue(String(b.status).slice(0, 30));
+      if (b.ongkir !== undefined &amp;&amp; b.ongkir !== null) sh.getRange(r, head.indexOf('Ongkir') + 1).setValue(Number(b.ongkir) || 0);
+      return { ok: true };
+    }
+  }
+  return { ok: false, error: 'Pesanan tidak ditemukan.' };
 }
 </textarea>
         </details>
@@ -1155,7 +1361,19 @@ function savePhoto_(body) {
     <div id="invDetailBody" style="max-height:60vh; overflow:auto;"></div>
     <button id="invDetailPay" class="action success full" style="margin-top:10px;">Bayar invoice</button>
     <button id="invDetailReturn" class="action ghost full" style="margin-top:8px;">Retur barang ke supplier</button>
+    <button id="invDetailDelete" class="action danger full" style="margin-top:8px;">Hapus invoice</button>
     <button id="invDetailClose" class="action ghost full" style="margin-top:8px;">Tutup</button>
+  </dialog>
+
+  <dialog id="invDelDialog">
+    <h2 style="color:var(--danger);">Hapus invoice?</h2>
+    <div id="invDelInfo" class="muted" style="white-space:pre-line; margin-bottom:8px;"></div>
+    <div class="muted" style="margin-bottom:6px;">Pembayaran ke supplier di invoice ini ikut terhapus dari laporan dan jurnal. Harga beli dan harga jual produk yang pernah diperbarui oleh invoice ini tidak dikembalikan. Data yang sudah terkirim ke Google Sheet tidak ikut terhapus. Tidak bisa dibatalkan.</div>
+    <label style="display:flex; align-items:flex-start; gap:8px; margin:8px 0;"><input id="invDelStock" type="checkbox" style="width:auto; margin-top:3px;" /><span>Kurangi stok produk sesuai isi invoice (disarankan, kecuali stok memang sudah disesuaikan)</span></label>
+    <div id="invDelStockList" class="muted" style="white-space:pre-line; margin-bottom:8px;"></div>
+    <div id="invDelErr" class="err" role="alert"></div>
+    <button id="invDelGo" class="action danger full">Hapus invoice</button>
+    <button id="invDelCancel" class="action ghost full" style="margin-top:8px;">Batal</button>
   </dialog>
 
   <dialog id="invPayDialog">
@@ -1312,7 +1530,7 @@ function savePhoto_(body) {
     let activeStockDraft = [];
     let currentUser = null;
     let currentReceiptTx = null;
-    const KASIR_TABS = ['kasir', 'riwayat', 'member', 'preorder', 'request', 'piutang', 'tutup', 'produktivitas'];
+    const KASIR_TABS = ['online', 'kasir', 'riwayat', 'member', 'preorder', 'request', 'piutang', 'tutup', 'produktivitas'];
     const canRefund = () => !!currentUser && (currentUser.role === 'owner' || !!state.kasirRefund);
     const nowLabel = () => new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
     const debtPaid = (d) => (d.payments || []).reduce((a, p) => a + Number(p.amount || 0), 0);
@@ -1367,7 +1585,8 @@ function savePhoto_(body) {
         if (!Array.isArray(d.payments)) d.payments = [];
         d.credit = Number(d.credit || 0);
       });
-      state.stockHistory.forEach((e) => {
+      state.stockHistory.forEach((e, i) => {
+        if (e.uid === undefined || e.uid === null || e.uid === '') e.uid = String(i);
         if (!Array.isArray(e.payments)) { e.payments = []; e.legacy = true; }
       });
       state.sync = Object.assign(makeSync(), (state.sync && typeof state.sync === 'object') ? state.sync : {});
@@ -1540,11 +1759,11 @@ function savePhoto_(body) {
         return hay.includes(keyword);
       }).forEach((p) => {
         const qty = cart[p.id] || 0;
-        html += '<button class="item' + (Number(p.stock || 0) <= 0 ? ' oos' : ((minStockOf(p) ? isLowStock(p) : p.stock <= 5) ? ' warn' : '')) + '" data-id="' + p.id + '" ' + (Number(p.stock || 0) <= 0 ? 'data-po="1"' : ((qty >= (p.stock || 0)) ? 'disabled' : '')) + '>' +
+        html += '<button class="item' + (Number(p.stock || 0) <= 0 ? ' oos' : ((minStockOf(p) ? isLowStock(p) : p.stock <= 5) ? ' warn' : '')) + '" data-id="' + p.id + '" ' + (Number(p.stock || 0) <= 0 ? 'data-po="1"' : ((qty >= (p.stock || 0) || !(Number(p.price) > 0)) ? 'disabled' : '')) + '>' +
           '<b>' + escapeHtml(p.name) + '</b>' +
           ((p.brand || p.category) ? '<span>' + escapeHtml([p.brand, p.category].filter(Boolean).join(' · ')) + '</span>' : '') +
-          '<span>' + escapeHtml(p.code) + ' · ' + formatRp(p.price) + '</span>' +
-          '<span>' + (Number(p.stock || 0) <= 0 ? '<span class="pill r">Habis · Pre Order</span>' : ((minStockOf(p) ? isLowStock(p) : p.stock <= 5) ? '<span class="pill y">Stok ' + p.stock + (minStockOf(p) ? ' · Min ' + minStockOf(p) : '') + '</span>' : 'Stok ' + p.stock + (minStockOf(p) ? ' · Min ' + minStockOf(p) : ''))) + '</span>' +
+          '<span>' + escapeHtml(p.code) + ' · ' + (Number(p.price) > 0 ? formatRp(p.price) : 'Belum ada harga') + '</span>' +
+          '<span>' + (Number(p.stock || 0) <= 0 ? '<span class="pill r">Habis · Pre Order</span>' : !(Number(p.price) > 0) ? '<span class="pill g">Harga belum diisi</span>' : ((minStockOf(p) ? isLowStock(p) : p.stock <= 5) ? '<span class="pill y">Stok ' + p.stock + (minStockOf(p) ? ' · Min ' + minStockOf(p) : '') + '</span>' : 'Stok ' + p.stock + (minStockOf(p) ? ' · Min ' + minStockOf(p) : ''))) + '</span>' +
           '</button>';
       });
       $('#productGrid').innerHTML = html || '<div class="muted">Produk tidak ditemukan.</div>';
@@ -1602,21 +1821,24 @@ function savePhoto_(body) {
       }
     }
 
-    function showStockToast(lines) {
+    function showToastBox(title, lines, color) {
       if (!lines.length) return;
       const old = document.getElementById('stockToast');
       if (old) old.remove();
       const el = document.createElement('div');
       el.id = 'stockToast';
       el.setAttribute('popover', 'manual');
-      el.style.cssText = 'position:fixed; inset:auto 12px 16px 12px; margin:0 auto; max-width:420px; width:auto; background:#fff; color:#12312c; border:2px solid #b34036; border-radius:12px; padding:12px 14px; box-shadow:0 12px 26px rgba(0,0,0,.25); cursor:pointer;';
-      el.innerHTML = '<b>Peringatan stok</b><div style="margin-top:4px;">' + lines.join('<br>') + '</div><div class="muted" style="margin-top:6px;">Ketuk untuk menutup</div>';
+      el.style.cssText = 'position:fixed; inset:auto 12px 16px 12px; margin:0 auto; max-width:420px; width:auto; background:#fff; color:#12312c; border:2px solid ' + color + '; border-radius:12px; padding:12px 14px; box-shadow:0 12px 26px rgba(0,0,0,.25); cursor:pointer; max-height:60vh; overflow:auto;';
+      el.innerHTML = '<b>' + title + '</b><div style="margin-top:4px; white-space:pre-line;">' + lines.join('<br>') + '</div><div class="muted" style="margin-top:6px;">Ketuk untuk menutup</div>';
       document.body.appendChild(el);
       try { el.showPopover(); } catch (e) { /* browser lama: tetap tampil sebagai elemen fixed */ }
       const close = () => { try { el.hidePopover(); } catch (e) { /* abaikan */ } el.remove(); };
       el.addEventListener('click', close);
-      setTimeout(close, 9000);
+      setTimeout(close, 12000);
     }
+
+    function showStockToast(lines) { showToastBox('Peringatan stok', lines, '#b34036'); }
+    function showNotice(msg, title) { showToastBox(title || 'Pemberitahuan', [escapeHtml(String(msg === undefined || msg === null ? '' : msg))], '#d99a2a'); }
 
     function notifyStockAfterSale(items) {
       const out = [];
@@ -1648,17 +1870,21 @@ function savePhoto_(body) {
         const hay = (p.name + ' ' + p.code + ' ' + (p.brand || '') + ' ' + (p.category || '')).toLowerCase();
         return hay.includes(q);
       });
+      prodVisible = list.map((p) => p.id);
+      Array.from(prodSel).forEach((id) => { if (!prodVisible.includes(id)) prodSel.delete(id); });
       const html = list.map((p) => {
         return '<div class="line">' +
+          '<input type="checkbox" data-sel-product="' + p.id + '"' + (prodSel.has(p.id) ? ' checked' : '') + ' style="width:auto; margin-right:4px;" aria-label="Pilih produk" />' +
           '<div class="n"><b>' + escapeHtml(p.name) + '</b>' +
           '<small>Brand ' + escapeHtml(p.brand || '-') + ' · Kategori ' + escapeHtml(p.category || '-') + '</small>' +
-          '<small>Kode ' + escapeHtml(p.code) + ' · Modal ' + formatRp(p.cost) + ' · Eceran ' + formatRp(minPriceOf(p)) + ' - ' + formatRp(p.price) + ' · Stok ' + (p.stock || 0) + ' · Min ' + (minStockOf(p) || '-') + '</small>' +
+          '<small>Kode ' + escapeHtml(p.code) + (Number(p.price) > 0 ? ' · Modal ' + formatRp(p.cost) + ' · Eceran ' + formatRp(minPriceOf(p)) + ' - ' + formatRp(p.price) : ' · Harga belum diisi') + ' · Stok ' + (p.stock || 0) + ' · Min ' + (minStockOf(p) || '-') + '</small>' +
           (Number(p.stock || 0) <= 0 ? '<small><span class="pill r">Habis</span></small>' : (isLowStock(p) ? '<small><span class="pill y">Sudah minimum stock</span></small>' : '')) + '</div>' +
           '<div class="q"><button class="action ghost" data-edit-product="' + p.id + '" style="padding:6px 10px;">Ubah</button>' +
           '<button class="x" data-del-product="' + p.id + '">Hapus</button></div>' +
           '</div>';
       }).join('');
       $('#productList').innerHTML = html || '<div class="muted">' + (state.products.length ? 'Produk tidak ditemukan.' : 'Belum ada produk.') + '</div>';
+      updateProdSelUI();
     }
 
     const BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
@@ -1798,7 +2024,7 @@ function savePhoto_(body) {
         const labels = { earn: 'Dapat', redeem: 'Tukar', refund: 'Refund', adjust: 'Penyesuaian' };
         const rows = state.pointLog.filter((l) => l.phone === m.phone).slice(-15).reverse()
           .map((l) => l.day + ' · ' + (labels[l.type] || l.type) + ' ' + (l.pts > 0 ? '+' : '') + l.pts + ' · saldo ' + l.balance + (l.txNo ? ' · ' + l.txNo : '') + (l.note ? ' · ' + l.note : ''));
-        alert(m.name + ' - saldo ' + (m.points || 0) + ' poin\n\n' + (rows.join('\n') || 'Belum ada riwayat poin.'));
+        showNotice(m.name + ' - saldo ' + (m.points || 0) + ' poin\n\n' + (rows.join('\n') || 'Belum ada riwayat poin.'));
         return;
       }
       const adj = e.target.closest('[data-pt-adj]');
@@ -1809,8 +2035,8 @@ function savePhoto_(body) {
         const raw = prompt('Tambah atau kurangi poin ' + m.name + ' (saldo ' + (m.points || 0) + '). Contoh: 50 atau -20', '');
         if (raw === null) return;
         const delta = Math.trunc(Number(String(raw).trim()));
-        if (!Number.isFinite(delta) || delta === 0) { alert('Isi angka poin yang valid, bukan nol.'); return; }
-        if ((m.points || 0) + delta < 0) { alert('Saldo poin tidak boleh kurang dari 0.'); return; }
+        if (!Number.isFinite(delta) || delta === 0) { showNotice('Isi angka poin yang valid, bukan nol.'); return; }
+        if ((m.points || 0) + delta < 0) { showNotice('Saldo poin tidak boleh kurang dari 0.'); return; }
         const note = prompt('Alasan penyesuaian (opsional):', '') || '';
         addPoints(m, delta, 'adjust', '', note.trim());
         saveState();
@@ -2016,7 +2242,8 @@ function savePhoto_(body) {
       const e = state.stockHistory[t.idx];
       if (!e) return;
       try {
-        const blob = await compressImage(file);
+        await checkPhotoStorage();
+        const blob = (await prepareImage(file)).blob;
         const id = newPhotoId();
         await putPhoto(id, blob);
         if (t.kind === 'inv') {
@@ -2030,7 +2257,7 @@ function savePhoto_(body) {
         renderStockHistory();
         openInvDetail(t.idx);
       } catch (err) {
-        alert(err.message || 'Foto gagal dilampirkan.');
+        showNotice((err && err.message) || 'Foto gagal dilampirkan.', 'Foto gagal dilampirkan');
       }
     }
 
@@ -2127,6 +2354,111 @@ function savePhoto_(body) {
         ? '<h2>Per kasir</h2>' + rows.map((r) => '<div class="line"><div class="n"><b>' + escapeHtml(r.name) + '</b><small>' + r.count + ' transaksi' +
             (r.refund ? ' · Refund -' + formatRp(r.refund) : '') + (r.pay ? ' · Bayar hutang ' + formatRp(r.pay) : '') + '</small></div><b>' + formatRp(r.sales) + '</b></div>').join('')
         : '';
+      renderDailyCharts(date);
+    }
+
+    // ===== Laporan harian / mingguan / bulanan + grafik =====
+    let periodMode = 'mingguan';
+    const pad2 = (n) => String(n).padStart(2, '0');
+    const isoOf = (d) => d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+    const shiftISO = (iso, n) => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return isoOf(d); };
+    const DAYN = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+
+    function svgBars(labels, vals, showAll) {
+      const W = showAll ? 420 : 640, fs = showAll ? 13 : 18, H = 220, L = 8, B = 28, T = 22, n = vals.length, max = Math.max(1, ...vals), bw = (W - L * 2) / n;
+      const short = (v) => v >= 1e6 ? (v / 1e6).toFixed(1).replace('.0', '') + ' jt' : v >= 1e3 ? Math.round(v / 1e3) + ' rb' : String(v);
+      let g = '';
+      vals.forEach((v, i) => {
+        const h = Math.round((H - B - T) * Math.max(v, 0) / max), x = L + i * bw + bw * 0.15, w = bw * 0.7, y = H - B - h, cx = (x + w / 2).toFixed(1);
+        g += '<rect x="' + x.toFixed(1) + '" y="' + y + '" width="' + w.toFixed(1) + '" height="' + Math.max(h, v > 0 ? 2 : 0) + '" rx="3" fill="var(--primary)"><title>' + escapeHtml(labels[i]) + ': ' + formatRp(v) + '</title></rect>';
+        if (showAll && v > 0) g += '<text x="' + cx + '" y="' + (y - 5) + '" text-anchor="middle" font-size="' + fs + '" fill="var(--ink)">' + short(v) + '</text>';
+        if (showAll || i % 5 === 0 || i === n - 1) g += '<text x="' + cx + '" y="' + (H - 9) + '" text-anchor="middle" font-size="' + fs + '" fill="var(--muted)">' + escapeHtml(labels[i]) + '</text>';
+      });
+      return '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;" role="img"><line x1="0" x2="' + W + '" y1="' + (H - B) + '" y2="' + (H - B) + '" stroke="var(--line)"/>' + g + '</svg>';
+    }
+
+    function hBars(rows) {
+      const max = Math.max(1, ...rows.map((r) => r[1]));
+      return rows.length ? rows.map((r) => '<div style="margin:8px 0;"><div style="display:flex; justify-content:space-between; gap:8px;"><span>' + escapeHtml(r[0]) + '</span><b>' + r[2] + '</b></div><div style="background:var(--primary-soft); border-radius:6px; height:8px;"><div style="background:var(--primary); width:' + Math.round(r[1] / max * 100) + '%; height:8px; border-radius:6px;"></div></div></div>').join('') : '<div class="muted">Belum ada data.</div>';
+    }
+
+    function periodData(days) {
+      const set = new Set(days), per = {}, prod = {}, meth = {};
+      days.forEach((d) => { per[d] = { sales: 0, refund: 0 }; });
+      let count = 0, sales = 0, cost = 0, refund = 0;
+      state.history.forEach((tx) => {
+        if (!set.has(tx.day)) return;
+        const t = Number(tx.total || 0), m = tx.method || '-';
+        per[tx.day].sales += t; sales += t; count++;
+        meth[m] = (meth[m] || 0) + t;
+        (tx.items || []).forEach((it) => {
+          cost += Number(it.cost || 0) * Number(it.qty);
+          const p = (prod[it.name] = prod[it.name] || { qty: 0, rev: 0 });
+          p.qty += Number(it.qty); p.rev += Number(it.qty) * Number(it.price || 0);
+        });
+      });
+      state.refunds.forEach((r) => { if (set.has(r.day)) { per[r.day].refund += Number(r.amount || 0); refund += Number(r.amount || 0); } });
+      return { per, count, sales, cost, refund, prod, meth };
+    }
+
+    function rankBlocks(d) {
+      const prods = Object.entries(d.prod).sort((a, b) => b[1].rev - a[1].rev).slice(0, 5).map(([n, p]) => [n, p.rev, formatRp(p.rev) + ' · ' + p.qty + ' pcs']);
+      const meths = Object.entries(d.meth).sort((a, b) => b[1] - a[1]).map(([n, v]) => [n, v, formatRp(v)]);
+      return '<div class="layout" style="margin-top:14px;"><div><h2>Produk terlaris</h2>' + hBars(prods) + '</div><div><h2>Per metode pembayaran</h2>' + hBars(meths) + '</div></div>';
+    }
+
+    function renderDailyCharts(date) {
+      const days = [];
+      for (let i = 6; i >= 0; i--) days.push(shiftISO(date, -i));
+      const d = periodData(days), one = periodData([date]);
+      const labels = days.map((x) => DAYN[new Date(x + 'T12:00:00').getDay()] + ' ' + x.slice(8));
+      $('#reportChart').innerHTML = '<h2>Penjualan bersih 7 hari terakhir</h2>' + svgBars(labels, days.map((x) => d.per[x].sales - d.per[x].refund), true) + rankBlocks(one);
+    }
+
+    const MONN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    function renderPeriod() {
+      const weekly = periodMode === 'mingguan';
+      $('#pdWeekWrap').classList.toggle('hide', !weekly);
+      $('#pdMonthWrap').classList.toggle('hide', weekly);
+      const periods = [];
+      if (weekly) {
+        const base = $('#pdWeek').value || localISODate();
+        const start = shiftISO(base, -((new Date(base + 'T12:00:00').getDay() + 6) % 7));
+        for (let k = 3; k >= 0; k--) {
+          const st = shiftISO(start, -7 * k), days = [];
+          for (let i = 0; i < 7; i++) days.push(shiftISO(st, i));
+          periods.push({ days, label: st.slice(8) + '/' + st.slice(5, 7), range: st + ' s/d ' + days[6] });
+        }
+      } else {
+        const [y, m] = ($('#pdMonth').value || localISODate().slice(0, 7)).split('-').map(Number);
+        for (let k = 3; k >= 0; k--) {
+          const dt = new Date(y, m - 1 - k, 1), ym = dt.getFullYear() + '-' + pad2(dt.getMonth() + 1), n = new Date(dt.getFullYear(), dt.getMonth() + 1, 0).getDate(), days = [];
+          for (let i = 1; i <= n; i++) days.push(ym + '-' + pad2(i));
+          periods.push({ days, label: MONN[dt.getMonth()] + ' ' + String(dt.getFullYear()).slice(2), range: MONN[dt.getMonth()] + ' ' + dt.getFullYear() });
+        }
+      }
+      periods.forEach((p) => { p.d = periodData(p.days); });
+      const cur = periods[3].d, all = periodData([].concat(...periods.map((p) => p.days)));
+      const unit = weekly ? 'minggu' : 'bulan';
+      const net = (d) => d.sales - d.refund;
+      const stat = (l, v) => '<div class="stat"><span>' + l + '</span><b>' + v + '</b></div>';
+      const rows = periods.map((p) => '<tr><td>' + escapeHtml(p.range) + '</td><td class="num">' + formatRp(p.d.sales) + '</td><td class="num hm">-' + formatRp(p.d.refund) + '</td><td class="num"><b>' + formatRp(net(p.d)) + '</b></td><td class="num hm">' + p.d.count + '</td><td class="num hm">' + formatRp(p.d.sales - p.d.cost) + '</td></tr>').join('');
+      $('#pdOut').innerHTML = '<h2 style="margin-top:14px;">' + (weekly ? 'Minggu' : 'Bulan') + ' terpilih: ' + escapeHtml(periods[3].range) + '</h2><div class="stats">' +
+        stat('Penjualan', formatRp(cur.sales)) + stat('Refund', '-' + formatRp(cur.refund)) + stat('Penjualan bersih', formatRp(net(cur))) +
+        stat('Transaksi', cur.count) + stat('Rata-rata / transaksi', formatRp(cur.count ? Math.round(cur.sales / cur.count) : 0)) +
+        stat('Laba kotor (sebelum refund)', formatRp(cur.sales - cur.cost)) + '</div>' +
+        '<h2 style="margin-top:14px;">Penjualan bersih 4 ' + unit + ' terakhir</h2>' + svgBars(periods.map((p) => p.label), periods.map((p) => net(p.d)), true) +
+        '<div style="overflow-x:auto; margin-top:10px;"><table class="tbl"><thead><tr><th>' + (weekly ? 'Minggu' : 'Bulan') + '</th><th class="num">Penjualan</th><th class="num hm">Refund</th><th class="num">Bersih</th><th class="num hm">Transaksi</th><th class="num hm">Laba kotor</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+        '<div class="muted" style="margin-top:10px;">Produk terlaris dan metode pembayaran di bawah dihitung dari 4 ' + unit + ' terakhir.</div>' + rankBlocks(all);
+    }
+
+    function shiftPeriod(dir) {
+      if (periodMode === 'mingguan') $('#pdWeek').value = shiftISO($('#pdWeek').value || localISODate(), 7 * dir);
+      else {
+        const [y, m] = ($('#pdMonth').value || localISODate().slice(0, 7)).split('-').map(Number), dt = new Date(y, m - 1 + dir, 1);
+        $('#pdMonth').value = dt.getFullYear() + '-' + pad2(dt.getMonth() + 1);
+      }
+      renderPeriod();
     }
 
     function renderStockDraft() {
@@ -2134,34 +2466,50 @@ function savePhoto_(body) {
       let total = 0;
       const html = items.map((item) => {
         total += Number(item.qty) * Number(item.cost || 0);
-        return '<div class="line"><div class="n"><b>' + escapeHtml(item.name) + '</b><small>' + item.qty + ' x ' + formatRp(item.cost || 0) + (getProductById(item.id) ? ' · Stok kini ' + Number(getProductById(item.id).stock || 0) + ' · Min ' + (minStockOf(getProductById(item.id)) || '-') : '') + '</small></div><button class="x" data-remove-stock-item="' + item.id + '">Hapus</button></div>';
+        return '<div class="line"><div class="n"><b>' + escapeHtml(item.name) + '</b><small>' + item.qty + ' x ' + formatRp(item.cost || 0) + (item.price > 0 ? ' · Jual ' + formatRp(item.minPrice || item.price) + ' - ' + formatRp(item.price) : '') + (getProductById(item.id) ? ' · Stok kini ' + Number(getProductById(item.id).stock || 0) + ' · Min ' + (minStockOf(getProductById(item.id)) || '-') : '') + '</small></div><button class="x" data-remove-stock-item="' + item.id + '">Hapus</button></div>';
       }).join('');
       $('#stockItems').innerHTML = html || '<div class="muted">Belum ada item masuk.</div>';
       $('#stockTotal').textContent = formatRp(total);
     }
 
+    function findStockProduct() {
+      const search = $('#stockProductSearch').value.trim().toLowerCase();
+      if (!search) return null;
+      return state.products.find((p) => (p.code + ' ' + p.name).toLowerCase().includes(search)) || null;
+    }
+
+    function updateStockPriceHint() {
+      const p = findStockProduct();
+      const el = $('#stockPriceHint');
+      if (!p) { el.textContent = ''; return; }
+      el.textContent = Number(p.price) > 0
+        ? p.name + ' · stok kini ' + Number(p.stock || 0) + ' · harga jual saat ini ' + formatRp(minPriceOf(p)) + ' - ' + formatRp(p.price) + '. Kolom harga jual boleh dikosongkan bila tidak berubah.'
+        : p.name + ' belum punya harga. Harga beli dan harga eceran tertinggi wajib diisi (terendah kosong = sama dengan tertinggi).';
+    }
+
     function addStockItem() {
-      const search = $('#stockProductSearch').value.trim();
+      const msg = $('#stockMsg');
       const qty = cleanNum($('#stockQty').value);
       const cost = cleanNum($('#stockCost').value);
-      const product = state.products.find((p) => {
-        if (!search) return false;
-        const hay = (p.code + ' ' + p.name).toLowerCase();
-        return hay.includes(search.toLowerCase());
-      });
-      if (!product) {
-        $('#stockMsg').textContent = 'Pilih produk yang valid.';
-        return;
+      const priceRaw = $('#stockPrice').value.trim();
+      const minRaw = $('#stockMinPrice').value.trim();
+      const product = findStockProduct();
+      if (!product) { msg.textContent = 'Pilih produk yang valid.'; return; }
+      if (!qty || qty <= 0) { msg.textContent = 'Qty harus lebih dari 0.'; return; }
+      const priced = Number(product.price) > 0;
+      let price = priceRaw === '' ? 0 : cleanNum(priceRaw);
+      let minPrice = minRaw === '' ? 0 : cleanNum(minRaw);
+      if (!priced) {
+        if (!(cost > 0)) { msg.textContent = 'Produk ini belum punya harga. Isi harga beli per unit.'; return; }
+        if (!(price > 0)) { msg.textContent = 'Produk ini belum punya harga. Isi harga eceran tertinggi.'; return; }
       }
-      if (!qty || qty <= 0) {
-        $('#stockMsg').textContent = 'Qty harus lebih dari 0.';
-        return;
-      }
-      activeStockDraft.push({ id: product.id, name: product.name, code: product.code, qty, cost });
-      $('#stockProductSearch').value = '';
-      $('#stockQty').value = '';
-      $('#stockCost').value = '';
-      $('#stockMsg').textContent = '';
+      const effPrice = price > 0 ? price : Number(product.price) || 0;
+      if (minRaw !== '' && (!(minPrice > 0) || minPrice > effPrice)) { msg.textContent = 'Harga eceran terendah harus lebih dari 0 dan tidak boleh melebihi harga eceran tertinggi.'; return; }
+      if (price > 0 && minRaw === '') minPrice = priced ? Math.min(minPriceOf(product), price) : price;
+      activeStockDraft.push({ id: product.id, name: product.name, code: product.code, qty, cost, price, minPrice });
+      ['#stockProductSearch', '#stockQty', '#stockCost', '#stockPrice', '#stockMinPrice'].forEach((s) => { $(s).value = ''; });
+      $('#stockPriceHint').textContent = '';
+      msg.textContent = '';
       renderStockDraft();
     }
 
@@ -2207,42 +2555,77 @@ function savePhoto_(body) {
 
     const newPhotoId = () => 'ph-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
 
-    function compressImage(file) {
+    const readAsDataUrl = (blob) => new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result));
+      r.onerror = () => reject(r.error || new Error('Gagal membaca file.'));
+      r.readAsDataURL(blob);
+    });
+
+    function loadImg(url) {
       return new Promise((resolve, reject) => {
-        if (!file || !(/^image\//.test(file.type || '') || /\.(jpe?g|png|webp|gif|bmp|heic|heif)$/i.test(file.name || ''))) {
-          reject(new Error('File harus berupa gambar (foto).'));
-          return;
-        }
-        const url = URL.createObjectURL(file);
         const img = new Image();
-        img.onload = () => {
-          const scale = Math.min(1, 1280 / Math.max(img.naturalWidth, img.naturalHeight));
-          const w = Math.max(1, Math.round(img.naturalWidth * scale));
-          const h = Math.max(1, Math.round(img.naturalHeight * scale));
-          const c = document.createElement('canvas');
-          c.width = w; c.height = h;
-          const ctx = c.getContext('2d');
-          ctx.fillStyle = '#fff';
-          ctx.fillRect(0, 0, w, h);
-          ctx.drawImage(img, 0, 0, w, h);
-          URL.revokeObjectURL(url);
-          c.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Gagal memproses gambar.'))), 'image/jpeg', 0.75);
-        };
-        img.onerror = () => {
-          URL.revokeObjectURL(url);
-          reject(new Error('Gambar tidak bisa dibaca. Coba foto ulang atau pilih file JPG/PNG.'));
-        };
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('decode'));
         img.src = url;
       });
+    }
+
+    function drawToJpeg(source, nw, nh) {
+      const scale = Math.min(1, 1280 / Math.max(nw, nh));
+      const w = Math.max(1, Math.round(nw * scale));
+      const h = Math.max(1, Math.round(nh * scale));
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(source, 0, 0, w, h);
+      return new Promise((resolve, reject) => c.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Gagal memproses gambar.'))), 'image/jpeg', 0.75));
+    }
+
+    async function compressImage(file) {
+      if (!file || !(/^image\//.test(file.type || '') || /\.(jpe?g|png|webp|gif|bmp|heic|heif)$/i.test(file.name || ''))) {
+        throw new Error('File harus berupa gambar (foto).');
+      }
+      // Cara 1: langsung dari file (tidak memakai alamat blob:, jadi tidak terkena pembatasan keamanan browser)
+      if (typeof createImageBitmap === 'function') {
+        try {
+          const bmp = await createImageBitmap(file);
+          try { return await drawToJpeg(bmp, bmp.width, bmp.height); } finally { if (bmp.close) bmp.close(); }
+        } catch (e) { /* lanjut ke cara berikutnya */ }
+      }
+      // Cara 2: elemen gambar lewat alamat blob:
+      try {
+        const url = URL.createObjectURL(file);
+        try {
+          const img = await loadImg(url);
+          return await drawToJpeg(img, img.naturalWidth, img.naturalHeight);
+        } finally { URL.revokeObjectURL(url); }
+      } catch (e) { /* lanjut */ }
+      // Cara 3: elemen gambar lewat data URL
+      try {
+        const img = await loadImg(await readAsDataUrl(file));
+        return await drawToJpeg(img, img.naturalWidth, img.naturalHeight);
+      } catch (e) { /* menyerah */ }
+      throw new Error('Gambar tidak bisa dibaca oleh browser ini. Coba foto ulang, pilih file JPG/PNG lain, atau buka aplikasi di Chrome/Safari biasa.');
+    }
+
+    function setImgFromBlob(img, blob, onUrl) {
+      const u = URL.createObjectURL(blob);
+      if (onUrl) onUrl(u);
+      img.onerror = () => {
+        img.onerror = () => img.classList.add('hide');
+        readAsDataUrl(blob).then((d) => { img.src = d; }).catch(() => img.classList.add('hide'));
+      };
+      img.src = u;
     }
 
     function setPreview(sel, blob) {
       const img = $(sel);
       if (img.dataset.url) URL.revokeObjectURL(img.dataset.url);
       if (blob) {
-        const u = URL.createObjectURL(blob);
-        img.dataset.url = u;
-        img.src = u;
+        setImgFromBlob(img, blob, (u) => { img.dataset.url = u; });
         img.classList.remove('hide');
       } else {
         delete img.dataset.url;
@@ -2251,20 +2634,60 @@ function savePhoto_(body) {
       }
     }
 
-    async function pickPhoto(inputSel, previewSel, msgSel, assign) {
+    const isHeic = (f) => /heic|heif/i.test((f && f.type) || '') || /\.(heic|heif)$/i.test((f && f.name) || '');
+
+    async function checkPhotoStorage() {
+      const fail = () => new Error('Penyimpanan foto tidak tersedia di browser ini (mode privat, pratinjau, atau dibatasi). Buka aplikasi di Chrome/Safari biasa, bukan mode privat.');
+      try {
+        const db = await Promise.race([openPhotoDb(), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 4000))]);
+        db.close();
+      } catch (e) {
+        throw fail();
+      }
+    }
+
+    async function prepareImage(file) {
+      if (file && file.size > 40 * 1024 * 1024) throw new Error('Ukuran file terlalu besar (maks. 40 MB). Coba foto dengan resolusi lebih kecil.');
+      try {
+        return { blob: await compressImage(file), preview: true };
+      } catch (err) {
+        const okType = file && (isHeic(file) || /^image\/(jpeg|png|webp|gif|bmp)$/i.test(file.type || ''));
+        if (okType && file.size <= 6 * 1024 * 1024) return { blob: file, preview: false };
+        throw err;
+      }
+    }
+
+    function setPhotoStatus(sel, text, kind) {
+      const el = sel ? $(sel) : null;
+      if (!el) return;
+      el.textContent = text;
+      el.style.color = kind === 'err' ? 'var(--danger)' : (kind === 'ok' ? 'var(--accent)' : '');
+      el.style.fontWeight = kind === 'err' ? '700' : '';
+    }
+
+    const fileSizeText = (n) => (n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB');
+
+    async function pickPhoto(inputSel, previewSel, msgSel, assign, statusSel) {
       const file = $(inputSel).files[0];
       assign(null);
       setPreview(previewSel, null);
-      if (!file) return;
+      const say = (t, k) => {
+        if (statusSel) setPhotoStatus(statusSel, t, k);
+        else if (k === 'err') $(msgSel).textContent = t;
+      };
+      if (!file) { say('Belum ada foto. Ketuk untuk memotret atau pilih dari galeri.', ''); return; }
       photoBusy++;
+      say('Memproses foto…', '');
       try {
-        const blob = await compressImage(file);
-        assign(blob);
-        setPreview(previewSel, blob);
+        await checkPhotoStorage();
+        const r = await prepareImage(file);
+        assign(r.blob);
+        if (r.preview) setPreview(previewSel, r.blob);
         $(msgSel).textContent = '';
+        say('✓ Foto siap: ' + (file.name || 'foto') + ' (' + fileSizeText(r.blob.size) + ')' + (r.preview ? '' : ' · browser ini tidak bisa menampilkan pratinjau, foto tetap disimpan apa adanya'), 'ok');
       } catch (err) {
         $(inputSel).value = '';
-        $(msgSel).textContent = err.message;
+        say('✗ ' + ((err && err.message) || 'Foto gagal diproses. Coba pilih foto lain.'), 'err');
       } finally {
         photoBusy--;
       }
@@ -2280,9 +2703,7 @@ function savePhoto_(body) {
         try {
           const blob = await getPhoto(img.dataset.photo);
           if (blob) {
-            const u = URL.createObjectURL(blob);
-            photoUrls.push(u);
-            img.src = u;
+            setImgFromBlob(img, blob, (u) => photoUrls.push(u));
           } else {
             img.replaceWith(Object.assign(document.createElement('span'), { className: 'muted', textContent: 'Foto tidak ditemukan di perangkat ini.' }));
           }
@@ -2336,10 +2757,14 @@ function savePhoto_(body) {
       }
       if (!pendingInvPhoto) {
         $('#stockMsg').textContent = 'Foto fisik invoice wajib dilampirkan.';
+        setPhotoStatus('#stockPhotoStatus', '✗ Foto fisik invoice wajib dilampirkan sebelum invoice disimpan.', 'err');
+        $('#stockPhotoStatus').scrollIntoView({ block: 'center', behavior: 'smooth' });
         return;
       }
       if (paidNow > 0 && !pendingInvProof) {
         $('#stockMsg').textContent = 'Bukti pembayaran wajib dilampirkan.';
+        setPhotoStatus('#stockProofStatus', '✗ Bukti pembayaran wajib dilampirkan karena ada pembayaran.', 'err');
+        $('#stockProofStatus').scrollIntoView({ block: 'center', behavior: 'smooth' });
         return;
       }
       savingStock = true;
@@ -2350,7 +2775,7 @@ function savePhoto_(body) {
           await putPhoto(photoId, pendingInvPhoto);
           if (proofId) await putPhoto(proofId, pendingInvProof);
         } catch (err) {
-          $('#stockMsg').textContent = 'Foto gagal disimpan di perangkat ini. Invoice belum disimpan, coba lagi.';
+          $('#stockMsg').textContent = 'Foto gagal disimpan di perangkat ini' + (err && err.message ? ' (' + err.message + ')' : '') + '. Invoice belum disimpan. Coba buka aplikasi di Chrome/Safari biasa (bukan mode privat), lalu ulangi.';
           return;
         }
         activeStockDraft.forEach((item) => {
@@ -2358,6 +2783,12 @@ function savePhoto_(body) {
           if (product) {
             product.stock = Number(product.stock || 0) + Number(item.qty);
             if (item.cost > 0) product.cost = Number(item.cost);
+            if (item.price > 0) {
+              product.price = Number(item.price);
+              product.minPrice = item.minPrice > 0 ? Math.min(Number(item.minPrice), Number(item.price)) : Number(item.price);
+            } else if (item.minPrice > 0) {
+              product.minPrice = Math.min(Number(item.minPrice), Number(product.price) || Number(item.minPrice));
+            }
           }
         });
         const payments = [];
@@ -2377,6 +2808,7 @@ function savePhoto_(body) {
           });
         }
         state.stockHistory.push({
+          uid: 'n' + Date.now(),
           no,
           supplier,
           date,
@@ -2400,6 +2832,8 @@ function savePhoto_(body) {
         pendingInvProof = null;
         setPreview('#stockPhotoPrev', null);
         setPreview('#stockProofPrev', null);
+        setPhotoStatus('#stockPhotoStatus', 'Belum ada foto. Ketuk untuk memotret atau pilih dari galeri.', '');
+        setPhotoStatus('#stockProofStatus', 'Belum ada foto.', '');
         updateStockPayUI();
         renderStockDraft();
         renderStockHistory();
@@ -2422,8 +2856,9 @@ function savePhoto_(body) {
       const price = cleanNum($('#epPrice').value);
       const minRaw = $('#epMin').value.trim();
       const minPrice = minRaw === '' ? price : cleanNum(minRaw);
-      if (!(price > 0)) { err.textContent = 'Harga eceran tertinggi wajib diisi.'; return; }
-      if (minPrice <= 0 || minPrice > price) { err.textContent = 'Harga eceran terendah harus lebih dari 0 dan tidak boleh melebihi harga eceran tertinggi.'; return; }
+      const hadPrice = Number(prod.price) > 0;
+      if (!(price > 0) && (hadPrice || minRaw !== '')) { err.textContent = 'Harga eceran tertinggi wajib diisi.'; return; }
+      if (price > 0 && (minPrice <= 0 || minPrice > price)) { err.textContent = 'Harga eceran terendah harus lebih dari 0 dan tidak boleh melebihi harga eceran tertinggi.'; return; }
       const newName = $('#epNameInput').value.trim();
       const newBrand = $('#epBrand').value.trim();
       if (!newName) { err.textContent = 'Nama produk wajib diisi.'; return; }
@@ -2444,31 +2879,37 @@ function savePhoto_(body) {
     }
 
     function addProduct() {
+      const msg = $('#prodMsg');
       const code = $('#prodCode').value.trim();
       const name = $('#prodName').value.trim();
       const brand = $('#prodBrand').value.trim();
       const category = $('#prodCategory').value.trim();
-      const cost = cleanNum($('#prodCost').value);
-      const price = cleanNum($('#prodPrice').value);
-      const minRaw = $('#prodMinPrice').value.trim();
-      const minPrice = minRaw === '' ? price : cleanNum(minRaw);
-      if (!name || !price) {
-        $('#prodMsg').textContent = 'Nama dan harga eceran tertinggi wajib diisi.';
+      msg.style.color = '';
+      if (!name) { msg.textContent = 'Nama produk wajib diisi.'; return; }
+      if (state.products.some((x) => (x.name + '|' + (x.brand || '')).toLowerCase() === (name + '|' + brand).toLowerCase())) {
+        msg.textContent = 'Produk dengan nama dan brand yang sama sudah ada.';
         return;
       }
-      if (minPrice <= 0 || minPrice > price) {
-        $('#prodMsg').textContent = 'Harga eceran terendah harus lebih dari 0 dan tidak boleh melebihi harga eceran tertinggi.';
+      if (code && state.products.some((x) => String(x.code).toLowerCase() === code.toLowerCase())) {
+        msg.textContent = 'Kode sudah dipakai produk lain.';
         return;
+      }
+      const id = state.pid++;
+      const used = new Set(state.products.map((x) => String(x.code).toLowerCase()));
+      let finalCode = code;
+      if (!finalCode) {
+        let n = id;
+        do { finalCode = 'P' + String(n).padStart(3, '0'); n++; } while (used.has(finalCode.toLowerCase()));
       }
       state.products.push({
-        id: state.pid++,
-        code: code || 'P' + String(state.pid).padStart(3, '0'),
+        id,
+        code: finalCode,
         name,
         brand,
         category,
-        cost,
-        price,
-        minPrice,
+        cost: 0,
+        price: 0,
+        minPrice: 0,
         minStock: Math.max(0, Math.floor(cleanNum($('#prodMinStock').value))),
         stock: 0,
         type: 'BNIB'
@@ -2476,15 +2917,10 @@ function savePhoto_(body) {
       saveState();
       renderProductList();
       renderProductGrid();
-      $('#prodCode').value = '';
-      $('#prodName').value = '';
-      $('#prodBrand').value = '';
-      $('#prodCategory').value = '';
-      $('#prodCost').value = '';
-      $('#prodMinStock').value = '';
-      $('#prodPrice').value = '';
-      $('#prodMinPrice').value = '';
-      $('#prodMsg').textContent = '';
+      ['#prodCode', '#prodName', '#prodBrand', '#prodCategory', '#prodMinStock'].forEach((s) => { $(s).value = ''; });
+      msg.style.color = 'var(--accent)';
+      msg.textContent = 'Produk "' + name + '" ditambahkan. Isi harga saat Stok Masuk.';
+      setTimeout(() => { msg.textContent = ''; msg.style.color = ''; }, 5000);
     }
 
     // ===== Arsip ke Google Sheets & Drive (Apps Script) =====
@@ -2527,6 +2963,9 @@ function savePhoto_(body) {
         row.Perangkat = dev;
         out.push({ key: cfg.deviceId + ':' + type + ':' + id, type, row, sig: hash8(JSON.stringify(row)) });
       };
+      state.products.forEach((p) => {
+        if (Number(p.price) > 0) add('katalog', p.code || p.id, { Kode: p.code || String(p.id), Produk: p.name, Brand: p.brand || '', Kategori: p.category || '', Tipe: p.type || '', Harga: Number(p.price), Stok: (p.type === 'Decant' && !Number(p.stock)) ? 'ada' : Number(p.stock || 0) });
+      });
       state.history.forEach((tx) => add('penjualan', tx.no, {
         No: tx.no, Tanggal: tx.date, Hari: tx.day || '', Kasir: tx.cashier || '', Member: tx.member ? tx.member.name : '',
         Item: itemsText(tx.items, 'price'), Subtotal: tx.sub, Diskon: tx.disc || 0, Total: tx.total, Metode: tx.method, 'Dibayar saat transaksi': tx.cash
@@ -2581,7 +3020,7 @@ function savePhoto_(body) {
         });
       });
       state.stockHistory.forEach((e, idx) => {
-        const base = idx + '-' + e.no;
+        const base = (e.uid !== undefined && e.uid !== null && e.uid !== '' ? e.uid : idx) + '-' + e.no;
         add('invoice', base, {
           'No Invoice': e.no, Supplier: e.supplier || '', Tanggal: e.date || '', 'Jatuh Tempo': e.dueDate || '', Total: e.total,
           Item: itemsText(e.items, 'cost'), 'Foto Invoice': syncPhotoUrl(e.photoId)
@@ -2612,16 +3051,21 @@ function savePhoto_(body) {
 
     async function syncPost(payload) {
       const cfg = state.sync;
-      const ctl = new AbortController();
-      const timer = setTimeout(() => ctl.abort(), 90000);
+      let timer;
+      // Batas waktu lewat Promise.race (tanpa signal): sebagian browser/WebView gagal menyalin signal (error postMessage).
+      const timeout = new Promise((_, reject) => {
+        timer = setTimeout(() => { const e = new Error('Waktu habis'); e.name = 'AbortError'; reject(e); }, 90000);
+      });
       try {
-        const res = await fetch(cfg.url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify(Object.assign({ token: cfg.token }, payload)),
-          signal: ctl.signal
-        });
-        const data = await res.json();
+        const res = await Promise.race([
+          fetch(cfg.url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify(Object.assign({ token: cfg.token }, payload))
+          }),
+          timeout
+        ]);
+        const data = await Promise.race([res.json(), timeout]);
         if (!data || !data.ok) throw new Error((data && data.error) || 'Server menolak permintaan.');
         return data;
       } finally {
@@ -2702,6 +3146,7 @@ function savePhoto_(body) {
         const byType = {};
         recs.forEach((r) => { (byType[r.type] = byType[r.type] || []).push(r); });
         const unsupported = [];
+        let done = 0;
         for (const type of Object.keys(byType)) {
           const list = byType[type];
           for (let i = 0; i < list.length; i += 25) {
@@ -2709,6 +3154,8 @@ function savePhoto_(body) {
             const res = await syncPost({ action: 'records', records: batch.map((r) => ({ type: r.type, key: r.key, row: r.row })) });
             if (Number(res.saved) !== batch.length) { unsupported.push(type); break; }
             batch.forEach((r) => { cfg.sent[r.key] = r.sig; });
+            done += batch.length;
+            if (manual) $('#syncStatus').textContent = 'Mengirim ' + done + ' dari ' + recs.length + ' baris…';
             persistState();
           }
         }
@@ -2823,7 +3270,7 @@ function savePhoto_(body) {
     function openSupReturn(preIdx) {
       const opts = state.stockHistory.map((e, idx) => ({ e, idx })).filter(({ e }) => returnableInvoice(e));
       if (!opts.length) {
-        alert('Belum ada invoice dengan barang yang bisa diretur (stok barangnya sudah habis atau sudah diretur).');
+        showNotice('Belum ada invoice dengan barang yang bisa diretur (stok barangnya sudah habis atau sudah diretur).');
         return;
       }
       $('#srInvoice').innerHTML = opts.map(({ e, idx }) => '<option value="' + idx + '">' + escapeHtml(e.no) + ' · ' + escapeHtml(e.supplier || 'tanpa supplier') + ' · ' + escapeHtml(e.date || '') + '</option>').join('');
@@ -2971,12 +3418,14 @@ function savePhoto_(body) {
     async function viewStoredPhoto(id) {
       try {
         const blob = await getPhoto(id);
-        if (!blob) { alert('Foto tidak ditemukan di perangkat ini.'); return; }
+        if (!blob) { showNotice('Foto tidak ditemukan di perangkat ini.'); return; }
+        const full = $('#photoFull');
         const u = URL.createObjectURL(blob);
-        $('#photoFull').onload = () => URL.revokeObjectURL(u);
+        full.onload = () => URL.revokeObjectURL(u);
+        full.onerror = () => { full.onerror = null; readAsDataUrl(blob).then((d) => { full.src = d; }).catch(() => showNotice('Foto tidak bisa dibuka.')); };
         showPhotoFull(u);
       } catch (err) {
-        alert('Foto tidak bisa dibuka.');
+        showNotice('Foto tidak bisa dibuka.');
       }
     }
 
@@ -3315,10 +3764,12 @@ function savePhoto_(body) {
 
     function deleteJm(id) {
       const j = state.journals.find((x) => String(x.id) === String(id));
-      if (!j || !confirm('Hapus jurnal manual ' + j.no + '?')) return;
-      state.journals = state.journals.filter((x) => x !== j);
-      saveState();
-      renderJournal();
+      if (!j) return;
+      opAsk('Hapus jurnal manual?', j.no + (j.memo ? ' · ' + j.memo : ''), () => {
+        state.journals = state.journals.filter((x) => x !== j);
+        saveState();
+        renderJournal();
+      }, 'Ya, hapus', true);
     }
 
     function setJournalMode(mode) {
@@ -3726,6 +4177,13 @@ function savePhoto_(body) {
       $('#rpDaily').classList.toggle('hide', mode !== 'harian');
       $('#rpClosings').classList.toggle('hide', mode !== 'tutup');
       $('#rpSuppliers').classList.toggle('hide', mode !== 'supplier');
+      $('#rpPeriod').classList.toggle('hide', mode !== 'mingguan' && mode !== 'bulanan');
+      if (mode === 'mingguan' || mode === 'bulanan') {
+        periodMode = mode;
+        if (!$('#pdWeek').value) $('#pdWeek').value = localISODate();
+        if (!$('#pdMonth').value) $('#pdMonth').value = localISODate().slice(0, 7);
+        renderPeriod();
+      }
       if (mode === 'tutup') renderClosingsReport();
       if (mode === 'supplier') renderSupplierReport();
     }
@@ -3739,9 +4197,6 @@ function savePhoto_(body) {
         nama: ['nama', 'namaproduk', 'produk', 'name', 'product', 'namabarang'],
         brand: ['brand', 'merek', 'merk'],
         kategori: ['kategori', 'category', 'jenis'],
-        modal: ['modal', 'hargamodal', 'hargabeli', 'cost', 'hpp'],
-        harga: ['harga', 'hargajual', 'jual', 'price', 'hargaecerantertinggi', 'ecerantertinggi', 'het', 'hettertinggi'],
-        hargamin: ['hargaeceranterendah', 'eceranterendah', 'hargaterendah', 'hargamin', 'minimum', 'min', 'hetterendah'],
         kode: ['kode', 'kodebarang', 'sku', 'code'],
         stokmin: ['stokminimum', 'minimumstok', 'stokmin', 'minstok', 'minimumstock', 'minstock', 'stockmin', 'stockminimum', 'batasstok', 'stokminimal']
       },
@@ -3749,25 +4204,55 @@ function savePhoto_(body) {
         kode: ['kode', 'kodebarang', 'sku', 'code'],
         nama: ['nama', 'namaproduk', 'produk', 'barang', 'item', 'namabarang', 'name'],
         qty: ['qty', 'jumlah', 'masuk', 'quantity', 'stok'],
-        cost: ['harga', 'hargabeli', 'modal', 'cost', 'hpp', 'hargasatuan', 'hargabelisatuan']
+        cost: ['harga', 'hargabeli', 'modal', 'cost', 'hpp', 'hargasatuan', 'hargabelisatuan'],
+        jual: ['hargajual', 'hargaeceran', 'hargaecerantertinggi', 'ecerantertinggi', 'jual', 'het', 'hettertinggi'],
+        jualmin: ['hargaeceranterendah', 'eceranterendah', 'hargaterendah', 'hargamin', 'hetterendah']
+      },
+      opname: {
+        kode: ['kode', 'kodebarang', 'sku', 'code'],
+        nama: ['nama', 'namaproduk', 'produk', 'barang', 'item', 'namabarang', 'name'],
+        fisik: ['fisik', 'stokfisik', 'stockfisik', 'hasilhitung', 'hitung', 'hitungan', 'jumlahfisik', 'qtyfisik', 'physical', 'count', 'qty', 'jumlah']
+      },
+      update: {
+        kode: ['kode', 'kodebarang', 'sku', 'code'],
+        nama: ['nama', 'namaproduk', 'produk', 'name', 'product', 'namabarang'],
+        brand: ['brand', 'merek', 'merk'],
+        kategori: ['kategori', 'category', 'jenis'],
+        stokmin: ['stokminimum', 'minimumstok', 'stokmin', 'minstok', 'minimumstock', 'minstock', 'stockmin', 'stockminimum', 'batasstok', 'stokminimal'],
+        modal: ['modal', 'hargamodal', 'hargabeli', 'cost', 'hpp'],
+        harga: ['harga', 'hargajual', 'jual', 'price', 'hargaecerantertinggi', 'ecerantertinggi', 'het', 'hettertinggi'],
+        hargamin: ['hargaeceranterendah', 'eceranterendah', 'hargaterendah', 'hargamin', 'hetterendah']
       }
     };
     const BULK_DEFAULT_ORDER = {
-      products: ['nama', 'brand', 'kategori', 'modal', 'harga', 'kode', 'hargamin', 'stokmin'],
-      stock: ['ident', 'qty', 'cost']
+      products: ['nama', 'brand', 'kategori', 'kode', 'stokmin'],
+      stock: ['ident', 'qty', 'cost', 'jual', 'jualmin'],
+      opname: ['ident', 'fisik']
     };
     const BULK_TEXT = {
       products: {
         title: 'Tambah produk massal',
-        help: 'Satu produk per baris. Urutan kolom: Nama, Brand, Kategori, Modal, Harga eceran tertinggi, Kode, Harga eceran terendah, Stok minimum (boleh kosong = tanpa alert). Stok awal tidak diisi di sini; stok awal produk selalu 0 dan ditambah lewat menu Stok Masuk atau Stok Opname. Hanya Nama dan Harga eceran tertinggi yang wajib; kalau harga eceran terendah kosong, dianggap sama dengan harga tertinggi (tanpa ruang diskon). Bisa tempel langsung dari Excel/Google Sheets, atau pilih file CSV. Kalau baris pertama berisi judul kolom, urutan bebas.',
-        sample: 'Nama;Brand;Kategori;Modal;Harga Eceran Tertinggi;Kode;Harga Eceran Terendah;Stok Minimum\nOud Wood 50ml;Alkaff;Parfum;450000;750000;;700000;5\nAmber Musk 30ml;Alkaff;Parfum;300000;520000;;480000;3',
+        help: 'Satu produk per baris. Urutan kolom: Nama, Brand, Kategori, Kode, Stok minimum (boleh kosong = tanpa alert). Hanya Nama yang wajib. Produk masuk tanpa harga dan dengan stok 0; harga beli, harga jual, dan stok diisi nanti lewat menu Stok Masuk. Kolom harga/modal/stok pada file lama diabaikan jika baris pertama berisi judul kolom. Bisa tempel langsung dari Excel/Google Sheets, atau pilih file CSV.',
+        sample: 'Nama;Brand;Kategori;Kode;Stok Minimum\nOud Wood 50ml;Alkaff;Parfum;;5\nAmber Musk 30ml;Alkaff;Parfum;;3',
         commit: (n) => 'Tambahkan ' + n + ' produk'
       },
       stock: {
         title: 'Tambah item barang masuk massal',
-        help: 'Satu item per baris. Urutan kolom: Kode atau Nama produk, Qty, Harga beli per unit (boleh kosong). Produk harus sudah ada di daftar produk. Item akan masuk ke invoice yang sedang disusun, belum langsung menambah stok.',
-        sample: 'Produk;Qty;Harga Beli\nP001;5;850000\nParfum B;10;400000',
+        help: 'Satu item per baris. Urutan kolom: Kode atau Nama produk, Qty, Harga beli per unit, Harga eceran tertinggi, Harga eceran terendah. Produk harus sudah ada di daftar produk. Produk yang belum punya harga wajib diisi harga beli dan harga eceran tertinggi (terendah kosong = sama dengan tertinggi); untuk produk yang sudah punya harga, kolom harga jual boleh kosong. Item akan masuk ke invoice yang sedang disusun, belum langsung menambah stok.',
+        sample: 'Produk;Qty;Harga Beli;Harga Eceran Tertinggi;Harga Eceran Terendah\nP001;5;850000;1200000;1100000\nParfum B;10;400000;;',
         commit: (n) => 'Tambahkan ' + n + ' item ke invoice'
+      },
+      opname: {
+        title: 'Upload hitungan stok opname',
+        help: 'Satu produk per baris. Urutan kolom: Kode atau Nama produk, Stok fisik. Paling mudah: klik "Unduh template", isi kolom Fisik di Excel/Google Sheets, lalu tempel atau pilih filenya di sini. Baris dengan Fisik kosong dilewati (dianggap belum dihitung). Hasil hanya mengisi kolom Fisik di halaman Stok Opname; stok belum berubah sampai Anda menekan "Terapkan opname". Angka yang sudah diisi untuk produk yang sama akan ditimpa.',
+        sample: 'Kode;Nama;Stok Sistem;Fisik\nP001;Oud Wood 50ml;5;4\nP002;Amber Musk 30ml;3;3',
+        commit: (n) => 'Isi ' + n + ' hitungan fisik'
+      },
+      update: {
+        title: 'Update produk massal',
+        help: 'Klik "Unduh data produk", ubah isinya di Excel/Google Sheets, lalu tempel atau pilih filenya di sini. Baris dicocokkan lewat Kode (kolom Kode dan baris judul wajib ada). Sel kosong = tidak diubah; isi "-" untuk mengosongkan Brand/Kategori. Yang bisa diubah: Nama, Brand, Kategori, Stok Minimum, Harga Beli, Harga Eceran Tertinggi/Terendah. Stok tidak bisa diubah di sini (pakai Stok Masuk atau Stok Opname). Baris yang tidak berubah otomatis dilewati.',
+        sample: 'Kode;Nama;Brand;Kategori;Stok Minimum;Harga Beli;Harga Eceran Tertinggi;Harga Eceran Terendah\nP001;;;Parfum;5;;;\nP002;Nama Baru;Alkaff;;;450000;750000;700000',
+        commit: (n) => 'Terapkan update ' + n + ' produk'
       }
     };
 
@@ -3847,10 +4332,12 @@ function savePhoto_(body) {
           if (idx[field] === undefined && aliases[field].includes(key)) { idx[field] = i; break; }
         }
       });
-      const needed = mode === 'products' ? ['nama', 'harga'] : ['qty'];
+      if (mode === 'update') return idx.kode !== undefined ? { idx, body: table.slice(1) } : null;
+      const needed = mode === 'products' ? ['nama'] : (mode === 'opname' ? ['fisik'] : ['qty']);
       const hasHeader = needed.every((f) => idx[f] !== undefined) || Object.keys(idx).length >= 2;
       if (hasHeader) {
-        if (mode === 'stock' && idx.kode === undefined && idx.nama === undefined) return null;
+        if ((mode === 'stock' || mode === 'opname') && idx.kode === undefined && idx.nama === undefined) return null;
+        if (mode === 'opname' && idx.fisik === undefined) return null;
         return { idx, body: table.slice(1) };
       }
       const order = BULK_DEFAULT_ORDER[mode];
@@ -3869,17 +4356,11 @@ function savePhoto_(body) {
           name: get(row, 'nama'),
           brand: get(row, 'brand'),
           category: get(row, 'kategori'),
-          cost: parseMoney(get(row, 'modal')),
-          price: parseMoney(get(row, 'harga')),
-          minPrice: parseMoney(get(row, 'hargamin')),
           code: get(row, 'kode'),
           minStock: parseCount(get(row, 'stokmin')),
           error: ''
         };
         if (!item.name) item.error = 'Nama kosong';
-        else if (!(item.price > 0)) item.error = 'Harga eceran tertinggi tidak valid';
-        else if (Number.isNaN(item.minPrice) || item.minPrice > item.price) item.error = 'Harga eceran terendah tidak valid (melebihi harga tertinggi)';
-        else if (Number.isNaN(item.cost)) item.error = 'Modal tidak valid';
         else if (Number.isNaN(item.minStock)) item.error = 'Stok minimum tidak valid';
         else if (item.code && codes.has(item.code.toLowerCase())) item.error = 'Kode sudah dipakai';
         else if (names.has((item.name + '|' + item.brand).toLowerCase())) item.error = 'Produk sudah ada';
@@ -3896,7 +4377,7 @@ function savePhoto_(body) {
       return body.map((row, i) => {
         const ident = get(row, 'ident') || get(row, 'kode') || get(row, 'nama');
         const nameCell = get(row, 'nama');
-        const item = { line: i + 1, ident, qty: parseCount(get(row, 'qty')), cost: parseMoney(get(row, 'cost')), product: null, error: '' };
+        const item = { line: i + 1, ident, qty: parseCount(get(row, 'qty')), cost: parseMoney(get(row, 'cost')), price: parseMoney(get(row, 'jual')), minPrice: parseMoney(get(row, 'jualmin')), product: null, error: '' };
         const lower = ident.toLowerCase();
         const byCode = state.products.find((p) => String(p.code).toLowerCase() === lower)
           || (get(row, 'kode') ? state.products.find((p) => String(p.code).toLowerCase() === get(row, 'kode').toLowerCase()) : null);
@@ -3913,6 +4394,51 @@ function savePhoto_(body) {
         else if (found) item.product = found;
         if (!item.error && !(item.qty > 0)) item.error = 'Qty harus angka lebih dari 0';
         else if (!item.error && Number.isNaN(item.cost)) item.error = 'Harga beli tidak valid';
+        else if (!item.error && (Number.isNaN(item.price) || Number.isNaN(item.minPrice))) item.error = 'Harga jual tidak valid';
+        if (!item.error && item.product) {
+          const pr = item.product;
+          const priced = Number(pr.price) > 0;
+          const eff = item.price > 0 ? item.price : Number(pr.price) || 0;
+          if (!priced && !(item.cost > 0)) item.error = 'Produk belum punya harga: harga beli wajib diisi';
+          else if (!priced && !(item.price > 0)) item.error = 'Produk belum punya harga: harga eceran tertinggi wajib diisi';
+          else if (item.minPrice > 0 && item.minPrice > eff) item.error = 'Harga eceran terendah melebihi harga tertinggi';
+          else if (item.price > 0 && !(item.minPrice > 0)) item.minPrice = priced ? Math.min(minPriceOf(pr), item.price) : item.price;
+        }
+        return item;
+      });
+    }
+
+    function reviewBulkOpname(body, idx) {
+      const get = (row, f) => (idx[f] !== undefined ? (row[idx[f]] || '').trim() : '');
+      const seen = new Set();
+      return body.map((row, i) => {
+        const ident = get(row, 'ident') || get(row, 'kode') || get(row, 'nama');
+        const nameCell = get(row, 'nama');
+        const rawPhys = get(row, 'fisik');
+        const item = { line: i + 1, ident, product: null, phys: null, error: '', noChange: false };
+        if (!ident && !rawPhys) { item.noChange = true; return item; }
+        const lower = ident.toLowerCase();
+        const kodeCell = get(row, 'kode');
+        let found = state.products.find((p) => String(p.code).toLowerCase() === lower)
+          || (kodeCell ? state.products.find((p) => String(p.code).toLowerCase() === kodeCell.toLowerCase()) : null)
+          || (nameCell ? state.products.find((p) => p.name.toLowerCase() === nameCell.toLowerCase()) : null)
+          || state.products.find((p) => p.name.toLowerCase() === lower) || null;
+        if (!found && ident) {
+          const part = state.products.filter((p) => p.name.toLowerCase().includes(lower));
+          if (part.length === 1) found = part[0];
+          else if (part.length > 1) item.error = 'Nama ambigu (' + part.length + ' produk cocok)';
+        }
+        if (found) item.product = found;
+        if (!ident) item.error = 'Produk kosong';
+        else if (!found && !item.error) item.error = 'Produk tidak ditemukan';
+        if (!item.error && rawPhys === '') { item.noChange = true; return item; }
+        if (!item.error) {
+          const n = parseCount(rawPhys);
+          if (Number.isNaN(n) || !/^\d[\d.,]*$/.test(rawPhys)) item.error = 'Stok fisik harus angka 0 atau lebih';
+          else item.phys = n;
+        }
+        if (!item.error && seen.has(found.id)) item.error = 'Produk muncul lebih dari sekali';
+        if (!item.error) seen.add(found.id);
         return item;
       });
     }
@@ -3929,6 +4455,7 @@ function savePhoto_(body) {
       $('#bulkPreview').innerHTML = '';
       $('#bulkCommit').disabled = true;
       $('#bulkCommit').textContent = 'Tambahkan';
+      $('#bulkTemplate').textContent = mode === 'update' ? 'Unduh data produk' : (mode === 'opname' ? 'Unduh template opname' : 'Unduh template');
       $('#bulkDialog').showModal();
     }
 
@@ -3942,25 +4469,36 @@ function savePhoto_(body) {
       }
       const mapped = mapColumns(table, bulkMode);
       if (!mapped) {
-        $('#bulkSummary').innerHTML = '<span class="low">Judul kolom tidak dikenali. Gunakan kolom Produk/Kode dan Qty.</span>';
+        $('#bulkSummary').innerHTML = '<span class="low">' + (bulkMode === 'update' ? 'Kolom Kode tidak ditemukan. Pakai baris judul dari file hasil Unduh produk.' : (bulkMode === 'opname' ? 'Judul kolom tidak dikenali. Gunakan kolom Kode/Nama dan Fisik (lihat template).' : 'Judul kolom tidak dikenali. Gunakan kolom Produk/Kode dan Qty.')) + '</span>';
         $('#bulkPreview').innerHTML = '';
         $('#bulkCommit').disabled = true;
         return;
       }
-      const rows = bulkMode === 'products' ? reviewBulkProducts(mapped.body, mapped.idx) : reviewBulkStock(mapped.body, mapped.idx);
+      let rows = bulkMode === 'products' ? reviewBulkProducts(mapped.body, mapped.idx) : (bulkMode === 'update' ? reviewBulkUpdate(mapped.body, mapped.idx) : (bulkMode === 'opname' ? reviewBulkOpname(mapped.body, mapped.idx) : reviewBulkStock(mapped.body, mapped.idx)));
+      const unchanged = rows.filter((r) => r.noChange).length;
+      rows = rows.filter((r) => !r.noChange);
       bulkRows = rows.filter((r) => !r.error);
       const bad = rows.length - bulkRows.length;
-      $('#bulkSummary').textContent = bulkRows.length + ' baris valid' + (bad ? ', ' + bad + ' dilewati' : '');
+      $('#bulkSummary').textContent = bulkRows.length + ' baris valid' + (bad ? ', ' + bad + ' dilewati' : '') + (unchanged ? ', ' + unchanged + (bulkMode === 'opname' ? ' kosong dilewati' : ' tidak berubah') : '');
       $('#bulkPreview').innerHTML = rows.map((r) => {
         const mark = r.error ? '<b class="low">✗</b>' : '<b style="color:var(--accent);">✓</b>';
         let main, sub;
         if (bulkMode === 'products') {
           main = r.name || '(tanpa nama)';
           sub = [r.brand, r.category].filter(Boolean).join(' · ');
-          sub += (sub ? ' · ' : '') + 'Modal ' + formatRp(r.cost || 0) + ' · Eceran ' + formatRp(r.minPrice || r.price || 0) + ' - ' + formatRp(r.price || 0) + (r.minStock ? ' · Min ' + r.minStock : '') + (r.code ? ' · Kode ' + r.code : '');
+          sub = [sub, r.minStock ? 'Min ' + r.minStock : '', r.code ? 'Kode ' + r.code : ''].filter(Boolean).join(' · ') || 'Nama saja';
+        } else if (bulkMode === 'opname') {
+          main = r.product ? r.product.name : (r.ident || '(kosong)');
+          if (r.product && r.phys !== null) {
+            const sys = Number(r.product.stock || 0);
+            sub = 'Sistem ' + sys + ' → Fisik ' + r.phys + (r.phys === sys ? ' · sama' : ' · selisih ' + opDiffText(r.phys - sys));
+          } else sub = '';
+        } else if (bulkMode === 'update') {
+          main = (r.product ? r.product.name : '') + (r.kode ? ' [' + r.kode + ']' : '(tanpa kode)');
+          sub = r.changes.join(' · ');
         } else {
           main = r.product ? r.product.name : (r.ident || '(kosong)');
-          sub = 'Qty ' + (Number.isNaN(r.qty) ? '-' : r.qty) + ' · Harga beli ' + (Number.isNaN(r.cost) ? '-' : formatRp(r.cost || 0));
+          sub = 'Qty ' + (Number.isNaN(r.qty) ? '-' : r.qty) + ' · Harga beli ' + (Number.isNaN(r.cost) ? '-' : formatRp(r.cost || 0)) + (r.price > 0 ? ' · Jual ' + formatRp(r.minPrice || r.price) + ' - ' + formatRp(r.price) : '');
         }
         return '<div class="line"><div class="n"><b>' + mark + ' ' + escapeHtml(main) + '</b><small>' + escapeHtml(sub) + '</small>' +
           (r.error ? '<small class="low">Baris ' + r.line + ': ' + escapeHtml(r.error) + '</small>' : '') + '</div></div>';
@@ -3971,6 +4509,29 @@ function savePhoto_(body) {
 
     function commitBulk() {
       if (!bulkRows.length) return;
+      if (bulkMode === 'update') {
+        bulkRows.forEach((r) => Object.assign(r.product, r.patch));
+        saveState();
+        renderAll();
+        updateStockAlert();
+        if ($('#poProd')) refreshPoForm();
+        $('#bulkDialog').close();
+        $('#prodMsg').style.color = 'var(--accent)';
+        $('#prodMsg').textContent = bulkRows.length + ' produk diperbarui.';
+        setTimeout(() => { $('#prodMsg').textContent = ''; $('#prodMsg').style.color = ''; }, 5000);
+        return;
+      }
+      if (bulkMode === 'opname') {
+        bulkRows.forEach((r) => { state.opDraft[r.product.id] = String(r.phys); });
+        persistState();
+        renderOpname();
+        $('#bulkDialog').close();
+        const m = $('#opMsg');
+        m.style.color = 'var(--accent)';
+        m.textContent = bulkRows.length + ' hitungan fisik terisi dari file. Periksa daftar di bawah, isi catatan bila ada selisih, lalu tekan "Terapkan opname".';
+        setTimeout(() => { m.textContent = ''; m.style.color = ''; }, 8000);
+        return;
+      }
       if (bulkMode === 'products') {
         const used = new Set(state.products.map((p) => String(p.code).toLowerCase()));
         bulkRows.forEach((r) => {
@@ -3981,7 +4542,7 @@ function savePhoto_(body) {
             do { code = 'P' + String(n).padStart(3, '0'); n++; } while (used.has(code.toLowerCase()));
           }
           used.add(code.toLowerCase());
-          state.products.push({ id, code, name: r.name, brand: r.brand, category: r.category, cost: r.cost || 0, price: r.price, minPrice: r.minPrice || r.price, minStock: r.minStock || 0, stock: 0, type: 'BNIB' });
+          state.products.push({ id, code, name: r.name, brand: r.brand, category: r.category, cost: 0, price: 0, minPrice: 0, minStock: r.minStock || 0, stock: 0, type: 'BNIB' });
         });
         saveState();
         renderProductList();
@@ -3993,11 +4554,11 @@ function savePhoto_(body) {
         setTimeout(() => { $('#prodMsg').textContent = ''; $('#prodMsg').style.color = ''; }, 5000);
       } else {
         bulkRows.forEach((r) => {
-          const same = activeStockDraft.find((d) => d.id === r.product.id && Number(d.cost || 0) === Number(r.cost || 0));
+          const same = activeStockDraft.find((d) => d.id === r.product.id && Number(d.cost || 0) === Number(r.cost || 0) && Number(d.price || 0) === Number(r.price || 0) && Number(d.minPrice || 0) === Number(r.minPrice || 0));
           if (same) {
             same.qty = Number(same.qty) + r.qty;
           } else {
-            activeStockDraft.push({ id: r.product.id, name: r.product.name, code: r.product.code, qty: r.qty, cost: r.cost || 0 });
+            activeStockDraft.push({ id: r.product.id, name: r.product.name, code: r.product.code, qty: r.qty, cost: r.cost || 0, price: r.price || 0, minPrice: r.minPrice || 0 });
           }
         });
         $('#stockMsg').textContent = '';
@@ -4017,6 +4578,8 @@ function savePhoto_(body) {
     }
 
     function downloadBulkTemplate() {
+      if (bulkMode === 'update') { downloadProductsCsv(); return; }
+      if (bulkMode === 'opname') { downloadOpnameCsv(); return; }
       const t = BULK_TEXT[bulkMode].sample;
       const blob = new Blob(['\uFEFF' + t.replace(/\n/g, '\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' });
       const a = document.createElement('a');
@@ -4084,6 +4647,11 @@ function savePhoto_(body) {
       }).filter(Boolean);
       if (!items.length) {
         $('#saleErr').textContent = 'Pesanan masih kosong.';
+        return;
+      }
+      const noPrice = items.filter((it) => !(it.price > 0));
+      if (noPrice.length) {
+        $('#saleErr').textContent = 'Harga belum diisi untuk: ' + noPrice.map((it) => it.name).join(', ') + '. Isi lewat Stok Masuk atau Ubah produk.';
         return;
       }
       const { sub, disc, discPct, total, over, maxDisc, pts, pointsValue, ptsReq, earned } = totals();
@@ -4659,7 +5227,7 @@ function savePhoto_(body) {
       saveState();
       $('#pinDialog').close();
       updatePinWarn();
-      alert('PIN berhasil diganti. Gunakan PIN baru saat masuk berikutnya.');
+      showNotice('PIN berhasil diganti. Gunakan PIN baru saat masuk berikutnya.');
     }
 
     function changeOwnerPin() {
@@ -4877,10 +5445,11 @@ function savePhoto_(body) {
       if (delBtn) {
         const u = findUser(delBtn.dataset.cashierDel);
         if (!u) return;
-        if (!confirm('Hapus kasir ' + u.name + '? Riwayat transaksinya tetap tersimpan.')) return;
-        state.users = state.users.filter((x) => x !== u);
-        saveState();
-        renderCashiers();
+        opAsk('Hapus kasir?', u.name + '\nRiwayat transaksinya tetap tersimpan.', () => {
+          state.users = state.users.filter((x) => x !== u);
+          saveState();
+          renderCashiers();
+        }, 'Ya, hapus kasir', true);
       }
     }
 
@@ -5043,7 +5612,7 @@ function savePhoto_(body) {
 
     function refreshPoForm() {
       const cur = $('#poProd').value;
-      $('#poProd').innerHTML = '<option value="">Pilih produk</option>' + state.products.map((p) => '<option value="' + p.id + '">' + escapeHtml(p.name) + (p.code ? ' (' + escapeHtml(p.code) + ')' : '') + ' · ' + formatRp(minPriceOf(p)) + ' - ' + formatRp(p.price) + '</option>').join('');
+      $('#poProd').innerHTML = '<option value="">Pilih produk</option>' + state.products.map((p) => '<option value="' + p.id + '">' + escapeHtml(p.name) + (p.code ? ' (' + escapeHtml(p.code) + ')' : '') + ' · ' + (Number(p.price) > 0 ? formatRp(minPriceOf(p)) + ' - ' + formatRp(p.price) : 'harga bebas') + '</option>').join('');
       if (cur && getProductById(cur)) $('#poProd').value = cur;
       refreshPoOos();
       $('#poMemberList').innerHTML = state.members.map((m) => '<option value="' + escapeHtml(m.name + ' — ' + m.phone) + '"></option>').join('');
@@ -5053,7 +5622,7 @@ function savePhoto_(body) {
       const p = getProductById($('#poProd').value);
       if (!p) { $('#poPrice').value = ''; $('#poPriceHint').textContent = ''; return; }
       $('#poPrice').value = Number(p.price) || '';
-      $('#poPriceHint').textContent = 'Harga boleh antara ' + formatRp(minPriceOf(p)) + ' dan ' + formatRp(p.price) + ' · stok saat ini ' + (p.stock || 0);
+      $('#poPriceHint').textContent = !(Number(p.price) > 0) ? 'Produk belum punya harga, isi harga jual untuk pesanan ini · stok saat ini ' + (p.stock || 0) : 'Harga boleh antara ' + formatRp(minPriceOf(p)) + ' dan ' + formatRp(p.price) + ' · stok saat ini ' + (p.stock || 0);
     }
 
     function onPoCustInput() {
@@ -5079,7 +5648,10 @@ function savePhoto_(body) {
       const qty = Math.floor(Number($('#poQty').value));
       const price = cleanNum($('#poPrice').value);
       if (!(qty >= 1)) { err.textContent = 'Qty minimal 1.'; return; }
-      if (price < minPriceOf(p) || price > Number(p.price)) { err.textContent = 'Harga harus antara ' + formatRp(minPriceOf(p)) + ' dan ' + formatRp(p.price) + '.'; return; }
+      if (Number(p.price) > 0 ? (price < minPriceOf(p) || price > Number(p.price)) : !(price > 0)) {
+        err.textContent = Number(p.price) > 0 ? 'Harga harus antara ' + formatRp(minPriceOf(p)) + ' dan ' + formatRp(p.price) + '.' : 'Isi harga jual untuk produk ini.';
+        return;
+      }
       err.textContent = '';
       const same = poDraft.find((x) => String(x.id) === String(p.id) && x.price === price);
       if (same) same.qty += qty;
@@ -5244,14 +5816,13 @@ function savePhoto_(body) {
       }));
       if (!cands.length) return;
       const names = cands.map((po) => po.no + ' (' + po.customer.name + ')').join(', ');
-      if (confirm('Stok barang untuk pre order berikut sudah tersedia: ' + names + '.\n\nTandai ready dan notifikasi pelanggan sekarang?')) {
+      opAsk('Pre order siap?', 'Stok barang untuk pre order berikut sudah tersedia: ' + names + '.\n\nTandai ready dan notifikasi pelanggan sekarang?', () => {
         cands.forEach(setPoReady);
         saveState();
         renderPo();
         showPoNotify(cands);
-      } else {
-        renderPo();
-      }
+      }, 'Ya, tandai ready');
+      renderPo();
     }
 
     function openPoPay(id) {
@@ -5526,6 +6097,31 @@ function savePhoto_(body) {
       renderRequest();
     }
 
+    const ON_STATUS = ['Baru', 'Menunggu pembayaran', 'Diproses', 'Siap diambil', 'Dikirim', 'Selesai', 'Batal'];
+    async function renderOnline() {
+      const msg = $('#onMsg'), box = $('#onList');
+      if (!syncReady()) { msg.textContent = 'Hubungkan Google Sheets dulu di Pengaturan.'; box.innerHTML = ''; return; }
+      msg.textContent = 'Memuat...';
+      try {
+        const res = await syncPost({ action: 'orders' });
+        const list = (res.orders || []).slice().reverse();
+        msg.textContent = list.length ? '' : 'Belum ada pesanan online.';
+        box.innerHTML = list.map((o) => {
+          const total = Number(o.Total || 0) + Number(o.Ongkir || 0);
+          const wa = 'https://wa.me/' + String(o.Telepon || '').replace(/\D/g, '').replace(/^0/, '62') + '?text=' + encodeURIComponent('Halo ' + o.Pelanggan + ', pesanan ' + o.No + ' di ' + state.store + ': ' + o.Item + '. Total ' + formatRp(total) + (Number(o.Ongkir) ? ' (termasuk ongkir ' + formatRp(o.Ongkir) + ')' : '') + '.');
+          return '<div class="line" data-on="' + escapeHtml(o.No) + '"><div class="n"><b>' + escapeHtml(o.No) + ' · ' + escapeHtml(o.Pelanggan) + '</b>' +
+            '<small>' + escapeHtml(o.Tanggal) + ' · ' + escapeHtml(o.Layanan) + ' · ' + escapeHtml(o.Pembayaran) + '</small>' +
+            '<small>' + escapeHtml(o.Item) + '</small>' + (o.Alamat ? '<small>' + escapeHtml(o.Alamat) + '</small>' : '') +
+            (o.Catatan ? '<small>Catatan: ' + escapeHtml(o.Catatan) + '</small>' : '') + '<small>Total ' + formatRp(total) + '</small></div>' +
+            '<div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">' +
+            (/^https:/.test(String(o['Bukti Bayar'])) ? '<a class="action ghost" target="_blank" rel="noopener" href="' + escapeHtml(o['Bukti Bayar']) + '">Bukti bayar</a>' : '') +
+            (o.Layanan === 'Kirim' ? '<input data-on-ongkir type="number" min="0" placeholder="Ongkir" value="' + Number(o.Ongkir || 0) + '" style="width:100px;" />' : '') +
+            '<select data-on-status style="width:auto;">' + ON_STATUS.map((x) => '<option' + (x === o.Status ? ' selected' : '') + '>' + x + '</option>').join('') + '</select>' +
+            '<button class="action" data-on-save>Simpan</button><a class="action ghost" target="_blank" rel="noopener" href="' + wa + '">WhatsApp</a></div></div>';
+        }).join('');
+      } catch (err) { msg.textContent = syncFriendly(err); }
+    }
+
     function renderRequest() {
       const q = rqNorm($('#rqSearch').value);
       const f = $('#rqFilter').value;
@@ -5569,7 +6165,7 @@ function savePhoto_(body) {
         const r = rqFind(po.dataset.rqPo);
         if (!r) return;
         const p = rqFindProduct(r.product);
-        if (!p) { alert('Produk belum ada di daftar produk. Tambahkan dulu lewat menu Produk (stok boleh 0), lalu buat pre order.'); return; }
+        if (!p) { showNotice('Produk belum ada di daftar produk. Tambahkan dulu lewat menu Produk (stok boleh 0), lalu buat pre order.'); return; }
         document.querySelector('nav button[data-tab="preorder"]').click();
         $('#poName').value = r.customer.name;
         $('#poPhone').value = r.customer.phone || '';
@@ -5583,6 +6179,7 @@ function savePhoto_(body) {
 
     function bindRequestEvents() {
       $('#rqSave').addEventListener('click', saveRequest);
+      $('#stockProductSearch').addEventListener('input', updateStockPriceHint);
       ['#rqSearch', '#rqFilter'].forEach((s) => $(s).addEventListener('input', renderRequest));
       $('#rqList').addEventListener('click', onRqListClick);
       $('#rqList').addEventListener('change', (e) => {
@@ -5680,7 +6277,11 @@ function savePhoto_(body) {
     }
 
     let opAskYes = null;
-    function opAsk(title, body, onYes) {
+    function opAsk(title, body, onYes, yesLabel, danger) {
+      const yes = $('#opConfirmYes');
+      yes.textContent = yesLabel || 'Ya, lanjutkan';
+      yes.classList.toggle('danger', !!danger);
+      yes.classList.toggle('success', !danger);
       $('#opConfirmTitle').textContent = title;
       $('#opConfirmBody').textContent = body;
       opAskYes = onYes;
@@ -5769,6 +6370,336 @@ function savePhoto_(body) {
       });
     }
 
+    // ===== Biaya operasional =====
+    const BIAYA_CATS = { '6-1100': 'Gaji', '6-1200': 'Sewa', '6-1300': 'Listrik, air & internet', '6-1400': 'Transportasi & kirim', '6-1500': 'Pemasaran / iklan', '6-1900': 'Operasional lain' };
+
+    function saveBiaya() {
+      const err = $('#byMsg');
+      err.style.color = '';
+      const date = $('#byDate').value;
+      const cat = $('#byCat').value;
+      const from = $('#byFrom').value;
+      const amount = Math.round(cleanNum($('#byAmount').value));
+      const note = $('#byMemo').value.trim();
+      if (!date) { err.textContent = 'Tanggal wajib diisi.'; return; }
+      if (!(amount > 0)) { err.textContent = 'Nominal harus lebih dari 0.'; return; }
+      const seq = state.journals.reduce((m, j) => (j.kind === 'biaya' ? Math.max(m, parseInt(String(j.no).replace(/\D/g, ''), 10) || 0) : m), 0) + 1;
+      state.journals.push({
+        id: Date.now(), no: 'BY-' + String(seq).padStart(4, '0'), kind: 'biaya', cat, from, amount, date,
+        memo: BIAYA_CATS[cat] + (note ? ' · ' + note : ''),
+        lines: [{ acc: cat, debit: amount, credit: 0 }, { acc: from, debit: 0, credit: amount }],
+        by: currentUser ? currentUser.name : '', byId: currentUser ? currentUser.id : '', ts: Date.now()
+      });
+      saveState();
+      $('#byAmount').value = '';
+      $('#byMemo').value = '';
+      err.textContent = '';
+      renderBiaya();
+      err.style.color = 'var(--accent)';
+      err.textContent = 'Biaya ' + formatRp(amount) + ' tersimpan.';
+      setTimeout(() => { err.textContent = ''; err.style.color = ''; }, 4000);
+    }
+
+    function renderBiaya() {
+      if (!$('#byList')) return;
+      if (!$('#byDate').value) $('#byDate').value = localISODate();
+      if (!$('#byMonth').value) $('#byMonth').value = localISODate().slice(0, 7);
+      const month = $('#byMonth').value;
+      const list = state.journals.filter((j) => j.kind === 'biaya' && String(j.date).slice(0, 7) === month).sort((a, b) => String(b.date).localeCompare(String(a.date)) || b.ts - a.ts);
+      const total = list.reduce((a, j) => a + Number(j.amount || 0), 0);
+      const per = {};
+      list.forEach((j) => { per[j.cat] = (per[j.cat] || 0) + Number(j.amount || 0); });
+      $('#bySummary').innerHTML = '<div class="stats"><div class="stat"><span>Total biaya bulan ini</span><b>' + formatRp(total) + '</b></div>' +
+        Object.keys(per).map((c) => '<div class="stat"><span>' + escapeHtml(BIAYA_CATS[c] || c) + '</span><b>' + formatRp(per[c]) + '</b></div>').join('') + '</div>';
+      $('#byList').innerHTML = list.map((j) => '<div class="line"><div class="n"><b>' + escapeHtml(j.memo) + '</b><small>' + escapeHtml(j.date) + ' · ' + escapeHtml(j.no) + ' · ' + (j.from === '1-1200' ? 'Bank/e-wallet' : 'Kas') + (j.by ? ' · ' + escapeHtml(j.by) : '') + '</small></div>' +
+        '<div class="q"><b>' + formatRp(j.amount) + '</b><button class="lnk" data-by-del="' + j.id + '">Hapus</button></div></div>').join('') || '<div class="muted">Belum ada biaya pada bulan ini.</div>';
+    }
+
+    function bindBiayaEvents() {
+      $('#bySave').addEventListener('click', saveBiaya);
+      $('#byMonth').addEventListener('input', renderBiaya);
+      $('#byList').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-by-del]');
+        if (!b) return;
+        const j = state.journals.find((x) => String(x.id) === String(b.dataset.byDel));
+        if (!j) return;
+        opAsk('Hapus biaya ini?', j.memo + '\n' + formatRp(j.amount) + ' · ' + j.date, () => {
+          state.journals = state.journals.filter((x) => x !== j);
+          saveState();
+          renderBiaya();
+        }, 'Ya, hapus', true);
+      });
+    }
+
+    // ===== Hapus produk & hapus invoice =====
+    function deleteProductFlow(id) {
+      const prod = getProductById(id);
+      const msg = $('#prodMsg');
+      if (!prod) return;
+      msg.style.color = '';
+      const same = (it) => String(it.id) === String(id);
+      const activePo = state.preorders.filter((po) => poActive(po) && (po.items || []).some(same));
+      if (activePo.length) {
+        msg.textContent = 'Tidak bisa dihapus: masih ada pre order aktif untuk produk ini (' + activePo.map((po) => po.no).join(', ') + '). Selesaikan atau batalkan dulu.';
+        msg.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        return;
+      }
+      const sales = state.history.filter((tx) => (tx.items || []).some(same)).length;
+      const invs = state.stockHistory.filter((e) => (e.items || []).some(same)).length;
+      const stock = Number(prod.stock || 0);
+      msg.textContent = '';
+      opAsk('Hapus produk?',
+        prod.name + ' (' + prod.code + ')\n' +
+        (stock > 0 ? 'Stok sisa ' + stock + ' ikut hilang dari sistem.\n' : '') +
+        'Tercatat di ' + sales + ' penjualan dan ' + invs + ' invoice. Riwayat itu tetap ada dengan nama produk yang sama; hanya produknya yang dihapus dari daftar.\nTidak bisa dibatalkan.',
+        () => {
+          purgeProducts([prod]);
+          msg.style.color = 'var(--accent)';
+          msg.textContent = 'Produk "' + prod.name + '" dihapus.';
+          setTimeout(() => { msg.textContent = ''; msg.style.color = ''; }, 5000);
+        }, 'Ya, hapus produk', true);
+    }
+
+    let invDelIdx = null;
+
+    function invNetQty(idx) {
+      const e = state.stockHistory[idx];
+      const net = {};
+      ((e && e.items) || []).forEach((it) => { net[it.id] = (net[it.id] || 0) + Number(it.qty || 0); });
+      state.supReturns.filter((r) => r.invIdx === idx).forEach((r) => (r.items || []).forEach((it) => { net[it.id] = (net[it.id] || 0) - Number(it.qty || 0); }));
+      return net;
+    }
+
+    function openInvDelete(idx) {
+      const e = state.stockHistory[idx];
+      if (!e) return;
+      invDelIdx = idx;
+      const rets = state.supReturns.filter((r) => r.invIdx === idx);
+      const net = invNetQty(idx);
+      const lines = Object.keys(net).filter((id) => net[id] > 0).map((id) => {
+        const it = (e.items || []).find((x) => String(x.id) === String(id));
+        const p = getProductById(id);
+        return '• ' + (it ? it.name : id) + ': -' + net[id] + (p ? ' (stok kini ' + Number(p.stock || 0) + ')' : ' (produk sudah dihapus)');
+      });
+      $('#invDelInfo').textContent = e.no + (e.supplier ? ' · ' + e.supplier : '') + ' · ' + (e.date || '-') + '\nTotal ' + formatRp(e.total) + ' · Dibayar ' + formatRp(invPaid(e)) +
+        (rets.length ? '\n' + rets.length + ' retur supplier terkait ikut terhapus.' : '');
+      $('#invDelStockList').textContent = lines.join('\n');
+      $('#invDelStock').checked = true;
+      $('#invDelErr').textContent = '';
+      $('#invDelDialog').showModal();
+    }
+
+    function doDeleteInvoice() {
+      const err = $('#invDelErr');
+      const idx = invDelIdx;
+      const e = state.stockHistory[idx];
+      if (!e) { $('#invDelDialog').close(); return; }
+      if (!currentUser || currentUser.role !== 'owner') { err.textContent = 'Hanya administrator yang boleh menghapus invoice.'; return; }
+      const net = invNetQty(idx);
+      if ($('#invDelStock').checked) {
+        const short = Object.keys(net).filter((id) => net[id] > 0).map((id) => ({ p: getProductById(id), q: net[id] }))
+          .filter((x) => x.p && Number(x.p.stock || 0) < x.q).map((x) => x.p.name + ' (stok ' + Number(x.p.stock || 0) + ', perlu -' + x.q + ')');
+        if (short.length) {
+          err.textContent = 'Stok tidak cukup untuk dikurangi: ' + short.join(', ') + '. Hapus tanpa mengurangi stok, lalu sesuaikan lewat Stok Opname.';
+          return;
+        }
+        Object.keys(net).forEach((id) => {
+          const p = getProductById(id);
+          if (p && net[id] > 0) p.stock = Number(p.stock || 0) - net[id];
+        });
+      }
+      state.supReturns = state.supReturns.filter((r) => r.invIdx !== idx);
+      state.supReturns.forEach((r) => { if (r.invIdx > idx) r.invIdx -= 1; });
+      state.stockHistory.splice(idx, 1);
+      invDelIdx = null;
+      saveState();
+      renderAll();
+      updateStockAlert();
+      $('#invDelDialog').close();
+      $('#invDetailDialog').close();
+    }
+
+    function bindDeleteEvents() {
+      $('#invDetailDelete').addEventListener('click', () => openInvDelete(invDetailIdx));
+      $('#invDelGo').addEventListener('click', doDeleteInvoice);
+      $('#invDelCancel').addEventListener('click', () => $('#invDelDialog').close());
+    }
+
+    // ===== Produk massal: update, hapus, unduh =====
+    let prodSel = new Set();
+    let prodVisible = [];
+
+    function updateProdSelUI() {
+      const n = prodSel.size;
+      const btn = $('#prodDelSelected');
+      const all = $('#prodSelAll');
+      if (!btn || !all) return;
+      btn.disabled = n === 0;
+      btn.textContent = 'Hapus terpilih (' + n + ')';
+      all.checked = prodVisible.length > 0 && n === prodVisible.length;
+      all.indeterminate = n > 0 && n < prodVisible.length;
+    }
+
+    function purgeProducts(list) {
+      const ids = new Set(list.map((x) => String(x.id)));
+      state.products = state.products.filter((x) => !ids.has(String(x.id)));
+      ids.forEach((id) => { delete cart[id]; delete state.opDraft[id]; });
+      activeStockDraft = activeStockDraft.filter((it) => !ids.has(String(it.id)));
+      poDraft = poDraft.filter((it) => !ids.has(String(it.id)));
+      saveState();
+      renderAll();
+      renderPoDraft();
+      updateStockAlert();
+    }
+
+    function deleteSelectedProducts() {
+      const msg = $('#prodMsg');
+      msg.style.color = '';
+      const items = Array.from(prodSel).map((id) => getProductById(id)).filter(Boolean);
+      if (!items.length) return;
+      const hasActivePo = (prod) => state.preorders.some((po) => poActive(po) && (po.items || []).some((it) => String(it.id) === String(prod.id)));
+      const blocked = items.filter(hasActivePo);
+      const ok = items.filter((x) => !hasActivePo(x));
+      if (!ok.length) {
+        msg.textContent = 'Tidak ada yang bisa dihapus: semua produk terpilih masih ada di pre order aktif.';
+        msg.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        return;
+      }
+      const stockSum = ok.reduce((a, x) => a + Number(x.stock || 0), 0);
+      const used = ok.filter((x) => state.history.some((tx) => (tx.items || []).some((it) => String(it.id) === String(x.id)))).length;
+      msg.textContent = '';
+      opAsk('Hapus ' + ok.length + ' produk?',
+        ok.slice(0, 8).map((x) => '• ' + x.name + ' (' + x.code + ')').join('\n') + (ok.length > 8 ? '\n... dan ' + (ok.length - 8) + ' lainnya' : '') + '\n\n' +
+        (stockSum > 0 ? 'Total stok ' + stockSum + ' ikut hilang dari sistem.\n' : '') +
+        used + ' produk pernah terjual; riwayatnya tetap ada dengan nama yang sama.' +
+        (blocked.length ? '\n\n' + blocked.length + ' produk dilewati karena masih ada pre order aktif: ' + blocked.map((x) => x.name).join(', ') + '.' : '') +
+        '\n\nTidak bisa dibatalkan.',
+        () => {
+          purgeProducts(ok);
+          msg.style.color = 'var(--accent)';
+          msg.textContent = ok.length + ' produk dihapus.';
+          setTimeout(() => { msg.textContent = ''; msg.style.color = ''; }, 5000);
+        }, 'Ya, hapus ' + ok.length + ' produk', true);
+    }
+
+    const csvEsc = (v) => {
+      const s = String(v === null || v === undefined ? '' : v);
+      return /[;"\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+
+    function downloadProductsCsv() {
+      const head = ['Kode', 'Nama', 'Brand', 'Kategori', 'Stok Minimum', 'Harga Beli', 'Harga Eceran Tertinggi', 'Harga Eceran Terendah', 'Stok Saat Ini (info)'];
+      const blank0 = (n) => (Number(n) > 0 ? Number(n) : '');
+      const rows = state.products.map((x) => [x.code, x.name, x.brand || '', x.category || '', minStockOf(x), blank0(x.cost), blank0(x.price), Number(x.price) > 0 ? blank0(minPriceOf(x)) : '', Number(x.stock || 0)]);
+      const text = [head].concat(rows).map((r) => r.map(csvEsc).join(';')).join('\r\n') + '\r\n';
+      const blob = new Blob(['﻿' + text], { type: 'text/csv;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'produk-' + localISODate() + '.csv';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    }
+
+    function downloadOpnameCsv() {
+      const head = ['Kode', 'Nama', 'Stok Sistem', 'Fisik'];
+      const rows = state.products.map((x) => [x.code, x.name, Number(x.stock || 0), opPhys(x) === null ? '' : opPhys(x)]);
+      const text = [head].concat(rows).map((r) => r.map(csvEsc).join(';')).join('\r\n') + '\r\n';
+      const blob = new Blob(['\uFEFF' + text], { type: 'text/csv;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'template-opname-' + localISODate() + '.csv';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    }
+
+    function reviewBulkUpdate(body, idx) {
+      const get = (row, f) => (idx[f] !== undefined ? (row[idx[f]] || '').trim() : '');
+      const seen = new Set();
+      const claimed = new Map();
+      return body.map((row, i) => {
+        const item = { line: i + 1, kode: get(row, 'kode'), product: null, patch: {}, changes: [], error: '', noChange: false };
+        if (!item.kode) { item.error = 'Kode kosong'; return item; }
+        const prod = state.products.find((x) => String(x.code).toLowerCase() === item.kode.toLowerCase());
+        if (!prod) { item.error = 'Kode tidak ditemukan'; return item; }
+        if (seen.has(prod.id)) { item.error = 'Kode muncul lebih dari sekali'; return item; }
+        seen.add(prod.id);
+        item.product = prod;
+        const patch = item.patch;
+        const ch = item.changes;
+        const nm = get(row, 'nama');
+        if (nm !== '' && nm !== prod.name) { patch.name = nm; ch.push('Nama: ' + prod.name + ' → ' + nm); }
+        [['brand', 'Brand', get(row, 'brand')], ['category', 'Kategori', get(row, 'kategori')]].forEach(([field, label, raw]) => {
+          if (raw === '') return;
+          const v = raw === '-' ? '' : raw;
+          if (v !== (prod[field] || '')) { patch[field] = v; ch.push(label + ': ' + (prod[field] || '-') + ' → ' + (v || '-')); }
+        });
+        const sm = get(row, 'stokmin');
+        if (sm !== '') {
+          const n = parseCount(sm);
+          if (Number.isNaN(n)) item.error = 'Stok minimum tidak valid';
+          else if (n !== minStockOf(prod)) { patch.minStock = n; ch.push('Min stok: ' + minStockOf(prod) + ' → ' + n); }
+        }
+        const md = get(row, 'modal');
+        if (!item.error && md !== '') {
+          const n = parseMoney(md);
+          if (Number.isNaN(n) || n < 0) item.error = 'Harga beli tidak valid';
+          else if (n !== (Number(prod.cost) || 0)) { patch.cost = n; ch.push('Harga beli: ' + formatRp(prod.cost || 0) + ' → ' + formatRp(n)); }
+        }
+        const hg = get(row, 'harga');
+        const hm = get(row, 'hargamin');
+        let newPrice = 0;
+        let newMin = 0;
+        if (!item.error && hg !== '') { newPrice = parseMoney(hg); if (!(newPrice > 0)) item.error = 'Harga eceran tertinggi tidak valid'; }
+        if (!item.error && hm !== '') { newMin = parseMoney(hm); if (!(newMin > 0)) item.error = 'Harga eceran terendah tidak valid'; }
+        if (!item.error && (newPrice > 0 || newMin > 0)) {
+          const curPrice = Number(prod.price) || 0;
+          const priced = curPrice > 0;
+          const effPrice = newPrice > 0 ? newPrice : curPrice;
+          if (!(effPrice > 0)) {
+            item.error = 'Produk belum punya harga: isi Harga Eceran Tertinggi';
+          } else {
+            const effMin = newMin > 0 ? newMin : (newPrice > 0 ? (priced ? Math.min(minPriceOf(prod), newPrice) : newPrice) : minPriceOf(prod));
+            if (effMin > effPrice) {
+              item.error = 'Harga eceran terendah melebihi harga tertinggi';
+            } else {
+              if (effPrice !== curPrice) { patch.price = effPrice; ch.push('Harga tertinggi: ' + (priced ? formatRp(curPrice) : '-') + ' → ' + formatRp(effPrice)); }
+              const curMin = priced ? minPriceOf(prod) : 0;
+              if (effMin !== curMin) { patch.minPrice = effMin; ch.push('Harga terendah: ' + (priced ? formatRp(curMin) : '-') + ' → ' + formatRp(effMin)); }
+            }
+          }
+        }
+        if (!item.error && (patch.name !== undefined || patch.brand !== undefined)) {
+          const key = ((patch.name !== undefined ? patch.name : prod.name) + '|' + (patch.brand !== undefined ? patch.brand : (prod.brand || ''))).toLowerCase();
+          const clash = state.products.find((x) => x.id !== prod.id && (x.name + '|' + (x.brand || '')).toLowerCase() === key);
+          if (clash || (claimed.has(key) && claimed.get(key) !== prod.id)) item.error = 'Nama dan brand sama dengan produk lain';
+          else claimed.set(key, prod.id);
+        }
+        if (!item.error && !ch.length) item.noChange = true;
+        return item;
+      });
+    }
+
+    function bindProductBulkEvents() {
+      $('#bulkUpdateBtn').addEventListener('click', () => openBulk('update'));
+      $('#exportProductsBtn').addEventListener('click', downloadProductsCsv);
+      $('#prodDelSelected').addEventListener('click', deleteSelectedProducts);
+      $('#prodSelAll').addEventListener('change', (e) => {
+        if (e.target.checked) prodVisible.forEach((id) => prodSel.add(id)); else prodSel.clear();
+        renderProductList();
+      });
+      $('#productList').addEventListener('change', (e) => {
+        const c = e.target.closest('[data-sel-product]');
+        if (!c) return;
+        const id = Number(c.dataset.selProduct);
+        if (c.checked) prodSel.add(id); else prodSel.delete(id);
+        updateProdSelUI();
+      });
+    }
+
     function bindEvents() {
       $('#searchProduct').addEventListener('input', renderProductGrid);
       $('#productGrid').addEventListener('click', (e) => {
@@ -5778,7 +6709,7 @@ function savePhoto_(body) {
         const id = btn.dataset.id;
         const p = getProductById(id);
         if (!p) return;
-        if ((cart[id] || 0) >= Number(p.stock || 0)) return;
+        if ((cart[id] || 0) >= Number(p.stock || 0) || !(Number(p.price) > 0)) return;
         cart[id] = (cart[id] || 0) + 1;
         renderCart();
       });
@@ -5824,7 +6755,7 @@ function savePhoto_(body) {
           $('#epBrand').value = prod.brand || '';
           $('#epCategory').value = prod.category || '';
           $('#epPrice').value = Number(prod.price) || '';
-          $('#epMin').value = minPriceOf(prod);
+          $('#epMin').value = minPriceOf(prod) || '';
           $('#epMinStock').value = minStockOf(prod) || '';
           $('#epErr').textContent = '';
           $('#editProdDialog').showModal();
@@ -5832,11 +6763,7 @@ function savePhoto_(body) {
         }
         const btn = e.target.closest('[data-del-product]');
         if (!btn) return;
-        const id = Number(btn.dataset.delProduct);
-        state.products = state.products.filter((p) => p.id !== id);
-        saveState();
-        renderProductList();
-        renderProductGrid();
+        deleteProductFlow(Number(btn.dataset.delProduct));
       });
 
       $('#addStockItemBtn').addEventListener('click', addStockItem);
@@ -5853,6 +6780,9 @@ function savePhoto_(body) {
       bindPoEvents();
       bindRequestEvents();
       bindOpnameEvents();
+      bindBiayaEvents();
+      bindDeleteEvents();
+      bindProductBulkEvents();
       $('#memberList').addEventListener('click', onMemberListClick);
       initBirthdayFilters();
       ['#mbMonth', '#mbDay'].forEach((sel) => $(sel).addEventListener('change', () => { bdWeek = false; renderMembers(); }));
@@ -5972,6 +6902,13 @@ function savePhoto_(body) {
       $('#spDetailClose').addEventListener('click', () => $('#spDialog').close());
       $('#syncSaveBtn').addEventListener('click', saveSyncConfig);
       $('#syncNowBtn').addEventListener('click', () => runSync(true));
+      $('#syncAllBtn').addEventListener('click', () => {
+        if (!syncReady()) { $('#syncErr').textContent = 'Hubungkan Google Sheets dulu (simpan URL dan token).'; return; }
+        if (!confirm('Kirim ulang SEMUA transaksi dan data ke Google Sheets? Baris yang sudah ada akan diperbarui, bukan digandakan. Bisa lama bila datanya banyak.')) return;
+        state.sync.sent = {};
+        persistState();
+        runSync(true);
+      });
       $('#syncOffBtn').addEventListener('click', disconnectSync);
       $('#syncCopyCode').addEventListener('click', copyGsCode);
       $('#syncBadge').addEventListener('click', () => runSync(true));
@@ -5984,8 +6921,8 @@ function savePhoto_(body) {
       window.addEventListener('online', () => runSync());
       setInterval(() => runSync(), 5 * 60 * 1000);
       $('#stockPayType').addEventListener('change', updateStockPayUI);
-      $('#stockPhoto').addEventListener('change', () => pickPhoto('#stockPhoto', '#stockPhotoPrev', '#stockMsg', (b) => { pendingInvPhoto = b; }));
-      $('#stockProof').addEventListener('change', () => pickPhoto('#stockProof', '#stockProofPrev', '#stockMsg', (b) => { pendingInvProof = b; }));
+      $('#stockPhoto').addEventListener('change', () => pickPhoto('#stockPhoto', '#stockPhotoPrev', '#stockMsg', (b) => { pendingInvPhoto = b; }, '#stockPhotoStatus'));
+      $('#stockProof').addEventListener('change', () => pickPhoto('#stockProof', '#stockProofPrev', '#stockMsg', (b) => { pendingInvProof = b; }, '#stockProofStatus'));
       $('#invPayProof').addEventListener('change', () => pickPhoto('#invPayProof', '#invPayProofPrev', '#invPayErr', (b) => { pendingPayProof = b; }));
       $('#attachInput').addEventListener('change', (ev) => {
         const f = ev.target.files[0];
@@ -6023,6 +6960,7 @@ function savePhoto_(body) {
       $('#invPayCancel').addEventListener('click', () => $('#invPayDialog').close());
       $('#bulkProductBtn').addEventListener('click', () => openBulk('products'));
       $('#bulkStockBtn').addEventListener('click', () => openBulk('stock'));
+      $('#opBulkBtn').addEventListener('click', () => openBulk('opname'));
       $('#bulkReview').addEventListener('click', reviewBulk);
       $('#bulkCommit').addEventListener('click', commitBulk);
       $('#bulkCancel').addEventListener('click', () => $('#bulkDialog').close());
@@ -6101,9 +7039,27 @@ function savePhoto_(body) {
           if (tab === 'preorder') renderPo();
           if (tab === 'request') renderRequest();
           if (tab === 'opname') renderOpname();
+          if (tab === 'biaya') renderBiaya();
+          if (tab === 'online') renderOnline();
         });
       });
 
+      $('#pdPrev').addEventListener('click', () => shiftPeriod(-1));
+      $('#pdNext').addEventListener('click', () => shiftPeriod(1));
+      $('#pdNow').addEventListener('click', () => { $('#pdWeek').value = localISODate(); $('#pdMonth').value = localISODate().slice(0, 7); renderPeriod(); });
+      ['#pdWeek', '#pdMonth'].forEach((sel) => $(sel).addEventListener('change', renderPeriod));
+      $('#onRefresh').addEventListener('click', renderOnline);
+      $('#onList').addEventListener('click', async (e) => {
+        const btn = e.target.closest('[data-on-save]');
+        if (!btn) return;
+        const row = btn.closest('[data-on]');
+        const ong = row.querySelector('[data-on-ongkir]');
+        btn.disabled = true;
+        try {
+          await syncPost({ action: 'orderupdate', no: row.dataset.on, status: row.querySelector('[data-on-status]').value, ongkir: ong ? (Number(ong.value) || 0) : undefined });
+          await renderOnline();
+        } catch (err) { $('#onMsg').textContent = syncFriendly(err); btn.disabled = false; }
+      });
       $('#lockBtn').addEventListener('click', lockApp);
       $('#addCashierBtn').addEventListener('click', addCashier);
       $('#cashierList').addEventListener('click', onCashierListClick);
@@ -6131,6 +7087,10 @@ function savePhoto_(body) {
       $('#app').classList.add('hide');
     }
 
+    document.querySelector('nav').addEventListener('click', (e) => {
+      const b = e.target.closest('button');
+      if (b) b.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+    });
     init();
   </script>
 </body>
