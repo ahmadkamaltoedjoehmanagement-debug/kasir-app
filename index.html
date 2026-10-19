@@ -312,6 +312,7 @@
       <button role="tab" data-tab="opname" aria-selected="false">Stok Opname</button>
       <button role="tab" data-tab="riwayat" aria-selected="false">Riwayat</button>
       <button role="tab" data-tab="member" aria-selected="false">Member</button>
+      <button role="tab" data-tab="broadcast" aria-selected="false">Broadcast WA</button>
       <button role="tab" data-tab="preorder" aria-selected="false">Pre Order <span id="poBadge" class="hide" style="background:#e53935; color:#fff; border-radius:10px; padding:1px 7px; font-size:11px; margin-left:4px;">0</span></button>
       <button role="tab" data-tab="request" aria-selected="false">Request Produk</button>
       <button role="tab" data-tab="online" aria-selected="false">Pesanan Online</button>
@@ -611,6 +612,41 @@
         <div id="poList"></div>
       </div>
     </section>
+    <section id="broadcast" class="view">
+      <div class="box">
+        <h2>WhatsApp broadcast</h2>
+        <div class="muted" style="margin-bottom:10px;">Pesan dibuka satu per satu di WhatsApp, lalu Anda menekan tombol kirim di sana. Kirim bertahap dan hanya ke member yang bersedia dihubungi, supaya nomor toko tidak diblokir WhatsApp.</div>
+        <label class="muted" style="display:block;">Penerima
+          <select id="bcAud">
+            <option value="semua">Semua member</option>
+            <option value="ultah">Ulang tahun hari ini</option>
+            <option value="bulan">Ulang tahun bulan ini</option>
+            <option value="piutang">Punya piutang aktif</option>
+            <option value="lama">Belum belanja 30 hari terakhir</option>
+          </select>
+        </label>
+        <label class="muted" style="display:block; margin-top:8px;">Template
+          <select id="bcTpl">
+            <option value="">Tulis sendiri</option>
+            <option value="promo">Promo</option>
+            <option value="ultah">Ucapan ulang tahun</option>
+            <option value="piutang">Pengingat piutang</option>
+            <option value="poin">Info poin member</option>
+          </select>
+        </label>
+        <label class="muted" style="display:block; margin-top:8px;">Pesan (pakai {nama}, {poin}, {hutang}, {toko})
+          <textarea id="bcMsg" rows="5" style="width:100%;" placeholder="Tulis pesan broadcast"></textarea>
+        </label>
+        <div id="bcCount" style="font-weight:700; margin:10px 0 6px;"></div>
+        <div class="err" id="bcErr" role="alert"></div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button id="bcNext" class="action">Kirim ke berikutnya</button>
+          <button id="bcReset" class="action ghost">Reset status terkirim</button>
+        </div>
+        <div id="bcList" style="margin-top:10px;"></div>
+      </div>
+    </section>
+
     <section id="online" class="view">
       <div class="box">
         <h2>Pesanan online</h2>
@@ -1568,7 +1604,7 @@ function updateOrder_(b) {
     let activeStockDraft = [];
     let currentUser = null;
     let currentReceiptTx = null;
-    const KASIR_TABS = ['online', 'kasir', 'riwayat', 'member', 'preorder', 'request', 'piutang', 'tutup', 'produktivitas'];
+    const KASIR_TABS = ['broadcast', 'online', 'kasir', 'riwayat', 'member', 'preorder', 'request', 'piutang', 'tutup', 'produktivitas'];
     const canRefund = () => !!currentUser && (currentUser.role === 'owner' || !!state.kasirRefund);
     const nowLabel = () => new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
     const debtPaid = (d) => (d.payments || []).reduce((a, p) => a + Number(p.amount || 0), 0);
@@ -6343,6 +6379,62 @@ function updateOrder_(b) {
       renderRequest();
     }
 
+    // ===== WhatsApp broadcast =====
+    let bcSent = {}, bcOff = {};
+    const BC_TPL = {
+      promo: 'Halo {nama}, ini {toko}. Ada promo spesial untuk Anda! Yuk mampir atau chat kami untuk info lengkapnya.',
+      ultah: 'Halo {nama}, selamat ulang tahun! Dari {toko}, semoga sehat dan bahagia selalu. Ada kejutan kecil untuk Anda, silakan datang ke toko ya.',
+      piutang: 'Halo {nama}, kami dari {toko}. Mengingatkan sisa tagihan Anda sebesar {hutang}. Terima kasih atas perhatiannya.',
+      poin: 'Halo {nama}, poin member Anda di {toko} saat ini {poin}. Yuk ditukarkan saat belanja berikutnya!'
+    };
+    function bcPhone(p) {
+      let d = String(p || '').replace(/\D/g, '');
+      if (d.startsWith('0')) d = '62' + d.slice(1);
+      else if (d.startsWith('8')) d = '62' + d;
+      return d;
+    }
+    function bcText(m, tpl) {
+      return tpl.replace(/\{nama\}/g, m.name).replace(/\{poin\}/g, String(m.points || 0)).replace(/\{hutang\}/g, formatRp(memberOutstanding(m.phone))).replace(/\{toko\}/g, state.store || '');
+    }
+    function bcRecipients() {
+      const aud = $('#bcAud').value, now = Date.now(), mo = new Date().getMonth() + 1, last = {};
+      state.history.forEach((tx) => {
+        if (tx.member && tx.member.phone) last[tx.member.phone] = Math.max(last[tx.member.phone] || 0, Number(tx.ts) || Date.parse(tx.day) || 0);
+      });
+      return state.members.filter((m) => {
+        if (aud === 'ultah') return isBirthdayToday(m);
+        if (aud === 'bulan') { const b = dobParts(m); return !!b && b.mo === mo; }
+        if (aud === 'piutang') return memberOutstanding(m.phone) > 0;
+        if (aud === 'lama') return !last[m.phone] || now - last[m.phone] > 30 * 86400000;
+        return true;
+      }).filter((m) => bcPhone(m.phone).length >= 9);
+    }
+    function renderBroadcast() {
+      const list = bcRecipients();
+      const chosen = list.filter((m) => !bcOff[m.phone]);
+      $('#bcCount').textContent = chosen.length + ' penerima dipilih dari ' + list.length + ' · ' + chosen.filter((m) => bcSent[m.phone]).length + ' sudah dibuka';
+      $('#bcList').innerHTML = list.map((m) => '<div class="line"><label style="display:flex; gap:8px; align-items:center; flex:1;"><input type="checkbox" data-bc-pick="' + escapeHtml(m.phone) + '" style="width:auto;"' + (bcOff[m.phone] ? '' : ' checked') + ' /><span><b>' + escapeHtml(m.name) + '</b><br><small class="muted">' + escapeHtml(m.phone) + '</small></span></label>' +
+        '<div class="q">' + (bcSent[m.phone] ? '<small>Sudah dibuka ✓</small>' : '') + '<button class="action ghost" data-bc-send="' + escapeHtml(m.phone) + '" style="padding:6px 10px;">Kirim</button></div></div>').join('') || '<div class="muted">Tidak ada member pada kelompok ini.</div>';
+    }
+    function bcOpen(phone) {
+      const m = state.members.find((x) => x.phone === phone);
+      const err = $('#bcErr');
+      if (!m) return;
+      const tpl = $('#bcMsg').value.trim();
+      if (!tpl) { err.textContent = 'Tulis pesan dulu.'; return; }
+      err.textContent = '';
+      const url = 'https://wa.me/' + bcPhone(phone) + '?text=' + encodeURIComponent(bcText(m, tpl));
+      bcSent[phone] = true;
+      const w = window.open(url, '_blank', 'noopener');
+      if (!w) err.innerHTML = 'Browser memblokir jendela baru. <a href="' + escapeHtml(url) + '" target="_blank" rel="noopener">Buka WhatsApp untuk ' + escapeHtml(m.name) + '</a>';
+      renderBroadcast();
+    }
+    function bcNext() {
+      const m = bcRecipients().find((x) => !bcOff[x.phone] && !bcSent[x.phone]);
+      if (!m) { $('#bcErr').textContent = 'Semua penerima terpilih sudah dibuka.'; return; }
+      bcOpen(m.phone);
+    }
+
     const ON_STATUS = ['Baru', 'Menunggu pembayaran', 'Diproses', 'Siap diambil', 'Dikirim', 'Selesai', 'Batal'];
     async function renderOnline() {
       const msg = $('#onMsg'), box = $('#onList');
@@ -7033,6 +7125,20 @@ function updateOrder_(b) {
       initBirthdayFilters();
       ['#mbMonth', '#mbDay'].forEach((sel) => $(sel).addEventListener('change', () => { bdWeek = false; renderMembers(); }));
       document.querySelectorAll('[data-bd-preset]').forEach((b) => b.addEventListener('click', () => setBirthdayPreset(b.dataset.bdPreset)));
+      $('#bcAud').addEventListener('change', renderBroadcast);
+      $('#bcTpl').addEventListener('change', () => { $('#bcMsg').value = BC_TPL[$('#bcTpl').value] || ''; });
+      $('#bcNext').addEventListener('click', bcNext);
+      $('#bcReset').addEventListener('click', () => { bcSent = {}; $('#bcErr').textContent = ''; renderBroadcast(); });
+      $('#bcList').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-bc-send]');
+        if (b) bcOpen(b.dataset.bcSend);
+      });
+      $('#bcList').addEventListener('change', (e) => {
+        const c = e.target.closest('[data-bc-pick]');
+        if (!c) return;
+        if (c.checked) delete bcOff[c.dataset.bcPick]; else bcOff[c.dataset.bcPick] = true;
+        renderBroadcast();
+      });
       $('#delYes').addEventListener('click', delConfirm);
       $('#delNo').addEventListener('click', () => $('#delDialog').close());
       $('#meSave').addEventListener('click', saveMemberEdit);
@@ -7300,6 +7406,7 @@ function updateOrder_(b) {
           if (tab === 'opname') renderOpname();
           if (tab === 'biaya') renderBiaya();
           if (tab === 'online') renderOnline();
+          if (tab === 'broadcast') renderBroadcast();
         });
       });
 
