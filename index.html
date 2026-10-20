@@ -316,6 +316,7 @@
       <button role="tab" data-tab="preorder" aria-selected="false">Pre Order <span id="poBadge" class="hide" style="background:#e53935; color:#fff; border-radius:10px; padding:1px 7px; font-size:11px; margin-left:4px;">0</span></button>
       <button role="tab" data-tab="request" aria-selected="false">Request Produk</button>
       <button role="tab" data-tab="online" aria-selected="false">Pesanan Online</button>
+      <button role="tab" data-tab="afiliator" aria-selected="false">Afiliator</button>
       <button role="tab" data-tab="piutang" aria-selected="false">Piutang</button>
       <button role="tab" data-tab="produktivitas" aria-selected="false">Produktivitas</button>
       <button role="tab" data-tab="tutup" aria-selected="false">Tutup Kasir</button>
@@ -647,6 +648,31 @@
       </div>
     </section>
 
+    <section id="afiliator" class="view">
+      <div class="box">
+        <h2>Afiliator</h2>
+        <div class="muted" style="margin-bottom:10px;">Bagikan link khusus ke afiliator. Pesanan online yang masuk lewat link itu tercatat atas nama mereka, dan komisi dihitung saat pesanan berstatus Selesai.</div>
+        <label class="muted" style="display:block;">Nama <input id="afName" autocomplete="off" /></label>
+        <label class="muted" style="display:block; margin-top:8px;">No. WhatsApp <input id="afPhone" inputmode="tel" autocomplete="off" /></label>
+        <label class="muted" style="display:block; margin-top:8px;">Kode unik (huruf/angka, contoh ANI) <input id="afCode" autocomplete="off" /></label>
+        <label class="muted" style="display:block; margin-top:8px;">Jenis komisi
+          <select id="afType"><option value="pct">Persentase (%) dari nilai barang</option><option value="nom">Nominal tetap per pesanan (Rp)</option></select>
+        </label>
+        <label class="muted" style="display:block; margin-top:8px;"><span id="afValLbl">Persentase komisi (%)</span> <input id="afValue" type="number" min="0" step="any" inputmode="decimal" /></label>
+        <div class="err" id="afErr" role="alert"></div>
+        <button id="afSave" class="action success full">Simpan afiliator</button>
+        <button id="afCancel" class="action ghost full hide" style="margin-top:8px;">Batal ubah</button>
+      </div>
+      <div class="box">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+          <h2>Daftar &amp; rekap</h2>
+          <button id="afRefresh" class="action ghost" style="padding:8px 10px;">Muat ulang</button>
+        </div>
+        <div id="afMsg" class="muted"></div>
+        <div id="afList"></div>
+      </div>
+    </section>
+
     <section id="online" class="view">
       <div class="box">
         <h2>Pesanan online</h2>
@@ -939,7 +965,9 @@ const SHEET_NAMES = {
   pesanan_online: 'Pesanan Online',
   member: 'Member',
   biaya: 'Biaya',
-  jurnal_manual: 'Jurnal Manual'
+  jurnal_manual: 'Jurnal Manual',
+  afiliator: 'Afiliator',
+  komisi_bayar: 'Bayar Komisi'
 };
 
 const HEADERS = {
@@ -956,10 +984,12 @@ const HEADERS = {
   opname: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'User', 'Produk Dihitung', 'Produk Selisih', 'Nilai Selisih', 'Catatan', 'Detail Selisih'],
   request_produk: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'Kasir', 'Pelanggan', 'Telepon', 'Produk', 'Brand', 'Qty', 'Budget', 'Status', 'Catatan'],
   katalog: ['Key', 'Perangkat', 'Kode', 'Produk', 'Brand', 'Kategori', 'Tipe', 'Harga', 'Stok'],
-  pesanan_online: ['Key', 'No', 'Tanggal', 'Pelanggan', 'Telepon', 'Item', 'Total', 'Layanan', 'Alamat', 'Ongkir', 'Pembayaran', 'Bukti Bayar', 'Status', 'Catatan'],
+  pesanan_online: ['Key', 'No', 'Tanggal', 'Pelanggan', 'Telepon', 'Item', 'Total', 'Layanan', 'Alamat', 'Ongkir', 'Pembayaran', 'Bukti Bayar', 'Status', 'Catatan', 'Referal', 'Komisi'],
   member: ['Key', 'Perangkat', 'Nama', 'Telepon', 'Tgl Lahir', 'Batas Hutang', 'Poin'],
   biaya: ['Key', 'Perangkat', 'No', 'Tanggal', 'Kategori', 'Dibayar dari', 'Jumlah', 'Catatan', 'Dicatat oleh'],
-  jurnal_manual: ['Key', 'Perangkat', 'No', 'Tanggal', 'Memo', 'Akun', 'Debit', 'Kredit', 'Dicatat oleh']
+  jurnal_manual: ['Key', 'Perangkat', 'No', 'Tanggal', 'Memo', 'Akun', 'Debit', 'Kredit', 'Dicatat oleh'],
+  afiliator: ['Key', 'Perangkat', 'Nama', 'Kode', 'Telepon', 'Jenis Komisi', 'Nilai', 'Aktif', 'PIN'],
+  komisi_bayar: ['Key', 'Perangkat', 'Tanggal', 'Kode', 'Jumlah', 'Catatan', 'Dicatat oleh']
 };
 
 function doGet(e) {
@@ -975,6 +1005,9 @@ function doPost(e) {
     body = JSON.parse(e.postData.contents);
   } catch (err) {
     return out_({ ok: false, error: 'Format permintaan tidak valid.' });
+  }
+  if (body.action === 'affiliate') {
+    return out_(affiliateView_(body));
   }
   if (body.action === 'order') {
     return out_(withLock_(function () { return saveOrder_(body); }));
@@ -1026,6 +1059,10 @@ function getSheet_(type) {
     var head = HEADERS[type];
     sh.getRange(1, 1, 1, head.length).setValues([head]).setFontWeight('bold');
     sh.setFrozenRows(1);
+  } else {
+    var h2 = HEADERS[type];
+    var cur = sh.getRange(1, 1, 1, h2.length).getValues()[0];
+    if (cur.join('|') !== h2.join('|')) sh.getRange(1, 1, 1, h2.length).setValues([h2]).setFontWeight('bold');
   }
   return sh;
 }
@@ -1136,7 +1173,6 @@ function saveOrder_(b) {
     var p = cat[String(it.code)];
     var q = Math.floor(Number(it.qty));
     if (!p || !(q &gt; 0) || q &gt; 99) throw new Error('Produk tidak ditemukan: ' + it.code);
-    if (p.Stok !== 'ada' &amp;&amp; Number(p.Stok) &lt; q) throw new Error('Stok ' + p.Produk + ' tidak cukup.');
     total += q * Number(p.Harga);
     lines.push(p.Produk + ' x' + q + ' @' + p.Harga);
   });
@@ -1156,8 +1192,9 @@ function saveOrder_(b) {
   var row = {
     No: no, Tanggal: Utilities.formatDate(now, tz, 'yyyy-MM-dd HH:mm'), Pelanggan: name, Telepon: "'" + phone,
     Item: lines.join('; '), Total: total, Layanan: ship ? 'Kirim' : 'Ambil di toko', Alamat: String(b.addr || '').slice(0, 300),
-    Ongkir: 0, Pembayaran: b.pay === 'transfer' ? 'Transfer bank' : 'Bayar saat ambil/COD', 'Bukti Bayar': proof,
-    Status: 'Baru', Catatan: String(b.note || '').slice(0, 300)
+    Ongkir: 0, Pembayaran: b.pay === 'transfer' ? 'Transfer bank' : (b.pay === 'cod' ? 'Bayar saat ambil/COD' : 'Dikonfirmasi via WhatsApp'), 'Bukti Bayar': proof,
+    Status: 'Baru', Catatan: String(b.note || '').slice(0, 300),
+    Referal: String(b.ref || '').toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 20), Komisi: 0
   };
   getSheet_('pesanan_online').appendRow(HEADERS.pesanan_online.map(function (h) {
     return h === 'Key' ? no : clean_(row[h]);
@@ -1176,10 +1213,56 @@ function updateOrder_(b) {
       var r = i + 2;
       if (b.status) sh.getRange(r, head.indexOf('Status') + 1).setValue(String(b.status).slice(0, 30));
       if (b.ongkir !== undefined &amp;&amp; b.ongkir !== null) sh.getRange(r, head.indexOf('Ongkir') + 1).setValue(Number(b.ongkir) || 0);
+      if (b.referal !== undefined &amp;&amp; b.referal !== null) sh.getRange(r, head.indexOf('Referal') + 1).setValue(String(b.referal).toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 20));
+      if (b.komisi !== undefined &amp;&amp; b.komisi !== null) sh.getRange(r, head.indexOf('Komisi') + 1).setValue(Number(b.komisi) || 0);
       return { ok: true };
     }
   }
   return { ok: false, error: 'Pesanan tidak ditemukan.' };
+}
+
+function affiliateView_(b) {
+  var code = String(b.code || '').toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 20);
+  var pin = String(b.pin || '').trim();
+  if (!code || !pin) return { ok: false, error: 'Isi kode dan PIN.' };
+  var cache = CacheService.getScriptCache();
+  var key = 'afl_' + code;
+  var fails = Number(cache.get(key) || 0);
+  if (fails &gt;= 5) return { ok: false, error: 'Terlalu banyak percobaan. Coba lagi 15 menit lagi.' };
+  var aff = null;
+  readSheet_('afiliator').forEach(function (a) {
+    if (String(a.Kode).toUpperCase() === code) aff = a;
+  });
+  if (!aff || !String(aff.PIN || '') || String(aff.PIN) !== pin || aff.Aktif === 'Tidak') {
+    cache.put(key, String(fails + 1), 900);
+    return { ok: false, error: 'Kode atau PIN salah.' };
+  }
+  cache.remove(key);
+  var orders = readSheet_('pesanan_online').filter(function (o) { return String(o.Referal).toUpperCase() === code; });
+  var pays = readSheet_('komisi_bayar').filter(function (p) { return String(p.Kode).toUpperCase() === code; });
+  var komisi = 0, pending = 0, estimate = 0, paid = 0;
+  var pct = aff['Jenis Komisi'] === 'Persen';
+  orders.forEach(function (o) {
+    if (o.Status === 'Selesai') {
+      komisi += Number(o.Komisi || 0);
+    } else if (o.Status !== 'Batal') {
+      pending++;
+      estimate += pct ? Math.round(Number(o.Total || 0) * Number(aff.Nilai || 0) / 100) : Math.round(Number(aff.Nilai || 0));
+    }
+  });
+  pays.forEach(function (p) { paid += Number(p.Jumlah || 0); });
+  return {
+    ok: true,
+    name: aff.Nama,
+    rule: pct ? aff.Nilai + '% dari nilai barang' : 'Rp' + Number(aff.Nilai || 0).toLocaleString('id-ID') + ' per pesanan',
+    komisi: komisi, paid: paid, sisa: komisi - paid, pending: pending, estimate: estimate,
+    orders: orders.slice(-100).reverse().map(function (o) {
+      return { No: o.No, Tanggal: o.Tanggal, Status: o.Status, Total: Number(o.Total || 0), Komisi: Number(o.Komisi || 0) };
+    }),
+    payments: pays.slice(-20).reverse().map(function (p) {
+      return { Tanggal: p.Tanggal, Jumlah: Number(p.Jumlah || 0), Catatan: p.Catatan || '' };
+    })
+  };
 }
 </textarea>
         </details>
@@ -1271,6 +1354,18 @@ function updateOrder_(b) {
     <div class="err" id="dobErr" role="alert"></div>
     <button id="dobSave" class="action success full">Simpan</button>
     <button id="dobCancel" class="action ghost full" style="margin-top:8px;">Batal</button>
+  </dialog>
+
+  <dialog id="afPayDialog">
+    <h2>Catat pembayaran komisi</h2>
+    <div id="afPayWho" class="muted"></div>
+    <label class="blk" for="afPayAmt">Jumlah dibayar (Rp)</label>
+    <input id="afPayAmt" type="number" min="0" inputmode="numeric" />
+    <label class="blk" for="afPayNote">Catatan (opsional)</label>
+    <input id="afPayNote" autocomplete="off" />
+    <div class="err" id="afPayErr" role="alert"></div>
+    <button id="afPayYes" class="action success full">Simpan</button>
+    <button id="afPayNo" class="action ghost full" style="margin-top:8px;">Batal</button>
   </dialog>
 
   <dialog id="delDialog">
@@ -1602,6 +1697,9 @@ function updateOrder_(b) {
       sseq: 1,
       bseq: 1,
       rseq: 1,
+      affiliates: [],
+      affPaid: [],
+      afseq: 1,
       receiptMode: 'wa',
       lockSalt: ''
     };
@@ -1691,6 +1789,9 @@ function updateOrder_(b) {
       if (!state.sseq) state.sseq = 1;
       if (!state.bseq) state.bseq = 1;
       if (!state.rseq) state.rseq = 1;
+      if (!Array.isArray(state.affiliates) || state.affiliates === defaultState.affiliates) state.affiliates = [];
+      if (!Array.isArray(state.affPaid) || state.affPaid === defaultState.affPaid) state.affPaid = [];
+      if (!state.afseq) state.afseq = 1;
       if (!state.lockSalt) state.lockSalt = Math.random().toString(36).slice(2, 12);
       if (!state.ownerPin) state.ownerPin = '1234';
       state.auth = Object.assign({ fails: 0, until: 0 }, (state.auth && typeof state.auth === 'object') ? state.auth : {});
@@ -3293,6 +3394,8 @@ function updateOrder_(b) {
           (j.lines || []).forEach((l, i) => add('jurnal_manual', j.id + ':' + i, { No: j.no, Tanggal: j.date, Memo: j.memo || '', Akun: accName(l.acc), Debit: Number(l.debit || 0), Kredit: Number(l.credit || 0), 'Dicatat oleh': j.by || '' }));
         }
       });
+      (state.affiliates || []).forEach((a) => add('afiliator', a.id, { Nama: a.name, Kode: a.code, Telepon: a.phone || '', 'Jenis Komisi': a.type === 'pct' ? 'Persen' : 'Nominal', Nilai: Number(a.value), Aktif: a.active === false ? 'Tidak' : 'Ya', PIN: a.pin ? "'" + a.pin : '' }));
+      (state.affPaid || []).forEach((p) => add('komisi_bayar', p.id, { Tanggal: p.date, Kode: p.code, Jumlah: Number(p.amount), Catatan: p.note || '', 'Dicatat oleh': p.by || '' }));
       state.members.forEach((m) => add('member', m.id, { Nama: m.name, Telepon: m.phone, 'Tgl Lahir': m.dob || '', 'Batas Hutang': Number(m.limit || 0), Poin: Number(m.points || 0) }));
       state.history.forEach((tx) => add('penjualan', tx.no, {
         No: tx.no, Tanggal: tx.date, Hari: tx.day || '', Kasir: tx.cashier || '', Member: tx.member ? tx.member.name : '',
@@ -6481,6 +6584,119 @@ function updateOrder_(b) {
       bcOpen(m.phone);
     }
 
+    // ===== Afiliator =====
+    let afOrders = [], afEdit = null, afPayCode = null;
+    const afClean = (c) => String(c || '').toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 20);
+    const afFind = (code) => (state.affiliates || []).find((a) => a.code === afClean(code));
+    const afCommission = (code, total) => {
+      const a = afFind(code);
+      if (!a) return 0;
+      return a.type === 'pct' ? Math.round(Number(total || 0) * Number(a.value || 0) / 100) : Math.round(Number(a.value || 0));
+    };
+    const afNewPin = () => {
+      const abc = 'ABCDFGHJKLMNPQRSTUVWXYZ23456789', r = new Uint32Array(6);
+      crypto.getRandomValues(r);
+      return Array.from(r, (x) => abc[x % abc.length]).join('');
+    };
+    const afPageUrl = (code) => new URL('afiliator.html', location.href).href.split('#')[0].split('?')[0] + '?kode=' + encodeURIComponent(code);
+    const afRule = (a) => a.type === 'pct' ? a.value + '% dari nilai barang' : formatRp(a.value) + ' per pesanan';
+    const afLink = (code) => new URL('toko.html', location.href).href.split('#')[0].split('?')[0] + '?ref=' + encodeURIComponent(code);
+    function afStats(a) {
+      const mine = afOrders.filter((o) => afClean(o.Referal) === a.code);
+      const done = mine.filter((o) => o.Status === 'Selesai');
+      const komisi = done.reduce((t, o) => t + Number(o.Komisi || 0), 0);
+      const paid = (state.affPaid || []).filter((p) => p.code === a.code).reduce((t, p) => t + Number(p.amount || 0), 0);
+      return { done: done.length, pending: mine.filter((o) => o.Status !== 'Selesai' && o.Status !== 'Batal').length, sales: done.reduce((t, o) => t + Number(o.Total || 0), 0), komisi, paid, sisa: komisi - paid };
+    }
+    async function renderAfiliator() {
+      const msg = $('#afMsg');
+      if (syncReady()) {
+        msg.textContent = 'Memuat rekap pesanan...';
+        try { afOrders = (await syncPost({ action: 'orders' })).orders || []; msg.textContent = ''; }
+        catch (err) { afOrders = []; msg.textContent = 'Rekap pesanan belum bisa dimuat: ' + syncFriendly(err); }
+      } else { afOrders = []; msg.textContent = 'Hubungkan Google Sheets (Pengaturan) agar rekap pesanan terhitung.'; }
+      drawAfiliator();
+    }
+    function drawAfiliator() {
+      $('#afList').innerHTML = (state.affiliates || []).map((a) => {
+        const st = afStats(a), link = afLink(a.code);
+        const wa = 'https://wa.me/' + String(a.phone || '').replace(/^0/, '62') + '?text=' + encodeURIComponent('Halo ' + a.name + ', ini link toko online ' + (state.store || '') + ' khusus untuk Anda: ' + link + (a.pin ? '\n\nLihat komisi Anda di: ' + afPageUrl(a.code) + '\nKode: ' + a.code + '\nPIN: ' + a.pin : ''));
+        return '<div class="line" style="flex-direction:column; align-items:stretch; gap:6px;" data-af="' + escapeHtml(a.code) + '">' +
+          '<div><b>' + escapeHtml(a.name) + '</b> (' + escapeHtml(a.code) + ')' + (a.active === false ? ' <small>Nonaktif</small>' : '') + '<br><small class="muted">Komisi: ' + escapeHtml(afRule(a)) + '</small></div>' +
+          '<small>Selesai ' + st.done + ' · menunggu ' + st.pending + ' · penjualan ' + formatRp(st.sales) + '<br>Komisi ' + formatRp(st.komisi) + ' · dibayar ' + formatRp(st.paid) + ' · <b>sisa ' + formatRp(st.sisa) + '</b></small>' +
+          '<small>Akses komisi: kode <b>' + escapeHtml(a.code) + '</b> · PIN <b>' + escapeHtml(a.pin || '-') + '</b></small>' +
+          '<input readonly value="' + escapeHtml(link) + '" style="font-size:12px;" />' +
+          '<div style="display:flex; gap:6px; flex-wrap:wrap;"><button class="action ghost" data-af-copy style="padding:6px 10px;">Salin link</button>' +
+          (a.phone ? '<a class="action ghost" target="_blank" rel="noopener" href="' + escapeHtml(wa) + '" style="padding:6px 10px;">Kirim akses via WA</a>' : '') +
+          '<button class="action ghost" data-af-pin style="padding:6px 10px;">' + (a.pin ? 'Reset PIN' : 'Buat PIN') + '</button>' +
+          '<button class="action ghost" data-af-edit style="padding:6px 10px;">Ubah</button>' +
+          '<button class="action ghost" data-af-pay style="padding:6px 10px;">Bayar komisi</button>' +
+          '<button class="action ghost" data-af-toggle style="padding:6px 10px;">' + (a.active === false ? 'Aktifkan' : 'Nonaktifkan') + '</button></div></div>';
+      }).join('') || '<div class="muted">Belum ada afiliator.</div>';
+    }
+    function afReset() {
+      afEdit = null;
+      ['#afName', '#afPhone', '#afCode', '#afValue'].forEach((x) => { $(x).value = ''; });
+      $('#afCode').disabled = false;
+      $('#afType').value = 'pct';
+      $('#afValLbl').textContent = 'Persentase komisi (%)';
+      $('#afErr').textContent = '';
+      $('#afCancel').classList.add('hide');
+      $('#afSave').textContent = 'Simpan afiliator';
+    }
+    function saveAffiliate() {
+      const name = $('#afName').value.trim(), phone = $('#afPhone').value.replace(/\D/g, ''), code = afClean($('#afCode').value || name), type = $('#afType').value, value = Number($('#afValue').value), err = $('#afErr');
+      if (!name || code.length < 2) { err.textContent = 'Isi nama dan kode (minimal 2 huruf/angka).'; return; }
+      if (!(value > 0) || (type === 'pct' && value > 100)) { err.textContent = type === 'pct' ? 'Persentase harus lebih dari 0 dan paling besar 100.' : 'Nominal komisi harus lebih dari 0.'; return; }
+      if (state.affiliates.some((a) => a.code === code && a.id !== afEdit)) { err.textContent = 'Kode itu sudah dipakai afiliator lain.'; return; }
+      if (afEdit) Object.assign(state.affiliates.find((a) => a.id === afEdit), { name, phone, type, value });
+      else state.affiliates.push({ id: state.afseq++, name, phone, code, type, value, active: true, pin: afNewPin() });
+      saveState();
+      afReset();
+      drawAfiliator();
+    }
+    function afListClick(e) {
+      const card = e.target.closest('[data-af]');
+      if (!card) return;
+      const a = afFind(card.dataset.af);
+      if (!a) return;
+      if (e.target.closest('[data-af-copy]')) {
+        const inp = card.querySelector('input');
+        inp.select();
+        try { navigator.clipboard.writeText(inp.value); } catch (x) { try { document.execCommand('copy'); } catch (y) { /* pilih manual */ } }
+      } else if (e.target.closest('[data-af-edit]')) {
+        afEdit = a.id;
+        $('#afName').value = a.name; $('#afPhone').value = a.phone || ''; $('#afCode').value = a.code; $('#afCode').disabled = true;
+        $('#afType').value = a.type; $('#afValue').value = a.value;
+        $('#afValLbl').textContent = a.type === 'pct' ? 'Persentase komisi (%)' : 'Nominal komisi per pesanan (Rp)';
+        $('#afCancel').classList.remove('hide'); $('#afSave').textContent = 'Simpan perubahan';
+        $('#afName').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else if (e.target.closest('[data-af-pin]')) {
+        const make = () => { a.pin = afNewPin(); saveState(); drawAfiliator(); };
+        if (!a.pin) make();
+        else askDel({ title: 'Reset PIN ' + a.name + '?', body: 'PIN lama tidak berlaku lagi. Kirim PIN baru ke afiliator.', yes: 'Reset PIN', safe: true, onYes: make });
+      } else if (e.target.closest('[data-af-toggle]')) {
+        a.active = a.active === false;
+        saveState();
+        drawAfiliator();
+      } else if (e.target.closest('[data-af-pay]')) {
+        afPayCode = a.code;
+        $('#afPayWho').textContent = a.name + ' (' + a.code + ') · sisa komisi ' + formatRp(afStats(a).sisa);
+        $('#afPayAmt').value = Math.max(0, afStats(a).sisa) || '';
+        $('#afPayNote').value = '';
+        $('#afPayErr').textContent = '';
+        $('#afPayDialog').showModal();
+      }
+    }
+    function saveAfPay() {
+      const amount = Math.round(Number($('#afPayAmt').value));
+      if (!(amount > 0)) { $('#afPayErr').textContent = 'Isi jumlah yang dibayar.'; return; }
+      state.affPaid.push({ id: state.afseq++, code: afPayCode, date: localISODate(), amount, note: $('#afPayNote').value.trim(), by: currentUser ? currentUser.name : '' });
+      saveState();
+      $('#afPayDialog').close();
+      drawAfiliator();
+    }
+
     const ON_STATUS = ['Baru', 'Menunggu pembayaran', 'Diproses', 'Siap diambil', 'Dikirim', 'Selesai', 'Batal'];
     async function renderOnline() {
       const msg = $('#onMsg'), box = $('#onList');
@@ -6493,13 +6709,14 @@ function updateOrder_(b) {
         box.innerHTML = list.map((o) => {
           const total = Number(o.Total || 0) + Number(o.Ongkir || 0);
           const wa = 'https://wa.me/' + String(o.Telepon || '').replace(/\D/g, '').replace(/^0/, '62') + '?text=' + encodeURIComponent('Halo ' + o.Pelanggan + ', pesanan ' + o.No + ' di ' + state.store + ': ' + o.Item + '. Total ' + formatRp(total) + (Number(o.Ongkir) ? ' (termasuk ongkir ' + formatRp(o.Ongkir) + ')' : '') + '.');
-          return '<div class="line" data-on="' + escapeHtml(o.No) + '"><div class="n"><b>' + escapeHtml(o.No) + ' · ' + escapeHtml(o.Pelanggan) + '</b>' +
+          const aff = afFind(o.Referal);
+          return '<div class="line" data-on="' + escapeHtml(o.No) + '" data-ref="' + escapeHtml(afClean(o.Referal)) + '" data-total="' + Number(o.Total || 0) + '" data-komisi="' + Number(o.Komisi || 0) + '"><div class="n"><b>' + escapeHtml(o.No) + ' · ' + escapeHtml(o.Pelanggan) + '</b>' +
             '<small>' + escapeHtml(o.Tanggal) + ' · ' + escapeHtml(o.Layanan) + ' · ' + escapeHtml(o.Pembayaran) + '</small>' +
             '<small>' + escapeHtml(o.Item) + '</small>' + (o.Alamat ? '<small>' + escapeHtml(o.Alamat) + '</small>' : '') +
-            (o.Catatan ? '<small>Catatan: ' + escapeHtml(o.Catatan) + '</small>' : '') + '<small>Total ' + formatRp(total) + '</small></div>' +
+            (o.Catatan ? '<small>Catatan: ' + escapeHtml(o.Catatan) + '</small>' : '') + '<small>Total ' + formatRp(total) + '</small>' + (o.Referal ? '<small>Afiliator: ' + escapeHtml(aff ? aff.name : 'kode ' + o.Referal + ' (belum terdaftar)') + (Number(o.Komisi) ? ' · komisi ' + formatRp(o.Komisi) : '') + '</small>' : '') + '</div>' +
             '<div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">' +
             (/^https:/.test(String(o['Bukti Bayar'])) ? '<a class="action ghost" target="_blank" rel="noopener" href="' + escapeHtml(o['Bukti Bayar']) + '">Bukti bayar</a>' : '') +
-            (o.Layanan === 'Kirim' ? '<input data-on-ongkir type="number" min="0" placeholder="Ongkir" value="' + Number(o.Ongkir || 0) + '" style="width:100px;" />' : '') +
+            '<input data-on-ref placeholder="Kode afiliator" value="' + escapeHtml(afClean(o.Referal)) + '" style="width:120px;" />' + (o.Layanan === 'Kirim' ? '<input data-on-ongkir type="number" min="0" placeholder="Ongkir" value="' + Number(o.Ongkir || 0) + '" style="width:100px;" />' : '') +
             '<select data-on-status style="width:auto;">' + ON_STATUS.map((x) => '<option' + (x === o.Status ? ' selected' : '') + '>' + x + '</option>').join('') + '</select>' +
             '<button class="action" data-on-save>Simpan</button><a class="action ghost" target="_blank" rel="noopener" href="' + wa + '">WhatsApp</a></div></div>';
         }).join('');
@@ -7171,6 +7388,13 @@ function updateOrder_(b) {
       initBirthdayFilters();
       ['#mbMonth', '#mbDay'].forEach((sel) => $(sel).addEventListener('change', () => { bdWeek = false; renderMembers(); }));
       document.querySelectorAll('[data-bd-preset]').forEach((b) => b.addEventListener('click', () => setBirthdayPreset(b.dataset.bdPreset)));
+      $('#afSave').addEventListener('click', saveAffiliate);
+      $('#afCancel').addEventListener('click', afReset);
+      $('#afRefresh').addEventListener('click', renderAfiliator);
+      $('#afList').addEventListener('click', afListClick);
+      $('#afType').addEventListener('change', () => { $('#afValLbl').textContent = $('#afType').value === 'pct' ? 'Persentase komisi (%)' : 'Nominal komisi per pesanan (Rp)'; });
+      $('#afPayYes').addEventListener('click', saveAfPay);
+      $('#afPayNo').addEventListener('click', () => $('#afPayDialog').close());
       $('#bcAud').addEventListener('change', renderBroadcast);
       $('#bcTpl').addEventListener('change', () => { $('#bcMsg').value = BC_TPL[$('#bcTpl').value] || ''; });
       $('#bcNext').addEventListener('click', bcNext);
@@ -7454,6 +7678,7 @@ function updateOrder_(b) {
           if (tab === 'opname') renderOpname();
           if (tab === 'biaya') renderBiaya();
           if (tab === 'online') renderOnline();
+          if (tab === 'afiliator') renderAfiliator();
           if (tab === 'broadcast') renderBroadcast();
         });
       });
@@ -7470,7 +7695,12 @@ function updateOrder_(b) {
         const ong = row.querySelector('[data-on-ongkir]');
         btn.disabled = true;
         try {
-          await syncPost({ action: 'orderupdate', no: row.dataset.on, status: row.querySelector('[data-on-status]').value, ongkir: ong ? (Number(ong.value) || 0) : undefined });
+          const st = row.querySelector('[data-on-status]').value, refNow = afClean(row.querySelector('[data-on-ref]').value), refOld = row.dataset.ref, oldKom = Number(row.dataset.komisi || 0);
+          let komisi;
+          if (st !== 'Selesai' || !refNow) komisi = 0;
+          else if (refNow !== refOld || oldKom === 0) komisi = afCommission(refNow, row.dataset.total);
+          else komisi = oldKom;
+          await syncPost({ action: 'orderupdate', no: row.dataset.on, status: st, ongkir: ong ? (Number(ong.value) || 0) : undefined, referal: refNow, komisi });
           await renderOnline();
         } catch (err) { $('#onMsg').textContent = syncFriendly(err); btn.disabled = false; }
       });
