@@ -967,7 +967,8 @@ const SHEET_NAMES = {
   biaya: 'Biaya',
   jurnal_manual: 'Jurnal Manual',
   afiliator: 'Afiliator',
-  komisi_bayar: 'Bayar Komisi'
+  komisi_bayar: 'Bayar Komisi',
+  stok_masuk: 'Stok Masuk'
 };
 
 const HEADERS = {
@@ -989,7 +990,8 @@ const HEADERS = {
   biaya: ['Key', 'Perangkat', 'No', 'Tanggal', 'Kategori', 'Dibayar dari', 'Jumlah', 'Catatan', 'Dicatat oleh'],
   jurnal_manual: ['Key', 'Perangkat', 'No', 'Tanggal', 'Memo', 'Akun', 'Debit', 'Kredit', 'Dicatat oleh'],
   afiliator: ['Key', 'Perangkat', 'Nama', 'Kode', 'Telepon', 'Jenis Komisi', 'Nilai', 'Aktif', 'PIN'],
-  komisi_bayar: ['Key', 'Perangkat', 'Tanggal', 'Kode', 'Jumlah', 'Catatan', 'Dicatat oleh']
+  komisi_bayar: ['Key', 'Perangkat', 'Tanggal', 'Kode', 'Jumlah', 'Catatan', 'Dicatat oleh'],
+  stok_masuk: ['Key', 'Perangkat', 'Tanggal', 'No Invoice', 'Supplier', 'Kode', 'Produk', 'Qty', 'Harga Modal', 'Subtotal']
 };
 
 function doGet(e) {
@@ -3455,6 +3457,13 @@ function affiliateView_(b) {
         add('invoice', base, {
           'No Invoice': e.no, Supplier: e.supplier || '', Tanggal: e.date || '', 'Jatuh Tempo': e.dueDate || '', Total: e.total,
           Item: itemsText(e.items, 'cost'), 'Foto Invoice': syncPhotoUrl(e.photoId)
+        });
+        (e.items || []).forEach((it, n) => {
+          const pr = getProductById(it.id);
+          add('stok_masuk', base + ':i' + n, {
+            Tanggal: e.date || '', 'No Invoice': e.no, Supplier: e.supplier || '', Kode: (pr && pr.code) || it.code || '', Produk: it.name,
+            Qty: Number(it.qty || 0), 'Harga Modal': Math.round(Number(it.cost || 0)), Subtotal: Math.round(Number(it.qty || 0) * Number(it.cost || 0))
+          });
         });
         (e.payments || []).forEach((p) => add('bayar_invoice', base + ':' + p.id, {
           'No Invoice': e.no, Tanggal: p.date, Hari: p.day || '', Pencatat: p.cashier || '', Jumlah: p.amount, Metode: p.method,
