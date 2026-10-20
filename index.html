@@ -968,7 +968,8 @@ const SHEET_NAMES = {
   jurnal_manual: 'Jurnal Manual',
   afiliator: 'Afiliator',
   komisi_bayar: 'Bayar Komisi',
-  stok_masuk: 'Stok Masuk'
+  stok_masuk: 'Stok Masuk',
+  aktivitas: 'Log Aktivitas'
 };
 
 const HEADERS = {
@@ -991,7 +992,8 @@ const HEADERS = {
   jurnal_manual: ['Key', 'Perangkat', 'No', 'Tanggal', 'Memo', 'Akun', 'Debit', 'Kredit', 'Dicatat oleh'],
   afiliator: ['Key', 'Perangkat', 'Nama', 'Kode', 'Telepon', 'Jenis Komisi', 'Nilai', 'Aktif', 'PIN'],
   komisi_bayar: ['Key', 'Perangkat', 'Tanggal', 'Kode', 'Jumlah', 'Catatan', 'Dicatat oleh'],
-  stok_masuk: ['Key', 'Perangkat', 'Tanggal', 'No Invoice', 'Supplier', 'Kode', 'Produk', 'Qty', 'Harga Modal', 'Subtotal']
+  stok_masuk: ['Key', 'Perangkat', 'Tanggal', 'No Invoice', 'Supplier', 'Kode', 'Produk', 'Qty', 'Harga Modal', 'Subtotal'],
+  aktivitas: ['Key', 'Perangkat', 'Waktu', 'Pengguna', 'Aksi', 'Modul', 'Referensi', 'Detail']
 };
 
 function doGet(e) {
@@ -1702,6 +1704,8 @@ function affiliateView_(b) {
       affiliates: [],
       affPaid: [],
       afseq: 1,
+      activity: [],
+      actseq: 1,
       receiptMode: 'wa',
       lockSalt: ''
     };
@@ -1794,6 +1798,8 @@ function affiliateView_(b) {
       if (!Array.isArray(state.affiliates) || state.affiliates === defaultState.affiliates) state.affiliates = [];
       if (!Array.isArray(state.affPaid) || state.affPaid === defaultState.affPaid) state.affPaid = [];
       if (!state.afseq) state.afseq = 1;
+      if (!Array.isArray(state.activity) || state.activity === defaultState.activity) state.activity = [];
+      if (!state.actseq) state.actseq = Math.max(1, ...state.activity.map((l) => Number(l.id) + 1 || 1));
       if (!state.lockSalt) state.lockSalt = Math.random().toString(36).slice(2, 12);
       if (!state.ownerPin) state.ownerPin = '1234';
       state.auth = Object.assign({ fails: 0, until: 0 }, (state.auth && typeof state.auth === 'object') ? state.auth : {});
@@ -1803,7 +1809,70 @@ function affiliateView_(b) {
       localStorage.setItem('alkaff_kasir_v2', JSON.stringify(state));
     }
 
+    // ===== Log aktivitas (diarsip ke Google Sheets) =====
+    const ACT_COLLS = [
+      ['products', 'Produk', (r) => r.id], ['members', 'Member', (r) => r.id], ['history', 'Penjualan', (r) => r.no],
+      ['refunds', 'Refund', (r) => r.no], ['debts', 'Piutang', (r) => r.id], ['stockHistory', 'Stok masuk', (r) => r.no],
+      ['supReturns', 'Retur supplier', (r) => r.no], ['closings', 'Tutup kasir', (r) => r.no], ['journals', 'Jurnal/Biaya', (r) => r.no],
+      ['preorders', 'Pre order', (r) => r.no || r.id], ['requests', 'Request produk', (r) => r.no || r.id], ['opnames', 'Stok opname', (r) => r.no || r.id],
+      ['users', 'Akun kasir', (r) => r.id], ['affiliates', 'Afiliator', (r) => r.id], ['affPaid', 'Bayar komisi', (r) => r.id]
+    ];
+    const ACT_SECRET = ['pin', 'token', 'ownerPin', 'password'];
+    let actPrev = null;
+    function actSnap() {
+      const s = { colls: {}, set: JSON.stringify([state.store, state.paper, state.receiptMode, state.kasirRefund, state.pointCfg, state.ownerUser]), pin: String(state.ownerPin) };
+      ACT_COLLS.forEach(([c, , kf]) => {
+        const mp = new Map();
+        (state[c] || []).forEach((r, i) => { const k = kf(r); mp.set(String(k != null ? k : 'i' + i), JSON.stringify(r)); });
+        s.colls[c] = mp;
+      });
+      return s;
+    }
+    function actDescribe(r) {
+      const parts = [r.name || r.title || r.memberName || r.supplier || ''];
+      if (r.total != null) parts.push(formatRp(r.total)); else if (r.amount != null) parts.push(formatRp(r.amount)); else if (r.price != null) parts.push(formatRp(r.price));
+      return parts.filter(Boolean).join(' · ').slice(0, 160);
+    }
+    function actChanges(a, b) {
+      const out = [];
+      Object.keys(b).forEach((k) => {
+        if (JSON.stringify(a[k]) === JSON.stringify(b[k])) return;
+        if (ACT_SECRET.includes(k)) out.push(k + ' diubah');
+        else if (typeof a[k] === 'object' || typeof b[k] === 'object') out.push(k + ' diubah');
+        else out.push(k + ': ' + a[k] + ' → ' + b[k]);
+      });
+      return out;
+    }
+    function logAct(act, mod, ref, detail, who) {
+      state.activity.push({ id: state.actseq++, ts: Date.now(), user: who || (currentUser ? currentUser.name : 'Sistem'), act, mod, ref: String(ref == null ? '' : ref), detail: String(detail || '').slice(0, 300) });
+    }
+    function trackActivity() {
+      const cur = actSnap();
+      if (!actPrev) { actPrev = cur; return; }
+      ACT_COLLS.forEach(([c, mod]) => {
+        const a = actPrev.colls[c], b = cur.colls[c], added = [], removed = [];
+        b.forEach((json, key) => {
+          if (!a.has(key)) { added.push([key, json]); return; }
+          if (a.get(key) === json) return;
+          const oldR = JSON.parse(a.get(key)), newR = JSON.parse(json);
+          let ch = actChanges(oldR, newR);
+          if (c === 'products') ch = ch.filter((x) => !/^stock:/.test(x));
+          if (ch.length) logAct('Ubah', mod, key, [actDescribe(newR), ch.join(', ')].filter(Boolean).join(' | '));
+        });
+        a.forEach((json, key) => { if (!b.has(key)) removed.push([key, json]); });
+        if (added.length > 20) logAct('Tambah', mod, '-', added.length + ' data sekaligus');
+        else added.forEach(([k, j]) => logAct('Tambah', mod, k, actDescribe(JSON.parse(j))));
+        if (removed.length > 20) logAct('Hapus', mod, '-', removed.length + ' data sekaligus');
+        else removed.forEach(([k, j]) => logAct('Hapus', mod, k, actDescribe(JSON.parse(j))));
+      });
+      if (cur.set !== actPrev.set) logAct('Ubah', 'Pengaturan', 'toko', 'Pengaturan toko diubah');
+      if (cur.pin !== actPrev.pin) logAct('Ubah', 'Pengaturan', 'akun', 'PIN administrator diganti');
+      actPrev = cur;
+      if (state.activity.length > 3000) state.activity.splice(0, state.activity.length - 3000);
+    }
+
     function saveState() {
+      trackActivity();
       persistState();
       scheduleSync();
     }
@@ -2449,6 +2518,8 @@ function affiliateView_(b) {
     }
 
     function downloadBackup() {
+      logAct('Unduh', 'Sistem', 'cadangan', 'Unduh cadangan data');
+      saveState();
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([JSON.stringify(state)], { type: 'application/json' }));
       a.download = 'cadangan-kasir-' + localISODate() + '.json';
@@ -2460,11 +2531,15 @@ function affiliateView_(b) {
 
     function masterReset(keep) {
       const old = state;
+      const who = currentUser ? currentUser.name : 'Sistem';
       const next = structuredClone(defaultState);
       next.products = [];
+      // id log tetap berlanjut agar arsip di Google Sheets tidak tertimpa
+      next.actseq = Number(old.actseq || 1) + 1;
+      next.activity = [{ id: Number(old.actseq || 1), ts: Date.now(), user: who, act: 'Reset', mod: 'Sistem', ref: '-', detail: 'Master reset: semua data dihapus' + (keep ? ' (pengaturan dipertahankan)' : '') }];
       if (keep) {
         ['store', 'ownerPin', 'ownerUser', 'users', 'lockSalt', 'paper', 'receiptMode', 'kasirRefund', 'pointCfg'].forEach((k) => { if (old[k] !== undefined) next[k] = structuredClone(old[k]); });
-        if (old.sync) { next.sync = structuredClone(old.sync); next.sync.sent = {}; next.sync.photos = {}; }
+        if (old.sync) { next.sync = structuredClone(old.sync); next.sync.sent = {}; next.sync.photos = {}; next.sync.deviceId = 'D' + Math.random().toString(36).slice(2, 7).toUpperCase(); }
       }
       state = next;
       persistState();
@@ -3398,6 +3473,10 @@ function affiliateView_(b) {
       });
       (state.affiliates || []).forEach((a) => add('afiliator', a.id, { Nama: a.name, Kode: a.code, Telepon: a.phone || '', 'Jenis Komisi': a.type === 'pct' ? 'Persen' : 'Nominal', Nilai: Number(a.value), Aktif: a.active === false ? 'Tidak' : 'Ya', PIN: a.pin ? "'" + a.pin : '' }));
       (state.affPaid || []).forEach((p) => add('komisi_bayar', p.id, { Tanggal: p.date, Kode: p.code, Jumlah: Number(p.amount), Catatan: p.note || '', 'Dicatat oleh': p.by || '' }));
+      (state.activity || []).forEach((l) => {
+        const d = new Date(l.ts), p2 = (n) => String(n).padStart(2, '0');
+        add('aktivitas', l.id, { Waktu: d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes()) + ':' + p2(d.getSeconds()), Pengguna: l.user, Aksi: l.act, Modul: l.mod, Referensi: l.ref, Detail: l.detail });
+      });
       state.members.forEach((m) => add('member', m.id, { Nama: m.name, Telepon: m.phone, 'Tgl Lahir': m.dob || '', 'Batas Hutang': Number(m.limit || 0), Poin: Number(m.points || 0) }));
       state.history.forEach((tx) => add('penjualan', tx.no, {
         No: tx.no, Tanggal: tx.date, Hari: tx.day || '', Kasir: tx.cashier || '', Member: tx.member ? tx.member.name : '',
@@ -5734,6 +5813,7 @@ function affiliateView_(b) {
         }
       }
       authFail();
+      { const fu = who === 'owner' ? null : state.users.find((x) => String(x.id) === who); logAct('Login gagal', 'Akun', fu ? fu.name : 'Administrator', 'PIN salah', 'Sistem'); saveState(); }
       err.textContent = authWait() > 0 ? 'PIN salah 5 kali. Coba lagi dalam ' + authWait() + ' detik.' : 'PIN salah. Jika lupa PIN, minta administrator untuk mereset.';
       $('#pinInput').value = '';
     }
@@ -5741,6 +5821,8 @@ function affiliateView_(b) {
     function enterApp(user) {
       authOk();
       currentUser = user;
+      logAct('Login', 'Akun', user.name, 'Masuk ke aplikasi', user.name);
+      saveState();
       $('#lockScreen').classList.add('hide');
       $('#app').classList.remove('hide');
       $('#lockErr').textContent = '';
@@ -5771,6 +5853,7 @@ function affiliateView_(b) {
     }
 
     function lockApp() {
+      if (currentUser) { logAct('Logout', 'Akun', currentUser.name, 'Keluar / kunci aplikasi'); saveState(); }
       currentUser = null;
       cart = {};
       currentMember = null;
@@ -7710,6 +7793,8 @@ function affiliateView_(b) {
           else if (refNow !== refOld || oldKom === 0) komisi = afCommission(refNow, row.dataset.total);
           else komisi = oldKom;
           await syncPost({ action: 'orderupdate', no: row.dataset.on, status: st, ongkir: ong ? (Number(ong.value) || 0) : undefined, referal: refNow, komisi });
+          logAct('Ubah', 'Pesanan online', row.dataset.on, 'Status: ' + st + (refNow ? ' · referal ' + refNow : '') + (komisi ? ' · komisi ' + formatRp(komisi) : ''));
+          saveState();
           await renderOnline();
         } catch (err) { $('#onMsg').textContent = syncFriendly(err); btn.disabled = false; }
       });
@@ -7740,6 +7825,7 @@ function affiliateView_(b) {
       $('#app').classList.add('hide');
     }
 
+    actPrev = actSnap();
     document.querySelector('nav').addEventListener('click', (e) => {
       const b = e.target.closest('button');
       if (b) b.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
