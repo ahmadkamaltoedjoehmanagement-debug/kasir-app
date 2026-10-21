@@ -577,7 +577,6 @@
           <input id="poPhone" placeholder="No. WhatsApp (untuk notifikasi)" inputmode="tel" autocomplete="off" style="flex:1 1 180px;" />
         </div>
         <h3 style="margin:14px 0 6px; font-size:.95rem;">Item pesanan</h3>
-        <div id="poOosBar"></div>
         <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
           <select id="poProd" style="flex:2 1 220px;"></select>
           <input id="poQty" type="number" min="1" step="1" value="1" placeholder="Qty" style="flex:0 1 80px;" />
@@ -6539,14 +6538,9 @@ function affiliateView_(b) {
     }
 
     function refreshPoOos() {
-      const oos = state.products.filter((p) => Number(p.stock || 0) <= 0);
-      $('#poOosBar').innerHTML = oos.length
-        ? '<div class="muted" style="margin:0 0 4px;">Stok habis, tap untuk dipesan:</div><div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;">' +
-          oos.map((p) => '<button type="button" class="action ghost" style="padding:6px 10px;" data-po-oos="' + p.id + '">' + escapeHtml(p.name) + '</button>').join('') + '</div>'
-        : '<div class="muted" style="margin-bottom:8px;">Tidak ada produk yang stoknya habis.</div>';
       Array.from($('#poProd').options).forEach((o) => {
         const p = o.value ? getProductById(o.value) : null;
-        if (p && Number(p.stock || 0) <= 0) o.textContent += ' · HABIS';
+        if (p && Number(p.stock || 0) <= 0 && !/ · HABIS$/.test(o.textContent)) o.textContent += ' · HABIS';
       });
     }
 
@@ -6855,10 +6849,6 @@ function affiliateView_(b) {
         const s = e.target.closest('[data-rq-status]');
         const r = s && rqFind(s.dataset.rqStatus);
         if (r) { r.status = s.value; saveState(); renderRequest(); }
-      });
-      $('#poOosBar').addEventListener('click', (e) => {
-        const b = e.target.closest('[data-po-oos]');
-        if (b) { $('#poProd').value = b.dataset.poOos; onPoProdChange(); $('#poQty').focus(); }
       });
     }
 
