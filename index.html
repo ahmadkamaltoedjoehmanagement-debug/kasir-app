@@ -272,6 +272,9 @@
     }
 
     /* ---- Perapian tampilan ---- */
+    #reportMode { overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; }
+    #reportMode::-webkit-scrollbar { display: none; }
+    #reportMode button { flex: 0 0 auto; white-space: nowrap; }
     header { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "brand user" "nav nav"; gap: 6px 12px; padding: 10px 16px 6px; }
     header > .brand { grid-area: brand; min-width: 0; width: 100%; border-bottom: 1px dashed rgba(255,255,255,.35); }
     header > div:last-child { grid-area: user; flex-wrap: nowrap; }
@@ -833,6 +836,7 @@
           <button data-rmode="harian" aria-pressed="true">Harian</button>
           <button data-rmode="mingguan" aria-pressed="false">Mingguan</button>
           <button data-rmode="bulanan" aria-pressed="false">Bulanan</button>
+          <button data-rmode="aruskas" aria-pressed="false">Arus kas</button>
           <button data-rmode="tutup" aria-pressed="false">Tutup kasir</button>
           <button data-rmode="supplier" aria-pressed="false">Supplier</button>
         </div>
@@ -846,6 +850,16 @@
           <div id="reportStats" class="stats"></div>
           <div id="reportChart" style="margin-top:14px;"></div>
           <div id="reportCashier" style="margin-top:14px;"></div>
+        </div>
+
+        <div id="rpCash" class="hide">
+          <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+            <button id="cfPrev" class="action ghost" aria-label="Sebelumnya">&lsaquo;</button>
+            <input id="cfMonth" type="month" style="max-width:190px;" />
+            <button id="cfNext" class="action ghost" aria-label="Berikutnya">&rsaquo;</button>
+            <button id="cfNow" class="action ghost">Bulan ini</button>
+          </div>
+          <div id="cfOut"></div>
         </div>
 
         <div id="rpPeriod" class="hide">
@@ -2931,6 +2945,80 @@ function affiliateView_(b) {
         '<div class="muted" style="margin-top:10px;">Produk terlaris dan metode pembayaran di bawah dihitung dari 4 ' + unit + ' terakhir.</div>' + rankBlocks(all);
     }
 
+    // ===== Arus kas (dari jurnal: akun Kas dan Bank & E-Wallet) =====
+    function cashFlowRows() {
+      const rows = [];
+      buildJournal().forEach((e) => {
+        if (!e.date) return;
+        let kas = 0, bank = 0;
+        e.lines.forEach((l) => {
+          if (l.acc === '1-1100') kas += l.debit - l.credit;
+          else if (l.acc === '1-1200') bank += l.debit - l.credit;
+        });
+        if (!kas && !bank) return;
+        let cat = (JR_GROUPS[e.group] || [e.group])[0];
+        if (e.group === 'manual') {
+          const j = state.journals.find((x) => x.id === e.manualId);
+          cat = j && j.kind === 'biaya' ? 'Biaya: ' + (BIAYA_CATS[j.cat] || 'Lainnya') : 'Jurnal manual';
+        } else if (e.group === 'preorder') cat = (kas + bank) >= 0 ? 'DP pre order' : 'Pengembalian DP pre order';
+        else if (e.group === 'invoice') cat = 'Barang masuk (dibayar tunai)';
+        rows.push({ date: e.date, kas, bank, net: kas + bank, cat });
+      });
+      return rows;
+    }
+    function cashMonth(ym, rows) {
+      const [y, m] = ym.split('-').map(Number), n = new Date(y, m, 0).getDate(), first = ym + '-01', last = ym + '-' + pad2(n);
+      let openK = 0, openB = 0, inn = 0, out = 0, flK = 0, flB = 0;
+      const days = {}, cats = {};
+      for (let i = 1; i <= n; i++) days[ym + '-' + pad2(i)] = { in: 0, out: 0 };
+      rows.forEach((r) => {
+        if (r.date < first) { openK += r.kas; openB += r.bank; return; }
+        if (r.date > last || !days[r.date]) return;
+        if (r.net > 0) { inn += r.net; days[r.date].in += r.net; } else if (r.net < 0) { out -= r.net; days[r.date].out -= r.net; }
+        if (r.net) {
+          const c = (cats[r.cat] = cats[r.cat] || { in: 0, out: 0 });
+          if (r.net > 0) c.in += r.net; else c.out -= r.net;
+        }
+        flK += r.kas; flB += r.bank;
+      });
+      return { ym, openK, openB, open: openK + openB, inn, out, net: inn - out, endK: openK + flK, endB: openB + flB, end: openK + openB + flK + flB, days, cats };
+    }
+    function svgFlow(labels, ins, outs) {
+      const W = 640, H = 220, L = 8, B = 28, T = 16, n = ins.length, max = Math.max(1, ...ins, ...outs), bw = (W - L * 2) / n;
+      let g = '';
+      ins.forEach((v, i) => {
+        const x = L + i * bw + bw * 0.1, w = bw * 0.38, hi = Math.round((H - B - T) * v / max), ho = Math.round((H - B - T) * outs[i] / max), cx = (L + i * bw + bw / 2).toFixed(1);
+        g += '<rect x="' + x.toFixed(1) + '" y="' + (H - B - hi) + '" width="' + w.toFixed(1) + '" height="' + Math.max(hi, v > 0 ? 2 : 0) + '" rx="2" fill="#1a9e4f"><title>' + escapeHtml(labels[i]) + ' masuk: ' + formatRp(v) + '</title></rect>' +
+          '<rect x="' + (x + w + 1).toFixed(1) + '" y="' + (H - B - ho) + '" width="' + w.toFixed(1) + '" height="' + Math.max(ho, outs[i] > 0 ? 2 : 0) + '" rx="2" fill="#b34036"><title>' + escapeHtml(labels[i]) + ' keluar: ' + formatRp(outs[i]) + '</title></rect>';
+        if (i % 5 === 0 || i === n - 1) g += '<text x="' + cx + '" y="' + (H - 9) + '" text-anchor="middle" font-size="18" fill="var(--muted)">' + escapeHtml(labels[i]) + '</text>';
+      });
+      return '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;" role="img"><line x1="0" x2="' + W + '" y1="' + (H - B) + '" y2="' + (H - B) + '" stroke="var(--line)"/>' + g + '</svg>';
+    }
+    function renderCash() {
+      const ym = $('#cfMonth').value || localISODate().slice(0, 7), rows = cashFlowRows(), cur = cashMonth(ym, rows);
+      const [y, m] = ym.split('-').map(Number), hist = [];
+      for (let k = 3; k >= 0; k--) { const dt = new Date(y, m - 1 - k, 1); hist.push(cashMonth(dt.getFullYear() + '-' + pad2(dt.getMonth() + 1), rows)); }
+      const signed = (v) => (v < 0 ? '-' : '') + formatRp(Math.abs(v));
+      const stat = (l, v) => '<div class="stat"><span>' + l + '</span><b>' + v + '</b></div>';
+      const days = Object.keys(cur.days);
+      const catRows = (dir) => Object.entries(cur.cats).filter(([, v]) => v[dir] > 0).sort((a, b) => b[1][dir] - a[1][dir]).map(([n, v]) => [n, v[dir], formatRp(v[dir])]);
+      $('#cfOut').innerHTML = '<h2 style="margin-top:14px;">' + MONN[m - 1] + ' ' + y + '</h2><div class="stats">' +
+        stat('Saldo awal', signed(cur.open)) + stat('Kas masuk', formatRp(cur.inn)) + stat('Kas keluar', '-' + formatRp(cur.out)) +
+        stat('Arus kas bersih', signed(cur.net)) + stat('Saldo akhir', signed(cur.end)) +
+        stat('Rincian saldo akhir', '<span style="font-size:.85rem;">Kas ' + signed(cur.endK) + '<br>Bank ' + signed(cur.endB) + '</span>') + '</div>' +
+        '<h2 style="margin-top:14px;">Masuk &amp; keluar per hari</h2><div class="muted"><span style="color:#1a9e4f;">■</span> Masuk &nbsp; <span style="color:#b34036;">■</span> Keluar</div>' +
+        svgFlow(days.map((d) => String(Number(d.slice(8)))), days.map((d) => cur.days[d].in), days.map((d) => cur.days[d].out)) +
+        '<div class="layout" style="margin-top:14px;"><div><h2>Sumber kas masuk</h2>' + hBars(catRows('in')) + '</div><div><h2>Pemakaian kas keluar</h2>' + hBars(catRows('out')) + '</div></div>' +
+        '<h2 style="margin-top:14px;">4 bulan terakhir</h2><div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>Bulan</th><th class="num">Masuk</th><th class="num hm">Keluar</th><th class="num">Bersih</th><th class="num hm">Saldo akhir</th></tr></thead><tbody>' +
+        hist.map((h) => '<tr><td>' + MONN[Number(h.ym.slice(5)) - 1] + ' ' + h.ym.slice(0, 4) + '</td><td class="num">' + formatRp(h.inn) + '</td><td class="num hm">-' + formatRp(h.out) + '</td><td class="num"><b>' + signed(h.net) + '</b></td><td class="num hm">' + signed(h.end) + '</td></tr>').join('') + '</tbody></table></div>' +
+        '<div class="muted" style="margin-top:8px;">Arus kas dihitung dari jurnal: semua uang yang masuk dan keluar lewat akun Kas dan Bank &amp; E-Wallet. Penjualan hutang dan pembelian yang belum dibayar baru terhitung saat dibayar.</div>';
+    }
+    function shiftCash(dir) {
+      const [y, m] = ($('#cfMonth').value || localISODate().slice(0, 7)).split('-').map(Number), dt = new Date(y, m - 1 + dir, 1);
+      $('#cfMonth').value = dt.getFullYear() + '-' + pad2(dt.getMonth() + 1);
+      renderCash();
+    }
+
     function shiftPeriod(dir) {
       if (periodMode === 'mingguan') $('#pdWeek').value = shiftISO($('#pdWeek').value || localISODate(), 7 * dir);
       else {
@@ -4678,6 +4766,11 @@ function affiliateView_(b) {
       $('#rpClosings').classList.toggle('hide', mode !== 'tutup');
       $('#rpSuppliers').classList.toggle('hide', mode !== 'supplier');
       $('#rpPeriod').classList.toggle('hide', mode !== 'mingguan' && mode !== 'bulanan');
+      $('#rpCash').classList.toggle('hide', mode !== 'aruskas');
+      if (mode === 'aruskas') {
+        if (!$('#cfMonth').value) $('#cfMonth').value = localISODate().slice(0, 7);
+        renderCash();
+      }
       if (mode === 'mingguan' || mode === 'bulanan') {
         periodMode = mode;
         if (!$('#pdWeek').value) $('#pdWeek').value = localISODate();
@@ -7446,6 +7539,10 @@ function affiliateView_(b) {
       initBirthdayFilters();
       ['#mbMonth', '#mbDay'].forEach((sel) => $(sel).addEventListener('change', () => { bdWeek = false; renderMembers(); }));
       document.querySelectorAll('[data-bd-preset]').forEach((b) => b.addEventListener('click', () => setBirthdayPreset(b.dataset.bdPreset)));
+      $('#cfPrev').addEventListener('click', () => shiftCash(-1));
+      $('#cfNext').addEventListener('click', () => shiftCash(1));
+      $('#cfNow').addEventListener('click', () => { $('#cfMonth').value = localISODate().slice(0, 7); renderCash(); });
+      $('#cfMonth').addEventListener('change', renderCash);
       $('#afSave').addEventListener('click', saveAffiliate);
       $('#afCancel').addEventListener('click', afReset);
       $('#afRefresh').addEventListener('click', renderAfiliator);
