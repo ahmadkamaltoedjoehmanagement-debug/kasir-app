@@ -337,7 +337,6 @@
   <main id="app" class="hide">
     <section id="kasir" class="view on">
       <div id="poKasirBanner" class="hide" style="background:#e7f6ec; color:#0b5a2b; border:1px solid #bfe3cb; border-radius:12px; padding:10px 12px; margin-bottom:12px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between;"></div>
-      <div id="stockAlertBanner" class="hide" style="background:#fff4e0; color:#7a4a00; border:1px solid #f0d39b; border-radius:12px; padding:10px 12px; margin-bottom:12px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between;"></div>
       <div class="layout">
         <div class="box">
           <input id="searchProduct" class="search" placeholder="Cari nama, kode, brand, kategori" />
@@ -2051,29 +2050,12 @@ function affiliateView_(b) {
 
     function updateStockAlert() {
       const out = state.products.filter((x) => Number(x.stock || 0) <= 0);
-      const low = state.products.filter((x) => Number(x.stock || 0) > 0 && isLowStock(x)).sort((a, b) => Number(a.stock || 0) - Number(b.stock || 0));
-      const mon = out.concat(low);
-      const bar = $('#stockAlertBanner');
-      if (!bar || !$('#lowBadge')) return;
+      const low = state.products.filter((x) => Number(x.stock || 0) > 0 && isLowStock(x));
+      if (!$('#lowBadge')) return;
       $('#outBadge').textContent = out.length;
       $('#outBadge').classList.toggle('hide', !out.length);
       $('#lowBadge').textContent = low.length;
       $('#lowBadge').classList.toggle('hide', !low.length);
-      if (mon.length && currentUser) {
-        const owner = currentUser.role === 'owner';
-        const pill = (x, cls) => '<span class="pill ' + cls + '">' + escapeHtml(x.name) + ' (' + Number(x.stock || 0) + (minStockOf(x) ? '/' + minStockOf(x) : '') + ')</span>';
-        const shown = out.map((x) => pill(x, 'r')).concat(low.map((x) => pill(x, 'y')));
-        bar.style.background = out.length ? '#fdeceb' : '#fff4e0';
-        bar.style.color = out.length ? '#7a1f18' : '#7a4a00';
-        bar.style.borderColor = out.length ? '#f0b8b3' : '#f0d39b';
-        bar.innerHTML = '<span>' + (out.length ? '🔴 <b>' + out.length + ' habis</b>' : '') + (out.length && low.length ? ' · ' : '') + (low.length ? '🟡 <b>' + low.length + ' sudah minimum</b>' : '') + ': ' +
-          shown.slice(0, 4).join(' ') + (shown.length > 4 ? ' ...' : '') + '</span>' +
-          (owner ? '<button class="action ghost" id="stockAlertBtn" style="padding:6px 10px;">Lihat</button>' : '');
-        bar.classList.remove('hide');
-      } else {
-        bar.classList.add('hide');
-        bar.innerHTML = '';
-      }
     }
 
     function showToastBox(title, lines, color) {
@@ -6540,12 +6522,6 @@ function affiliateView_(b) {
         if (!a) return;
         const po = poFind(a.dataset.poWa);
         if (po) { po.notifiedAt = Date.now(); po.notifiedBy = currentUser ? currentUser.name : ''; saveState(); renderPo(); }
-      });
-      $('#stockAlertBanner').addEventListener('click', (e) => {
-        if (!e.target.closest('#stockAlertBtn')) return;
-        document.querySelector('nav button[data-tab="produk"]').click();
-        $('#filterStock').value = 'low';
-        renderProductList();
       });
       $('#poKasirBanner').addEventListener('click', (e) => {
         if (e.target.closest('#poBannerBtn')) document.querySelector('nav button[data-tab="preorder"]').click();
