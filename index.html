@@ -465,13 +465,13 @@
           </label>
         </div>
         <div class="row" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;">
-          <label class="muted" style="flex:1 1 200px;">Foto fisik invoice (wajib)
-            <input id="stockPhoto" type="file" accept="image/*" />
+          <label class="muted" style="flex:1 1 200px;">Foto atau PDF invoice (wajib)
+            <input id="stockPhoto" type="file" accept="image/*,application/pdf" />
             <img id="stockPhotoPrev" class="pv hide" alt="Pratinjau foto invoice" />
             <div id="stockPhotoStatus" class="muted" style="margin-top:4px;" role="status">Belum ada foto. Ketuk untuk memotret atau pilih dari galeri.</div>
           </label>
           <label id="stockProofWrap" class="muted" style="flex:1 1 200px;">Bukti bayar (wajib)
-            <input id="stockProof" type="file" accept="image/*" />
+            <input id="stockProof" type="file" accept="image/*,application/pdf" />
             <img id="stockProofPrev" class="pv hide" alt="Pratinjau bukti bayar" />
             <div id="stockProofStatus" class="muted" style="margin-top:4px;" role="status">Belum ada foto.</div>
           </label>
@@ -1150,11 +1150,12 @@ function savePhoto_(body) {
   if (String(body.data).length &gt; MAX_PHOTO_BASE64) throw new Error('Foto terlalu besar.');
   var base = String(body.name || 'foto').replace(/\.[a-z0-9]+$/i, '').replace(/[^\w\-]+/g, '_').slice(0, 60);
   var id = String(body.id).replace(/[^\w\-]+/g, '_').slice(0, 40);
-  var fileName = base + '__' + id + '.jpg';
+  var isPdf = String(body.mime || '') === 'application/pdf';
+  var fileName = base + '__' + id + (isPdf ? '.pdf' : '.jpg');
   var folder = getFolder_();
   var existing = folder.getFilesByName(fileName);
   if (existing.hasNext()) return { ok: true, url: existing.next().getUrl() };
-  var blob = Utilities.newBlob(Utilities.base64Decode(body.data), 'image/jpeg', fileName);
+  var blob = Utilities.newBlob(Utilities.base64Decode(body.data), isPdf ? 'application/pdf' : 'image/jpeg', fileName);
   var file = folder.createFile(blob);
   return { ok: true, url: file.getUrl() };
 }
@@ -1332,7 +1333,7 @@ function affiliateView_(b) {
     </div>
   </div>
 
-  <input id="attachInput" type="file" accept="image/*" class="hide" />
+  <input id="attachInput" type="file" accept="image/*,application/pdf" class="hide" />
   <dialog id="photoDialog" style="width:min(720px, 96vw);">
     <img id="photoFull" alt="Foto" style="width:100%; border-radius:8px;" />
     <button id="photoClose" class="action ghost full" style="margin-top:8px;">Tutup</button>
@@ -1589,7 +1590,7 @@ function affiliateView_(b) {
     <label class="blk" for="invPayMethod">Metode</label>
     <select id="invPayMethod"><option>Transfer</option><option>Tunai</option><option>QRIS</option></select>
     <label class="blk" for="invPayProof">Bukti bayar (wajib)</label>
-    <input id="invPayProof" type="file" accept="image/*" />
+    <input id="invPayProof" type="file" accept="image/*,application/pdf" />
     <img id="invPayProofPrev" class="pv hide" alt="Pratinjau bukti bayar" />
     <div class="err" id="invPayErr" role="alert"></div>
     <button id="invPaySubmit" class="action success full">Catat pembayaran</button>
@@ -3230,6 +3231,10 @@ function affiliateView_(b) {
     }
 
     async function prepareImage(file) {
+      if (file && (file.type === 'application/pdf' || /\.pdf$/i.test(file.name || ''))) {
+        if (file.size > 4 * 1024 * 1024) throw new Error('File PDF terlalu besar (maks. 4 MB). Kompres PDF-nya atau pakai foto.');
+        return { blob: file.type === 'application/pdf' ? file : file.slice(0, file.size, 'application/pdf'), preview: false, pdf: true };
+      }
       if (file && file.size > 40 * 1024 * 1024) throw new Error('Ukuran file terlalu besar (maks. 40 MB). Coba foto dengan resolusi lebih kecil.');
       try {
         return { blob: await compressImage(file), preview: true };
@@ -3267,7 +3272,8 @@ function affiliateView_(b) {
         assign(r.blob);
         if (r.preview) setPreview(previewSel, r.blob);
         $(msgSel).textContent = '';
-        say('✓ Foto siap: ' + (file.name || 'foto') + ' (' + fileSizeText(r.blob.size) + ')' + (r.preview ? '' : ' · browser ini tidak bisa menampilkan pratinjau, foto tetap disimpan apa adanya'), 'ok');
+        if (r.pdf) say('✓ PDF siap: ' + (file.name || 'file.pdf') + ' (' + fileSizeText(r.blob.size) + ')', 'ok');
+        else say('✓ Foto siap: ' + (file.name || 'foto') + ' (' + fileSizeText(r.blob.size) + ')' + (r.preview ? '' : ' · browser ini tidak bisa menampilkan pratinjau, foto tetap disimpan apa adanya'), 'ok');
       } catch (err) {
         $(inputSel).value = '';
         say('✗ ' + ((err && err.message) || 'Foto gagal diproses. Coba pilih foto lain.'), 'err');
@@ -3285,7 +3291,17 @@ function affiliateView_(b) {
       for (const img of imgs) {
         try {
           const blob = await getPhoto(img.dataset.photo);
-          if (blob) {
+          if (blob && blob.type === 'application/pdf') {
+            const u = URL.createObjectURL(blob);
+            photoUrls.push(u);
+            const a = document.createElement('a');
+            a.className = 'lnk';
+            a.href = u;
+            a.target = '_blank';
+            a.rel = 'noopener';
+            a.textContent = '📄 Buka file PDF';
+            img.replaceWith(a);
+          } else if (blob) {
             setImgFromBlob(img, blob, (u) => photoUrls.push(u));
           } else {
             img.replaceWith(Object.assign(document.createElement('span'), { className: 'muted', textContent: 'Foto tidak ditemukan di perangkat ini.' }));
@@ -3340,7 +3356,7 @@ function affiliateView_(b) {
       }
       if (!pendingInvPhoto) {
         $('#stockMsg').textContent = 'Foto fisik invoice wajib dilampirkan.';
-        setPhotoStatus('#stockPhotoStatus', '✗ Foto fisik invoice wajib dilampirkan sebelum invoice disimpan.', 'err');
+        setPhotoStatus('#stockPhotoStatus', '✗ Foto atau PDF invoice wajib dilampirkan sebelum invoice disimpan.', 'err');
         $('#stockPhotoStatus').scrollIntoView({ block: 'center', behavior: 'smooth' });
         return;
       }
@@ -3741,7 +3757,7 @@ function affiliateView_(b) {
           if (!blob) {
             cfg.photos[job.id] = { missing: true };
           } else {
-            const res = await syncPost({ action: 'photo', id: cfg.deviceId + '_' + job.id, name: job.name, data: await blobToBase64(blob) });
+            const res = await syncPost({ action: 'photo', id: cfg.deviceId + '_' + job.id, name: job.name, mime: blob.type === 'application/pdf' ? 'application/pdf' : 'image/jpeg', data: await blobToBase64(blob) });
             cfg.photos[job.id] = { url: res.url };
           }
           persistState();
