@@ -272,10 +272,19 @@
     }
 
     /* ---- Perapian tampilan ---- */
+    #catBar { grid-area: cats; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 2px 0; }
+    #catBar::-webkit-scrollbar { display: none; }
+    #catBar button { flex: 0 0 auto; border: 0; border-radius: 999px; padding: 7px 14px; font-weight: 700; font-size: 13px; background: rgba(255,255,255,.14); color: #fff; cursor: pointer; white-space: nowrap; }
+    #catBar button[aria-pressed="true"] { background: #fff; color: #0f5d54; }
+    nav button.navoff { display: none !important; }
+    #kasirCats { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 0 0 10px; padding-bottom: 2px; }
+    #kasirCats::-webkit-scrollbar { display: none; }
+    .chip { flex: 0 0 auto; border: 1px solid var(--line, #dce7e4); border-radius: 999px; padding: 6px 12px; font-weight: 600; font-size: 13px; background: #fff; color: inherit; cursor: pointer; white-space: nowrap; }
+    .chip[aria-pressed="true"] { background: var(--primary, #0f5d54); border-color: var(--primary, #0f5d54); color: #fff; }
     #reportMode { overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; }
     #reportMode::-webkit-scrollbar { display: none; }
     #reportMode button { flex: 0 0 auto; white-space: nowrap; }
-    header { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "brand user" "nav nav"; gap: 6px 12px; padding: 10px 16px 6px; }
+    header { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "brand user" "cats cats" "nav nav"; gap: 6px 12px; padding: 10px 16px 6px; }
     header > .brand { grid-area: brand; min-width: 0; width: 100%; border-bottom: 1px dashed rgba(255,255,255,.35); }
     header > div:last-child { grid-area: user; flex-wrap: nowrap; }
     nav { grid-area: nav; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; gap: 2px; margin: 0 -16px; padding: 0 16px; -webkit-overflow-scrolling: touch; }
@@ -308,6 +317,7 @@
 <body>
   <header>
     <input id="storeName" class="brand" value="Alkaff Fragrances" aria-label="Nama toko" />
+    <div id="catBar" role="group" aria-label="Kategori menu"></div>
     <nav>
       <button role="tab" data-tab="kasir" aria-selected="true">Kasir</button>
       <button role="tab" data-tab="produk" aria-selected="false">Produk <span id="outBadge" class="hide" style="background:#b34036; color:#fff; border-radius:10px; padding:1px 7px; font-size:11px; margin-left:4px;">0</span><span id="lowBadge" class="hide" style="background:#d99a2a; color:#fff; border-radius:10px; padding:1px 7px; font-size:11px; margin-left:4px;">0</span></button>
@@ -343,6 +353,7 @@
       <div class="layout">
         <div class="box">
           <input id="searchProduct" class="search" placeholder="Cari nama, kode, brand, kategori" />
+          <div id="kasirCats" role="group" aria-label="Kategori produk"></div>
           <div id="productGrid" class="grid"></div>
         </div>
         <div class="box">
@@ -2017,11 +2028,16 @@ function affiliateView_(b) {
       renderProductGrid();
     }
 
+    let kasirCat = '';
     function renderProductGrid() {
       updateStockAlert();
       const keyword = $('#searchProduct').value.toLowerCase();
+      const cats = uniqueValues('category');
+      if (kasirCat && !cats.includes(kasirCat)) kasirCat = '';
+      $('#kasirCats').innerHTML = cats.length ? [''].concat(cats).map((c) => '<button type="button" class="chip" data-kcat="' + escapeHtml(c) + '" aria-pressed="' + (c === kasirCat) + '">' + (c ? escapeHtml(c) : 'Semua') + '</button>').join('') : '';
       let html = '';
       state.products.filter((p) => {
+        if (kasirCat && String(p.category || '').trim() !== kasirCat) return false;
         const hay = (p.name + ' ' + p.code + ' ' + (p.brand || '') + ' ' + (p.category || '')).toLowerCase();
         return hay.includes(keyword);
       }).forEach((p) => {
@@ -5904,6 +5920,29 @@ function affiliateView_(b) {
       applyAccess();
     }
 
+    // ===== Menu per kategori =====
+    const NAV_CATS = [
+      ['Penjualan', '🛒', ['kasir', 'riwayat', 'preorder', 'online', 'request']],
+      ['Produk & Stok', '📦', ['produk', 'stok', 'opname']],
+      ['Pelanggan', '👥', ['member', 'broadcast', 'afiliator', 'piutang']],
+      ['Keuangan', '💰', ['laporan', 'biaya', 'jurnal', 'tutup']],
+      ['Lainnya', '⚙️', ['produktivitas', 'pengaturan']]
+    ];
+    const navLast = {};
+    const navCatOf = (tab) => { const i = NAV_CATS.findIndex((c) => c[2].includes(tab)); return i < 0 ? 0 : i; };
+    function renderNavCats(tab) {
+      if (!currentUser) return;
+      const nav = document.querySelector('nav'), idx = navCatOf(tab);
+      NAV_CATS.forEach((c) => c[2].forEach((t) => { const b = nav.querySelector('[data-tab="' + t + '"]'); if (b) nav.appendChild(b); }));
+      nav.querySelectorAll('button[role="tab"]').forEach((b) => b.classList.toggle('navoff', navCatOf(b.dataset.tab) !== idx));
+      $('#catBar').innerHTML = NAV_CATS.map((c, i) => c[2].some(canAccess)
+        ? '<button type="button" data-navcat="' + i + '" aria-pressed="' + (i === idx) + '">' + c[1] + ' ' + c[0] + '</button>' : '').join('');
+    }
+    function openNavCat(i) {
+      const tabs = NAV_CATS[i][2], t = tabs.includes(navLast[i]) && canAccess(navLast[i]) ? navLast[i] : tabs.find(canAccess);
+      if (t) document.querySelector('nav button[data-tab="' + t + '"]').click();
+    }
+
     function applyAccess() {
       const owner = currentUser.role === 'owner';
       document.querySelectorAll('nav button[role="tab"]').forEach((b) => {
@@ -7891,7 +7930,17 @@ function affiliateView_(b) {
     actPrev = actSnap();
     document.querySelector('nav').addEventListener('click', (e) => {
       const b = e.target.closest('button');
-      if (b) b.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+      if (!b) return;
+      if (b.dataset.tab) { navLast[navCatOf(b.dataset.tab)] = b.dataset.tab; renderNavCats(b.dataset.tab); }
+      b.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+    });
+    $('#catBar').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-navcat]');
+      if (b) openNavCat(Number(b.dataset.navcat));
+    });
+    $('#kasirCats').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-kcat]');
+      if (b) { kasirCat = b.dataset.kcat; renderProductGrid(); }
     });
     init();
   </script>
