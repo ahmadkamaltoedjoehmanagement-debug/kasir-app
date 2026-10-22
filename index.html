@@ -2817,7 +2817,7 @@ function affiliateView_(b) {
 
     function renderReport() {
       const date = $('#reportDate').value || localISODate();
-      let sales = 0, count = 0, refunds = 0, payments = 0, debt = 0, supPaid = 0, supDebt = 0, supRet = 0;
+      let sales = 0, count = 0, refunds = 0, payments = 0, debt = 0;
       const by = {};
       const row = (name) => (by[name] = by[name] || { name, count: 0, sales: 0, refund: 0, pay: 0 });
       state.history.forEach((tx) => {
@@ -2844,15 +2844,10 @@ function affiliateView_(b) {
           }
         });
       });
-      state.stockHistory.forEach((e) => {
-        supDebt += invRemaining(e);
-        (e.payments || []).forEach((p) => { if (p.day === date) supPaid += Number(p.amount || 0); });
-      });
-      state.supReturns.forEach((r) => { if (r.day === date) supRet += Number(r.value || 0); });
       const stat = (label, value) => '<div class="stat"><span>' + label + '</span><b>' + value + '</b></div>';
       $('#reportStats').innerHTML = stat('Penjualan', formatRp(sales)) + stat('Refund', '-' + formatRp(refunds)) +
         stat('Penjualan bersih', formatRp(sales - refunds)) + stat('Transaksi', count) +
-        stat('Bayar hutang masuk', formatRp(payments)) + stat('Piutang aktif', formatRp(debt)) + stat('Bayar ke supplier', formatRp(supPaid)) + stat('Hutang supplier', formatRp(supDebt)) + stat('Retur ke supplier', formatRp(supRet)) + stat('Member', state.members.length) + stat('DP pre order masuk (bersih)', formatRp(state.preorders.reduce((a, po) => a + (po.payments || []).filter((pp) => pp.day === date).reduce((b, pp) => b + Number(pp.amount || 0), 0), 0))) + stat('Pre order aktif', state.preorders.filter((po) => po.status === 'menunggu' || po.status === 'ready').length);
+        stat('Bayar hutang masuk', formatRp(payments)) + stat('Piutang aktif', formatRp(debt)) + stat('Member', state.members.length) + stat('DP pre order masuk (bersih)', formatRp(state.preorders.reduce((a, po) => a + (po.payments || []).filter((pp) => pp.day === date).reduce((b, pp) => b + Number(pp.amount || 0), 0), 0))) + stat('Pre order aktif', state.preorders.filter((po) => po.status === 'menunggu' || po.status === 'ready').length);
       const rows = Object.values(by);
       $('#reportCashier').innerHTML = rows.length
         ? '<h2>Per kasir</h2>' + rows.map((r) => '<div class="line"><div class="n"><b>' + escapeHtml(r.name) + '</b><small>' + r.count + ' transaksi' +
