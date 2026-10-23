@@ -1381,6 +1381,19 @@ function affiliateView_(b) {
         </label>
         <div class="muted" style="margin-top:6px;">Bila dicentang, penjualan, refund, pembayaran piutang, serta DP, pelunasan, dan pengembalian DP pre order ditolak sampai kasir dibuka (isi modal awal) di tab Buka/Tutup Kasir.</div>
       </div>
+      <div class="box">
+        <h2>Harga eceran tertinggi (HET)</h2>
+        <div class="muted" style="margin-bottom:8px;">Harga eceran tertinggi dihitung dari harga modal, lalu dibulatkan ke atas. Bila hasilnya lebih rendah dari harga eceran terendah, harga eceran tertinggi disamakan dengan harga eceran terendah. Di Stok Masuk, kolom harga eceran tertinggi terisi otomatis saat harga beli diketik (tetap bisa diubah).</div>
+        <label style="display:flex; gap:8px; align-items:center; margin-bottom:8px;"><input id="hetAutoChk" type="checkbox" style="width:auto;" /><span>Isi harga eceran tertinggi otomatis di Stok Masuk</span></label>
+        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+          <label class="muted" style="flex:1 1 150px;">Rumus
+            <select id="hetMode"><option value="x">Harga modal × persen</option><option value="div">Harga modal ÷ persen</option></select>
+          </label>
+          <label class="muted" style="flex:1 1 110px;">Persen (%)<input id="hetPct" type="number" min="1" step="0.01" inputmode="decimal" /></label>
+          <label class="muted" style="flex:1 1 150px;">Dibulatkan ke atas, kelipatan (Rp)<input id="hetRound" type="number" min="1" step="1" inputmode="numeric" /></label>
+        </div>
+        <div id="hetExample" class="muted" style="margin-top:8px;"></div>
+      </div>
       <div class="box" style="border:1px solid #e3b4af;">
         <h2 style="color:#b34036;">Zona berbahaya</h2>
         <div class="muted" style="margin-bottom:10px;">Master reset menghapus semua data di perangkat ini: produk, stok, transaksi, member, piutang, biaya, dan lainnya. Data yang sudah terkirim ke Google Sheets tidak ikut terhapus. Unduh cadangan dulu bila perlu (berisi PIN dan token, simpan baik-baik).</div>
@@ -1434,6 +1447,7 @@ function affiliateView_(b) {
     <input id="epCategory" list="categoryOptions" autocomplete="off" />
     <label class="blk" for="epPrice">Harga eceran tertinggi</label>
     <input id="epPrice" type="number" min="0" />
+    <button type="button" id="epHet" class="action ghost hide" style="margin-top:6px;"></button>
     <label class="blk" for="epMin">Harga eceran terendah</label>
     <input id="epMin" type="number" min="0" />
     <div class="muted" style="margin-top:6px;">Harga setelah diskon tidak bisa lebih rendah dari harga eceran terendah.</div>
@@ -1803,7 +1817,12 @@ function affiliateView_(b) {
       closings: [],
       cseq: 1,
       shiftOpens: [],
-      bseq: 1,
+      hetPct: 64.73,
+      hetMode: 'div',
+      hetVer: 2,
+      hetRound: 5000,
+      hetAuto: true,
+      bkseq: 1,
       journals: [],
       jseq: 1,
       supReturns: [],
@@ -1901,7 +1920,8 @@ function affiliateView_(b) {
       state.products.forEach((p) => { if (p.minPrice === undefined || p.minPrice === null || p.minPrice === '') p.minPrice = Number(p.price) || 0; });
       if (!state.cseq) state.cseq = 1;
       if (!Array.isArray(state.shiftOpens) || state.shiftOpens === defaultState.shiftOpens) state.shiftOpens = [];
-      if (!state.bseq) state.bseq = 1;
+      if (!state.bkseq) state.bkseq = Math.max(1, ...state.shiftOpens.map((o) => (parseInt(String(o.no).replace(/\D/g, ''), 10) || 0) + 1));
+      if (state.hetVer !== 2) { state.hetMode = 'div'; state.hetPct = 64.73; state.hetVer = 2; }
       if (!state.jseq) state.jseq = 1;
       if (!state.sseq) state.sseq = 1;
       if (!state.bseq) state.bseq = 1;
@@ -2637,7 +2657,7 @@ function affiliateView_(b) {
       next.actseq = Number(old.actseq || 1) + 1;
       next.activity = [{ id: Number(old.actseq || 1), ts: Date.now(), user: who, act: 'Reset', mod: 'Sistem', ref: '-', detail: 'Master reset: semua data dihapus' + (keep ? ' (pengaturan dipertahankan)' : '') }];
       if (keep) {
-        ['store', 'ownerPin', 'ownerUser', 'users', 'lockSalt', 'paper', 'receiptMode', 'kasirRefund', 'pointCfg', 'requireOpen'].forEach((k) => { if (old[k] !== undefined) next[k] = structuredClone(old[k]); });
+        ['store', 'ownerPin', 'ownerUser', 'users', 'lockSalt', 'paper', 'receiptMode', 'kasirRefund', 'pointCfg', 'requireOpen', 'hetPct', 'hetMode', 'hetRound', 'hetAuto'].forEach((k) => { if (old[k] !== undefined) next[k] = structuredClone(old[k]); });
         if (old.sync) { next.sync = structuredClone(old.sync); next.sync.sent = {}; next.sync.photos = {}; next.sync.deviceId = 'D' + Math.random().toString(36).slice(2, 7).toUpperCase(); }
       }
       state = next;
@@ -3222,6 +3242,8 @@ function affiliateView_(b) {
       if (price > 0 && minRaw === '') minPrice = priced ? Math.min(minPriceOf(product), price) : price;
       activeStockDraft.push({ id: product.id, name: product.name, code: product.code, qty, cost, price, minPrice });
       ['#stockProductSearch', '#stockQty', '#stockCost', '#stockPrice', '#stockMinPrice'].forEach((s) => { $(s).value = ''; });
+      $('#stockPrice').dataset.auto = '';
+      hetRefresh();
       $('#stockPriceHint').textContent = '';
       msg.textContent = '';
       renderStockDraft();
@@ -4598,6 +4620,36 @@ function affiliateView_(b) {
     const diffText = (d) => (d === 0 ? 'Pas' : (d > 0 ? 'Lebih ' : 'Kurang ') + formatRp(Math.abs(d)));
 
     // ===== Buka kasir =====
+    // Harga eceran tertinggi (HET) dari harga modal, dibulatkan ke atas
+    function hetCalc(cost) {
+      const c = Number(cost);
+      if (!(c > 0)) return 0;
+      const pct = Number(state.hetPct) > 0 ? Number(state.hetPct) : 64.73;
+      const raw = state.hetMode === 'div' ? c / (pct / 100) : c * pct / 100;
+      const step = Number(state.hetRound) > 0 ? Number(state.hetRound) : 5000;
+      return Math.ceil(raw / step - 1e-9) * step;
+    }
+    const hetFinal = (cost, low) => { const b = hetCalc(cost); return b ? Math.max(b, Number(low) || 0) : 0; };
+    const hetText = () => (state.hetMode === 'div' ? 'modal ÷ ' : 'modal × ') + String(Number(state.hetPct) || 64.73).replace('.', ',') + '%';
+    function hetRefresh() {
+      const f = $('#stockCost'), p = $('#stockPrice');
+      if (!f || !p) return;
+      const prod = findStockProduct();
+      let low = Number($('#stockMinPrice').value) || 0;
+      if (!low && prod && Number(prod.price) > 0) low = minPriceOf(prod);
+      const het = hetFinal(f.value, low);
+      p.placeholder = 'Harga eceran tertinggi' + (het ? ' (HET ' + formatRp(het) + ')' : '');
+      if (state.hetAuto !== false && het && (p.value === '' || p.dataset.auto === '1')) { p.value = het; p.dataset.auto = '1'; }
+      else if (!het && p.dataset.auto === '1') { p.value = ''; p.dataset.auto = ''; }
+    }
+    function renderHetSettings() {
+      if (!$('#hetPct')) return;
+      $('#hetAutoChk').checked = state.hetAuto !== false;
+      $('#hetMode').value = state.hetMode === 'div' ? 'div' : 'x';
+      $('#hetPct').value = Number(state.hetPct) || 64.73;
+      $('#hetRound').value = Number(state.hetRound) || 5000;
+      $('#hetExample').textContent = 'Contoh: harga modal ' + formatRp(1000000) + ' → harga eceran tertinggi ' + formatRp(hetCalc(1000000)) + ' (' + hetText() + ', dibulatkan ke atas).';
+    }
     const NEED_OPEN_MSG = 'Kasir belum dibuka. Buka kasir dulu di tab Buka/Tutup Kasir.';
     const needOpenShift = () => state.requireOpen !== false && !!currentUser && !currentOpen(currentUser);
     function currentOpen(user) {
@@ -4632,7 +4684,7 @@ function affiliateView_(b) {
       const raw = $('#opAmt').value.trim(), amt = Math.round(cleanNum(raw));
       if (raw === '' || amt < 0) { $('#opErr').textContent = 'Isi modal awal (boleh 0), tidak boleh negatif.'; return; }
       const { last } = computeShift(currentUser), carry = last ? Number(last.carry || 0) : 0;
-      state.shiftOpens.push({ no: 'BK-' + String(state.bseq++).padStart(4, '0'), userId: currentUser.id, userName: currentUser.name, date: nowLabel(), day: localISODate(), ts: Date.now(), opening: amt, expectedCarry: carry, diff: last ? amt - carry : 0, note: $('#bkNote').value.trim(), closedNo: '' });
+      state.shiftOpens.push({ no: 'BK-' + String(state.bkseq++).padStart(4, '0'), userId: currentUser.id, userName: currentUser.name, date: nowLabel(), day: localISODate(), ts: Date.now(), opening: amt, expectedCarry: carry, diff: last ? amt - carry : 0, note: $('#bkNote').value.trim(), closedNo: '' });
       saveState();
       $('#openDialog').close();
       renderShift();
@@ -7824,6 +7876,7 @@ function affiliateView_(b) {
           $('#epBrand').value = prod.brand || '';
           $('#epCategory').value = prod.category || '';
           $('#epPrice').value = Number(prod.price) || '';
+          { const het = hetFinal(prod.cost, prod.minPrice), hb = $('#epHet'); hb.classList.toggle('hide', !het); hb.textContent = 'Isi dari modal: ' + formatRp(het) + ' (' + hetText() + ')'; hb.dataset.cost = Number(prod.cost) || 0; }
           $('#epMin').value = minPriceOf(prod) || '';
           $('#epMinStock').value = minStockOf(prod) || '';
           $('#epErr').textContent = '';
@@ -7864,6 +7917,19 @@ function affiliateView_(b) {
       $('#cfNext').addEventListener('click', () => shiftCash(1));
       $('#cfNow').addEventListener('click', () => { $('#cfMonth').value = localISODate().slice(0, 7); renderCash(); });
       $('#cfMonth').addEventListener('change', renderCash);
+      ['#hetAutoChk', '#hetMode', '#hetPct', '#hetRound'].forEach((sel) => $(sel).addEventListener('change', () => {
+        state.hetAuto = $('#hetAutoChk').checked;
+        state.hetMode = $('#hetMode').value;
+        const pct = Number($('#hetPct').value), step = Math.round(Number($('#hetRound').value));
+        if (pct > 0) state.hetPct = pct;
+        if (step > 0) state.hetRound = step;
+        saveState();
+        renderHetSettings();
+        hetRefresh();
+      }));
+      ['#stockCost', '#stockMinPrice', '#stockProductSearch'].forEach((sel) => $(sel).addEventListener('input', hetRefresh));
+      $('#stockPrice').addEventListener('input', () => { $('#stockPrice').dataset.auto = ''; });
+      $('#epHet').addEventListener('click', () => { $('#epPrice').value = hetFinal($('#epHet').dataset.cost, $('#epMin').value); });
       $('#reqOpen').addEventListener('change', () => { state.requireOpen = $('#reqOpen').checked; saveState(); });
       $('#openBox').addEventListener('click', (e) => { if (e.target.closest('#openShiftBtn')) openOpenDialog(); });
       $('#opSave').addEventListener('click', saveOpen);
@@ -8158,7 +8224,7 @@ function affiliateView_(b) {
           if (tab === 'opname') renderOpname();
           if (tab === 'biaya') renderBiaya();
           if (tab === 'online') renderOnline();
-          if (tab === 'pengaturan') $('#reqOpen').checked = state.requireOpen !== false;
+          if (tab === 'pengaturan') { $('#reqOpen').checked = state.requireOpen !== false; renderHetSettings(); }
           if (tab === 'afiliator') renderAfiliator();
           if (tab === 'broadcast') renderBroadcast();
         });
