@@ -334,7 +334,7 @@
       <button role="tab" data-tab="piutang" aria-selected="false">Piutang</button>
       <button role="tab" data-tab="produktivitas" aria-selected="false">Produktivitas</button>
       <button role="tab" data-tab="tutup" aria-selected="false">Buka/Tutup Kasir</button>
-      <button role="tab" data-tab="biaya" aria-selected="false">Biaya</button>
+      <button role="tab" data-tab="biaya" aria-selected="false">Biaya &amp; Pendapatan Lain</button>
       <button role="tab" data-tab="jurnal" aria-selected="false">Jurnal</button>
       <button role="tab" data-tab="laporan" aria-selected="false">Laporan</button>
       <button role="tab" data-tab="pengaturan" aria-selected="false">Pengaturan</button>
@@ -805,6 +805,35 @@
         <button id="bySave" class="action success full">Simpan biaya</button>
       </div>
       <div class="box" style="margin-top:18px;">
+        <h2>Catat pendapatan lain</h2>
+        <div class="muted" style="margin-bottom:8px;">Untuk uang masuk di luar penjualan toko, seperti komisi dari afiliate live (TikTok, Shopee, dan sejenisnya). Otomatis masuk ke Jurnal, Laba rugi, dan Arus kas.</div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+          <label class="muted" style="flex:1 1 140px;">Tanggal<input id="inDate" type="date" /></label>
+          <label class="muted" style="flex:1 1 200px;">Kategori
+            <select id="inCat">
+              <option value="4-1500">Komisi afiliate live</option>
+              <option value="4-1600">Pendapatan lain-lain</option>
+            </select>
+          </label>
+          <label class="muted" style="flex:1 1 140px;">Nominal (Rp)<input id="inAmount" type="number" min="1" step="1" inputmode="numeric" placeholder="0" /></label>
+          <label class="muted" style="flex:1 1 180px;">Diterima di
+            <select id="inTo">
+              <option value="1-1200">Bank / e-wallet</option>
+              <option value="1-1100">Kas (tunai)</option>
+            </select>
+          </label>
+        </div>
+        <input id="inMemo" placeholder="Keterangan (opsional), contoh: Komisi live TikTok minggu ke-2" autocomplete="off" style="margin-top:8px;" />
+        <div id="inMsg" class="err" role="alert"></div>
+        <button id="inSave" class="action success full">Simpan pendapatan</button>
+      </div>
+      <div class="box" style="margin-top:18px;">
+        <h2>Daftar pendapatan lain</h2>
+        <div class="muted">Mengikuti bulan yang dipilih di Daftar biaya di bawah.</div>
+        <div id="inSummary" style="margin-top:10px;"></div>
+        <div id="inList" style="margin-top:8px;"></div>
+      </div>
+      <div class="box" style="margin-top:18px;">
         <h2>Daftar biaya</h2>
         <label class="muted" style="display:block; max-width:220px;">Bulan<input id="byMonth" type="month" /></label>
         <div id="bySummary" style="margin-top:10px;"></div>
@@ -854,6 +883,7 @@
           <button data-rmode="mingguan" aria-pressed="false">Mingguan</button>
           <button data-rmode="bulanan" aria-pressed="false">Bulanan</button>
           <button data-rmode="aruskas" aria-pressed="false">Arus kas</button>
+          <button data-rmode="afiliator" aria-pressed="false">Afiliator</button>
           <button data-rmode="tutup" aria-pressed="false">Tutup kasir</button>
           <button data-rmode="supplier" aria-pressed="false">Supplier</button>
         </div>
@@ -867,6 +897,17 @@
           <div id="reportStats" class="stats"></div>
           <div id="reportChart" style="margin-top:14px;"></div>
           <div id="reportCashier" style="margin-top:14px;"></div>
+        </div>
+
+        <div id="rpAff" class="hide">
+          <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+            <button id="rfPrev" class="action ghost" aria-label="Sebelumnya">&lsaquo;</button>
+            <input id="rfMonth" type="month" style="max-width:190px;" />
+            <button id="rfNext" class="action ghost" aria-label="Berikutnya">&rsaquo;</button>
+            <button id="rfNow" class="action ghost">Bulan ini</button>
+          </div>
+          <div id="rpAffMsg" class="muted" style="margin-top:8px;"></div>
+          <div id="rpAffOut"></div>
         </div>
 
         <div id="rpCash" class="hide">
@@ -999,7 +1040,8 @@ const SHEET_NAMES = {
   komisi_bayar: 'Bayar Komisi',
   stok_masuk: 'Stok Masuk',
   aktivitas: 'Log Aktivitas',
-  buka_kasir: 'Buka Kasir'
+  buka_kasir: 'Buka Kasir',
+  pendapatan_lain: 'Pendapatan Lain'
 };
 
 const HEADERS = {
@@ -1024,7 +1066,8 @@ const HEADERS = {
   komisi_bayar: ['Key', 'Perangkat', 'Tanggal', 'Kode', 'Jumlah', 'Catatan', 'Dicatat oleh'],
   stok_masuk: ['Key', 'Perangkat', 'Tanggal', 'No Invoice', 'Supplier', 'Kode', 'Produk', 'Qty', 'Harga Modal', 'Subtotal'],
   aktivitas: ['Key', 'Perangkat', 'Waktu', 'Pengguna', 'Aksi', 'Modul', 'Referensi', 'Detail'],
-  buka_kasir: ['Key', 'Perangkat', 'No', 'Tanggal', 'Kasir', 'Modal Awal', 'Kas Shift Sebelumnya', 'Selisih', 'Catatan', 'Ditutup Dengan']
+  buka_kasir: ['Key', 'Perangkat', 'No', 'Tanggal', 'Kasir', 'Modal Awal', 'Kas Shift Sebelumnya', 'Selisih', 'Catatan', 'Ditutup Dengan'],
+  pendapatan_lain: ['Key', 'Perangkat', 'No', 'Tanggal', 'Kategori', 'Diterima di', 'Jumlah', 'Catatan', 'Dicatat oleh']
 };
 
 function doGet(e) {
@@ -1287,11 +1330,22 @@ function affiliateView_(b) {
     }
   });
   pays.forEach(function (p) { paid += Number(p.Jumlah || 0); });
+  var months = {};
+  orders.forEach(function (o) {
+    if (o.Status !== 'Selesai') return;
+    var ym = String(o.Tanggal || '').slice(0, 7);
+    if (!ym) return;
+    var m = months[ym] || (months[ym] = { bulan: ym, pesanan: 0, penjualan: 0, komisi: 0 });
+    m.pesanan++;
+    m.penjualan += Number(o.Total || 0);
+    m.komisi += Number(o.Komisi || 0);
+  });
+  var monthly = Object.keys(months).sort().reverse().slice(0, 6).map(function (k) { return months[k]; });
   return {
     ok: true,
     name: aff.Nama,
     rule: pct ? aff.Nilai + '% dari nilai barang' : 'Rp' + Number(aff.Nilai || 0).toLocaleString('id-ID') + ' per pesanan',
-    komisi: komisi, paid: paid, sisa: komisi - paid, pending: pending, estimate: estimate,
+    komisi: komisi, paid: paid, sisa: komisi - paid, pending: pending, estimate: estimate, monthly: monthly,
     orders: orders.slice(-100).reverse().map(function (o) {
       return { No: o.No, Tanggal: o.Tanggal, Status: o.Status, Total: Number(o.Total || 0), Komisi: Number(o.Komisi || 0) };
     }),
@@ -2984,7 +3038,8 @@ function affiliateView_(b) {
       $('#pdOut').innerHTML = '<h2 style="margin-top:14px;">' + (weekly ? 'Minggu' : 'Bulan') + ' terpilih: ' + escapeHtml(periods[3].range) + '</h2><div class="stats">' +
         stat('Penjualan', formatRp(cur.sales)) + stat('Refund', '-' + formatRp(cur.refund)) + stat('Penjualan bersih', formatRp(net(cur))) +
         stat('Transaksi', cur.count) + stat('Rata-rata / transaksi', formatRp(cur.count ? Math.round(cur.sales / cur.count) : 0)) +
-        stat('Laba kotor (sebelum refund)', formatRp(cur.sales - cur.cost)) + '</div>' +
+        stat('Laba kotor (sebelum refund)', formatRp(cur.sales - cur.cost)) +
+        stat('Pendapatan lain (komisi live dll.)', formatRp(state.journals.filter((j) => j.kind === 'pendapatan' && periods[3].days.includes(j.date)).reduce((t, j) => t + Number(j.amount || 0), 0))) + '</div>' +
         '<h2 style="margin-top:14px;">Penjualan bersih 4 ' + unit + ' terakhir</h2>' + svgBars(periods.map((p) => p.label), periods.map((p) => net(p.d)), true) +
         '<div style="overflow-x:auto; margin-top:10px;"><table class="tbl"><thead><tr><th>' + (weekly ? 'Minggu' : 'Bulan') + '</th><th class="num">Penjualan</th><th class="num hm">Refund</th><th class="num">Bersih</th><th class="num hm">Transaksi</th><th class="num hm">Laba kotor</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
         '<div class="muted" style="margin-top:10px;">Produk terlaris dan metode pembayaran di bawah dihitung dari 4 ' + unit + ' terakhir.</div>' + rankBlocks(all);
@@ -3004,7 +3059,7 @@ function affiliateView_(b) {
         let cat = (JR_GROUPS[e.group] || [e.group])[0];
         if (e.group === 'manual') {
           const j = state.journals.find((x) => x.id === e.manualId);
-          cat = j && j.kind === 'biaya' ? 'Biaya: ' + (BIAYA_CATS[j.cat] || 'Lainnya') : 'Jurnal manual';
+          cat = j && j.kind === 'biaya' ? 'Biaya: ' + (BIAYA_CATS[j.cat] || 'Lainnya') : (j && j.kind === 'pendapatan' ? 'Pendapatan: ' + (INCOME_CATS[j.cat] || 'Lainnya') : 'Jurnal manual');
         } else if (e.group === 'preorder') cat = (kas + bank) >= 0 ? 'DP pre order' : 'Pengembalian DP pre order';
         else if (e.group === 'invoice') cat = 'Barang masuk (dibayar tunai)';
         rows.push({ date: e.date, kas, bank, net: kas + bank, cat });
@@ -3058,6 +3113,53 @@ function affiliateView_(b) {
         hist.map((h) => '<tr><td>' + MONN[Number(h.ym.slice(5)) - 1] + ' ' + h.ym.slice(0, 4) + '</td><td class="num">' + formatRp(h.inn) + '</td><td class="num hm">-' + formatRp(h.out) + '</td><td class="num"><b>' + signed(h.net) + '</b></td><td class="num hm">' + signed(h.end) + '</td></tr>').join('') + '</tbody></table></div>' +
         '<div class="muted" style="margin-top:8px;">Arus kas dihitung dari jurnal: semua uang yang masuk dan keluar lewat akun Kas dan Bank &amp; E-Wallet. Penjualan hutang dan pembelian yang belum dibayar baru terhitung saat dibayar.</div>';
     }
+    // ===== Laporan pendapatan afiliator =====
+    async function renderAffReport() {
+      const msg = $('#rpAffMsg');
+      if (!syncReady()) { msg.textContent = 'Hubungkan Google Sheets (Pengaturan) agar data pesanan online terbaca.'; $('#rpAffOut').innerHTML = ''; return; }
+      msg.textContent = 'Memuat...';
+      try { afOrders = (await syncPost({ action: 'orders' })).orders || []; msg.textContent = ''; }
+      catch (err) { msg.textContent = 'Belum bisa dimuat: ' + syncFriendly(err); return; }
+      drawAffReport();
+    }
+    function affMonthData(ym) {
+      const rows = afOrders.filter((o) => String(o.Tanggal || '').slice(0, 7) === ym && o.Status === 'Selesai');
+      const per = {};
+      let online = 0;
+      rows.forEach((o) => {
+        online += Number(o.Total || 0);
+        const code = afClean(o.Referal);
+        if (!code) return;
+        const p = (per[code] = per[code] || { code, count: 0, sales: 0, komisi: 0 });
+        p.count++; p.sales += Number(o.Total || 0); p.komisi += Number(o.Komisi || 0);
+      });
+      const paid = (state.affPaid || []).filter((x) => String(x.date || '').slice(0, 7) === ym).reduce((t, x) => t + Number(x.amount || 0), 0);
+      const list = Object.values(per);
+      return { per: list, online, count: list.reduce((t, p) => t + p.count, 0), sales: list.reduce((t, p) => t + p.sales, 0), komisi: list.reduce((t, p) => t + p.komisi, 0), paid };
+    }
+    function drawAffReport() {
+      const ym = $('#rfMonth').value || localISODate().slice(0, 7), [y, m] = ym.split('-').map(Number), cur = affMonthData(ym);
+      const hist = [];
+      for (let k = 3; k >= 0; k--) { const dt = new Date(y, m - 1 - k, 1), key = dt.getFullYear() + '-' + pad2(dt.getMonth() + 1); hist.push({ key, label: MONN[dt.getMonth()] + ' ' + String(dt.getFullYear()).slice(2), d: affMonthData(key) }); }
+      const stat = (l, v) => '<div class="stat"><span>' + l + '</span><b>' + v + '</b></div>';
+      const name = (code) => { const a = afFind(code); return a ? a.name + ' (' + code + ')' : code + ' (belum terdaftar)'; };
+      const sorted = cur.per.slice().sort((a, b) => b.komisi - a.komisi);
+      const share = cur.online ? (cur.sales / cur.online * 100).toFixed(1).replace('.', ',') + '%' : '-';
+      $('#rpAffOut').innerHTML = '<h2 style="margin-top:14px;">' + MONN[m - 1] + ' ' + y + '</h2><div class="stats">' +
+        stat('Pendapatan afiliator (komisi)', formatRp(cur.komisi)) + stat('Penjualan via afiliator', formatRp(cur.sales)) +
+        stat('Pesanan selesai', cur.count) + stat('Porsi dari penjualan online', share) + stat('Komisi dibayar bulan ini', formatRp(cur.paid)) + '</div>' +
+        '<h2 style="margin-top:14px;">Pendapatan afiliator 4 bulan terakhir</h2>' + svgBars(hist.map((h) => h.label), hist.map((h) => h.d.komisi), true) +
+        '<h2 style="margin-top:14px;">Per afiliator</h2>' + hBars(sorted.map((p) => [name(p.code), p.komisi, formatRp(p.komisi) + ' · ' + p.count + ' pesanan'])) +
+        (sorted.length ? '<div style="overflow-x:auto; margin-top:10px;"><table class="tbl"><thead><tr><th>Afiliator</th><th class="num">Pesanan</th><th class="num">Penjualan</th><th class="num">Pendapatan</th></tr></thead><tbody>' +
+          sorted.map((p) => '<tr><td>' + escapeHtml(name(p.code)) + '</td><td class="num">' + p.count + '</td><td class="num">' + formatRp(p.sales) + '</td><td class="num"><b>' + formatRp(p.komisi) + '</b></td></tr>').join('') + '</tbody></table></div>' : '') +
+        '<div class="muted" style="margin-top:8px;">Pendapatan afiliator = komisi dari pesanan online berstatus Selesai, dikelompokkan menurut tanggal pesanan. Komisi dibayar mengikuti tanggal pencatatan pembayaran.</div>';
+    }
+    function shiftAffMonth(dir) {
+      const [y, m] = ($('#rfMonth').value || localISODate().slice(0, 7)).split('-').map(Number), dt = new Date(y, m - 1 + dir, 1);
+      $('#rfMonth').value = dt.getFullYear() + '-' + pad2(dt.getMonth() + 1);
+      drawAffReport();
+    }
+
     function shiftCash(dir) {
       const [y, m] = ($('#cfMonth').value || localISODate().slice(0, 7)).split('-').map(Number), dt = new Date(y, m - 1 + dir, 1);
       $('#cfMonth').value = dt.getFullYear() + '-' + pad2(dt.getMonth() + 1);
@@ -3596,6 +3698,8 @@ function affiliateView_(b) {
       state.journals.forEach((j) => {
         if (j.kind === 'biaya') {
           add('biaya', j.id, { No: j.no, Tanggal: j.date, Kategori: BIAYA_CATS[j.cat] || j.cat || '', 'Dibayar dari': accName(j.from), Jumlah: Number(j.amount || 0), Catatan: j.memo || '', 'Dicatat oleh': j.by || '' });
+        } else if (j.kind === 'pendapatan') {
+          add('pendapatan_lain', j.id, { No: j.no, Tanggal: j.date, Kategori: INCOME_CATS[j.cat] || j.cat || '', 'Diterima di': accName(j.to), Jumlah: Number(j.amount || 0), Catatan: j.memo || '', 'Dicatat oleh': j.by || '' });
         } else {
           (j.lines || []).forEach((l, i) => add('jurnal_manual', j.id + ':' + i, { No: j.no, Tanggal: j.date, Memo: j.memo || '', Akun: accName(l.acc), Debit: Number(l.debit || 0), Kredit: Number(l.credit || 0), 'Dicatat oleh': j.by || '' }));
         }
@@ -4093,6 +4197,8 @@ function affiliateView_(b) {
       { code: '4-1200', name: 'Retur Penjualan', normal: 'D' },
       { code: '4-1300', name: 'Diskon Penjualan', normal: 'D' },
       { code: '4-1400', name: 'Pendapatan Lain-lain (DP Hangus)', normal: 'K' },
+      { code: '4-1500', name: 'Komisi Afiliasi Live', normal: 'K' },
+      { code: '4-1600', name: 'Pendapatan Lain-lain (Umum)', normal: 'K' },
       { code: '5-1100', name: 'Harga Pokok Penjualan', normal: 'D' },
       { code: '6-1100', name: 'Beban Gaji', normal: 'D' },
       { code: '6-1200', name: 'Beban Sewa', normal: 'D' },
@@ -4288,13 +4394,13 @@ function affiliateView_(b) {
       const bebanOps = COA.filter((a) => /^6-1/.test(a.code)).reduce((n, a) => n + sal(a.code), 0);
       const netSales = sal('4-1100') - sal('4-1200') - sal('4-1300');
       const gross = netSales - sal('5-1100');
-      const net = gross - bebanOps - sal('6-9100') - sal('6-9200') + sal('4-1400');
+      const net = gross - bebanOps - sal('6-9100') - sal('6-9200') + sal('4-1400') + sal('4-1500') + sal('4-1600');
       const lr = (a, b, bold) => '<div class="row"' + (bold ? ' style="font-weight:700;"' : '') + '><span>' + a + '</span><b>' + b + '</b></div>';
       $('#jrSummary').innerHTML = 'Periode: ' + escapeHtml(($('#jrFrom').value || 'awal') + ' s/d ' + ($('#jrTo').value || 'sekarang')) + (balanced ? '' : ' · <span class="low">TIDAK SEIMBANG</span>');
       $('#jrList').innerHTML = '<h3 style="margin:6px 0;">Laba rugi</h3>' +
         lr('Penjualan', formatRp(sal('4-1100'))) + lr('Retur penjualan', '-' + formatRp(sal('4-1200'))) + lr('Diskon penjualan', '-' + formatRp(sal('4-1300'))) +
         lr('Penjualan bersih', signedRp(netSales), true) + lr('Harga pokok penjualan', '-' + formatRp(sal('5-1100'))) + lr('Laba kotor', signedRp(gross), true) +
-        lr('Beban operasional', '-' + formatRp(bebanOps)) + lr('Selisih kas', signedRp(-sal('6-9100'))) + lr('Selisih stok (opname)', signedRp(-sal('6-9200'))) + lr('Pendapatan lain-lain (DP hangus)', signedRp(sal('4-1400'))) + lr('LABA BERSIH', signedRp(net), true) +
+        lr('Beban operasional', '-' + formatRp(bebanOps)) + lr('Selisih kas', signedRp(-sal('6-9100'))) + lr('Selisih stok (opname)', signedRp(-sal('6-9200'))) + lr('Pendapatan lain-lain (DP hangus)', signedRp(sal('4-1400'))) + lr('Komisi afiliasi live', signedRp(sal('4-1500'))) + lr('Pendapatan lain-lain (umum)', signedRp(sal('4-1600'))) + lr('LABA BERSIH', signedRp(net), true) +
         '<h3 style="margin:14px 0 6px;">Neraca saldo</h3><div style="overflow-x:auto;"><table class="tbl" style="min-width:0;"><thead><tr><th>Kode</th><th>Akun</th><th class="num">Debit</th><th class="num">Kredit</th><th class="num">Saldo</th></tr></thead><tbody>' + rows +
         '<tr><td></td><td><b>Total</b></td><td class="num"><b>' + formatRp(debit) + '</b></td><td class="num"><b>' + formatRp(credit) + '</b></td><td></td></tr></tbody></table></div>' +
         '<div class="muted" style="margin-top:8px;">Laba rugi memakai harga pokok yang tercatat saat barang terjual. Penjualan lama yang dibuat sebelum fitur ini memakai harga modal produk saat ini sebagai perkiraan.</div>';
@@ -4889,6 +4995,11 @@ function affiliateView_(b) {
       $('#rpSuppliers').classList.toggle('hide', mode !== 'supplier');
       $('#rpPeriod').classList.toggle('hide', mode !== 'mingguan' && mode !== 'bulanan');
       $('#rpCash').classList.toggle('hide', mode !== 'aruskas');
+      $('#rpAff').classList.toggle('hide', mode !== 'afiliator');
+      if (mode === 'afiliator') {
+        if (!$('#rfMonth').value) $('#rfMonth').value = localISODate().slice(0, 7);
+        renderAffReport();
+      }
       if (mode === 'aruskas') {
         if (!$('#cfMonth').value) $('#cfMonth').value = localISODate().slice(0, 7);
         renderCash();
@@ -7281,6 +7392,43 @@ function affiliateView_(b) {
     // ===== Biaya operasional =====
     const BIAYA_CATS = { '6-1100': 'Gaji', '6-1200': 'Sewa', '6-1300': 'Listrik, air & internet', '6-1400': 'Transportasi & kirim', '6-1500': 'Pemasaran / iklan', '6-1900': 'Operasional lain' };
 
+    const INCOME_CATS = { '4-1500': 'Komisi afiliate live', '4-1600': 'Pendapatan lain-lain' };
+
+    function saveIncome() {
+      const err = $('#inMsg');
+      err.style.color = '';
+      const date = $('#inDate').value, cat = $('#inCat').value, to = $('#inTo').value, amount = Math.round(cleanNum($('#inAmount').value)), note = $('#inMemo').value.trim();
+      if (!date) { err.textContent = 'Tanggal wajib diisi.'; return; }
+      if (!(amount > 0)) { err.textContent = 'Nominal harus lebih dari 0.'; return; }
+      const seq = state.journals.reduce((mx, j) => (j.kind === 'pendapatan' ? Math.max(mx, parseInt(String(j.no).replace(/\D/g, ''), 10) || 0) : mx), 0) + 1;
+      state.journals.push({
+        id: Date.now(), no: 'PL-' + String(seq).padStart(4, '0'), kind: 'pendapatan', cat, to, amount, date,
+        memo: INCOME_CATS[cat] + (note ? ' · ' + note : ''),
+        lines: [{ acc: to, debit: amount, credit: 0 }, { acc: cat, debit: 0, credit: amount }],
+        by: currentUser ? currentUser.name : '', byId: currentUser ? currentUser.id : '', ts: Date.now()
+      });
+      saveState();
+      $('#inAmount').value = '';
+      $('#inMemo').value = '';
+      renderBiaya();
+      err.style.color = 'var(--accent)';
+      err.textContent = 'Pendapatan ' + formatRp(amount) + ' tersimpan.';
+      setTimeout(() => { err.textContent = ''; err.style.color = ''; }, 4000);
+    }
+
+    function renderIncome() {
+      if (!$('#inList')) return;
+      if (!$('#inDate').value) $('#inDate').value = localISODate();
+      const month = $('#byMonth').value || localISODate().slice(0, 7);
+      const list = state.journals.filter((j) => j.kind === 'pendapatan' && String(j.date).slice(0, 7) === month).sort((a, b) => String(b.date).localeCompare(String(a.date)) || b.ts - a.ts);
+      const per = {};
+      list.forEach((j) => { per[j.cat] = (per[j.cat] || 0) + Number(j.amount || 0); });
+      $('#inSummary').innerHTML = '<div class="stats"><div class="stat"><span>Total pendapatan lain</span><b>' + formatRp(list.reduce((a, j) => a + Number(j.amount || 0), 0)) + '</b></div>' +
+        Object.keys(per).map((c) => '<div class="stat"><span>' + escapeHtml(INCOME_CATS[c] || c) + '</span><b>' + formatRp(per[c]) + '</b></div>').join('') + '</div>';
+      $('#inList').innerHTML = list.map((j) => '<div class="line"><div class="n"><b>' + escapeHtml(j.memo) + '</b><small>' + escapeHtml(j.date) + ' · ' + escapeHtml(j.no) + ' · ' + (j.to === '1-1100' ? 'Kas' : 'Bank / e-wallet') + '</small></div>' +
+        '<div class="q"><b>' + formatRp(j.amount) + '</b><button class="lnk" data-in-del="' + j.id + '">Hapus</button></div></div>').join('') || '<div class="muted">Belum ada pendapatan lain pada bulan ini.</div>';
+    }
+
     function saveBiaya() {
       const err = $('#byMsg');
       err.style.color = '';
@@ -7310,6 +7458,7 @@ function affiliateView_(b) {
 
     function renderBiaya() {
       if (!$('#byList')) return;
+      renderIncome();
       if (!$('#byDate').value) $('#byDate').value = localISODate();
       if (!$('#byMonth').value) $('#byMonth').value = localISODate().slice(0, 7);
       const month = $('#byMonth').value;
@@ -7325,6 +7474,18 @@ function affiliateView_(b) {
 
     function bindBiayaEvents() {
       $('#bySave').addEventListener('click', saveBiaya);
+      $('#inSave').addEventListener('click', saveIncome);
+      $('#inList').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-in-del]');
+        if (!b) return;
+        const j = state.journals.find((x) => String(x.id) === String(b.dataset.inDel));
+        if (!j) return;
+        opAsk('Hapus pendapatan ini?', j.memo + '\n' + formatRp(j.amount) + ' · ' + j.date, () => {
+          state.journals = state.journals.filter((x) => x !== j);
+          saveState();
+          renderBiaya();
+        }, 'Ya, hapus', true);
+      });
       $('#byMonth').addEventListener('input', renderBiaya);
       $('#byList').addEventListener('click', (e) => {
         const b = e.target.closest('[data-by-del]');
@@ -7695,6 +7856,10 @@ function affiliateView_(b) {
       initBirthdayFilters();
       ['#mbMonth', '#mbDay'].forEach((sel) => $(sel).addEventListener('change', () => { bdWeek = false; renderMembers(); }));
       document.querySelectorAll('[data-bd-preset]').forEach((b) => b.addEventListener('click', () => setBirthdayPreset(b.dataset.bdPreset)));
+      $('#rfPrev').addEventListener('click', () => shiftAffMonth(-1));
+      $('#rfNext').addEventListener('click', () => shiftAffMonth(1));
+      $('#rfNow').addEventListener('click', () => { $('#rfMonth').value = localISODate().slice(0, 7); drawAffReport(); });
+      $('#rfMonth').addEventListener('change', drawAffReport);
       $('#cfPrev').addEventListener('click', () => shiftCash(-1));
       $('#cfNext').addEventListener('click', () => shiftCash(1));
       $('#cfNow').addEventListener('click', () => { $('#cfMonth').value = localISODate().slice(0, 7); renderCash(); });
