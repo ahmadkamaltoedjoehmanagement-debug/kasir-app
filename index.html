@@ -272,6 +272,7 @@
     }
 
     /* ---- Perapian tampilan ---- */
+    .action:disabled { opacity: .5; cursor: not-allowed; }
     #catBar { grid-area: cats; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 2px 0; }
     #catBar::-webkit-scrollbar { display: none; }
     #catBar button { flex: 0 0 auto; border: 0; border-radius: 999px; padding: 7px 14px; font-weight: 700; font-size: 13px; background: rgba(255,255,255,.14); color: #fff; cursor: pointer; white-space: nowrap; }
@@ -764,6 +765,7 @@
         <div id="shiftInfo" class="muted"></div>
         <div id="shiftSummary" class="stats" style="margin-top:8px;"></div>
         <div id="shiftDetail" style="margin-top:10px;"></div>
+        <div class="err" id="shiftErr" role="alert"></div>
         <button id="closeShiftBtn" class="action success full" style="margin-top:12px;">Tutup kasir</button>
       </div>
       <div class="box" style="margin-top:18px;">
@@ -1006,7 +1008,7 @@ const HEADERS = {
   bayar_hutang: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'Kasir', 'Member', 'Telepon', 'Ref Transaksi', 'Jumlah', 'Metode', 'Sisa Sebelum', 'Sisa Sesudah'],
   invoice: ['Key', 'Perangkat', 'No Invoice', 'Supplier', 'Tanggal', 'Jatuh Tempo', 'Total', 'Item', 'Foto Invoice'],
   bayar_invoice: ['Key', 'Perangkat', 'No Invoice', 'Tanggal', 'Hari', 'Pencatat', 'Jumlah', 'Metode', 'Catatan', 'Sisa Sesudah', 'Bukti Bayar'],
-  tutup_kasir: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'Kasir', 'Periode Dari', 'Modal Awal', 'Penjualan Tunai', 'Penjualan QRIS', 'Penjualan Transfer', 'Penjualan Hutang', 'DP Hutang Tunai', 'Diskon', 'Refund', 'Refund Tunai', 'Bayar Hutang Tunai', 'Bayar Hutang Non-Tunai', 'Kas Seharusnya', 'Uang Fisik', 'Selisih', 'Setoran', 'Dibawa Shift Berikut', 'Catatan'],
+  tutup_kasir: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'Kasir', 'Periode Dari', 'Modal Awal', 'Penjualan Tunai', 'Penjualan QRIS', 'Penjualan Transfer', 'Penjualan Hutang', 'DP Hutang Tunai', 'Diskon', 'Refund', 'Refund Tunai', 'Bayar Hutang Tunai', 'Bayar Hutang Non-Tunai', 'Kas Seharusnya', 'Uang Fisik', 'Selisih', 'Setoran', 'Dibawa Shift Berikut', 'Catatan', 'No Buka', 'Waktu Buka'],
   retur_beli: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'Pencatat', 'Supplier', 'No Invoice', 'Item', 'Nilai Retur', 'Potong Tagihan', 'Uang Dikembalikan', 'Metode', 'Alasan', 'Foto Retur'],
   penjualan_item: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'Kasir', 'Metode', 'Kode', 'Produk', 'Qty', 'Harga', 'Subtotal', 'Modal'],
   pre_order: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'Kasir', 'Pelanggan', 'Telepon', 'Item', 'Total', 'DP Tersimpan', 'Perkiraan Datang', 'Status', 'Catatan', 'No Transaksi', 'Alasan Batal', 'DP Hangus'],
@@ -3656,7 +3658,8 @@ function affiliateView_(b) {
           'Penjualan Tunai': s.byMethod.Tunai || 0, 'Penjualan QRIS': s.byMethod.QRIS || 0, 'Penjualan Transfer': s.byMethod.Transfer || 0,
           'Penjualan Hutang': s.byMethod.Hutang || 0, 'DP Hutang Tunai': s.dp, Diskon: s.disc, Refund: s.refundTotal, 'Refund Tunai': s.refundCashOut,
           'Bayar Hutang Tunai': s.payByMethod.Tunai || 0, 'Bayar Hutang Non-Tunai': (s.payTotal || 0) - (s.payByMethod.Tunai || 0),
-          'Kas Seharusnya': c.expected, 'Uang Fisik': c.counted, Selisih: c.diff, Setoran: c.deposit, 'Dibawa Shift Berikut': c.carry, Catatan: c.note || ''
+          'Kas Seharusnya': c.expected, 'Uang Fisik': c.counted, Selisih: c.diff, Setoran: c.deposit, 'Dibawa Shift Berikut': c.carry, Catatan: c.note || '',
+          'No Buka': c.openNo || '', 'Waktu Buka': ((state.shiftOpens || []).find((o) => o.no === c.openNo) || {}).date || ''
         });
       });
       state.stockHistory.forEach((e, idx) => {
@@ -4496,6 +4499,9 @@ function affiliateView_(b) {
     }
     function renderOpenBox() {
       if (!currentUser) return;
+      const blocked = needOpenShift();
+      $('#closeShiftBtn').disabled = blocked;
+      $('#shiftErr').textContent = blocked ? NEED_OPEN_CLOSE_MSG : '';
       const op = currentOpen(currentUser), row = (a, b) => '<div class="row"><span>' + a + '</span><b>' + b + '</b></div>';
       $('#openBox').innerHTML = op
         ? row('Kasir dibuka', escapeHtml(op.date)) + row('Modal awal di laci', formatRp(op.opening)) +
@@ -4554,8 +4560,10 @@ function affiliateView_(b) {
         '<div class="q"><button class="action ghost" data-open-closing="' + c.no + '" style="padding:8px 10px;">Buka</button></div></div>';
     }
 
+    const NEED_OPEN_CLOSE_MSG = 'Tidak bisa tutup kasir karena kasir belum dibuka. Klik Buka kasir dulu.';
     function openClose() {
       if (!currentUser) return;
+      if (needOpenShift()) { $('#shiftErr').textContent = NEED_OPEN_CLOSE_MSG; return; }
       closeData = computeShift(currentUser);
       $('#closeInfo').textContent = 'Kasir: ' + currentUser.name + ' · Sejak: ' + (closeData.last ? closeData.last.date : 'awal pemakaian');
       $('#clOpening').value = closeData.opening;
@@ -4590,6 +4598,7 @@ function affiliateView_(b) {
 
     function submitClose() {
       if (!currentUser) return;
+      if (needOpenShift()) { $('#clErr').textContent = NEED_OPEN_CLOSE_MSG; return; }
       const fresh = computeShift(currentUser);
       const s = fresh.s;
       const opening = Math.round(cleanNum($('#clOpening').value));
@@ -4707,6 +4716,19 @@ function affiliateView_(b) {
       return state.closings.filter((c) => (!from || c.day >= from) && (!to || c.day <= to) && (!u || String(c.userId) === u));
     }
 
+    const opOf = (c) => (state.shiftOpens || []).find((o) => o.no === c.openNo) || null;
+    function closingTableHtml(list) {
+      const from = $('#clFrom').value, to = $('#clTo').value, uid = $('#clUser').value;
+      const running = (state.shiftOpens || []).filter((o) => !o.closedNo && (!from || o.day >= from) && (!to || o.day <= to) && (!uid || String(o.userId) === String(uid)));
+      const rows = list.map((c) => ({ ts: c.ts, c, o: opOf(c) })).concat(running.map((o) => ({ ts: o.ts, c: null, o })));
+      rows.sort((x, y) => y.ts - x.ts);
+      if (!rows.length) return '<div class="muted">Belum ada buka/tutup kasir pada filter ini.</div>';
+      const body = rows.map(({ c, o }) => c
+        ? '<tr><td><b>' + escapeHtml(c.no) + '</b></td><td>' + escapeHtml(c.userName) + '</td><td>' + (o ? escapeHtml(o.date) : '-') + '</td><td>' + escapeHtml(c.date) + '</td><td class="num">' + formatRp(c.opening) + '</td><td class="num">' + formatRp(c.summary.netSales) + '</td><td class="num">' + formatRp(c.expected) + '</td><td class="num">' + formatRp(c.counted) + '</td><td class="num"><span class="' + (c.diff !== 0 ? 'low' : '') + '">' + diffText(c.diff) + '</span></td><td class="num">' + formatRp(c.deposit) + '</td><td><button class="action ghost" data-open-closing="' + c.no + '" style="padding:6px 10px;">Buka</button></td></tr>'
+        : '<tr><td><b>' + escapeHtml(o.no) + '</b></td><td>' + escapeHtml(o.userName) + '</td><td>' + escapeHtml(o.date) + '</td><td colspan="2"><small>Shift berjalan</small></td><td class="num">' + formatRp(o.opening) + '</td><td class="num">-</td><td class="num">-</td><td class="num">-</td><td class="num">-</td><td class="num">-</td></tr>').join('');
+      return '<div style="overflow-x:auto;"><table class="tbl" style="min-width:860px;"><thead><tr><th>No</th><th>Kasir</th><th>Dibuka</th><th>Ditutup</th><th class="num">Modal awal</th><th class="num">Penjualan bersih</th><th class="num">Kas seharusnya</th><th class="num">Uang fisik</th><th class="num">Selisih</th><th class="num">Setoran</th><th></th></tr></thead><tbody>' + body + '</tbody></table></div>';
+    }
+
     function renderClosingsReport() {
       const sel = $('#clUser');
       const keep = sel.value;
@@ -4717,8 +4739,8 @@ function affiliateView_(b) {
       const list = closingFilter();
       let net = 0, diff = 0, dep = 0;
       list.forEach((c) => { net += c.summary.netSales; diff += c.diff; dep += c.deposit; });
-      $('#clSummary').textContent = list.length + ' tutup kasir · Penjualan bersih ' + formatRp(net) + ' · Setoran ' + formatRp(dep) + ' · Total selisih ' + (diff === 0 ? 'Rp0' : (diff > 0 ? '+' : '-') + formatRp(Math.abs(diff)));
-      $('#clList').innerHTML = list.slice().reverse().map((c) => closingRowHtml(c, true)).join('') || '<div class="muted">Belum ada tutup kasir pada filter ini.</div>';
+      $('#clSummary').textContent = list.length + ' shift ditutup · Penjualan bersih ' + formatRp(net) + ' · Setoran ' + formatRp(dep) + ' · Total selisih ' + (diff === 0 ? 'Rp0' : (diff > 0 ? '+' : '-') + formatRp(Math.abs(diff)));
+      $('#clList').innerHTML = closingTableHtml(list);
     }
 
     function downloadCsv(name, lines) {
@@ -4734,11 +4756,11 @@ function affiliateView_(b) {
     const csvQ = (v) => '"' + String(v ?? '').replace(/"/g, '""') + '"';
 
     function exportClosingsCsv() {
-      const head = ['No', 'Tanggal', 'Kasir', 'Modal Awal', 'Penjualan', 'Penjualan Tunai', 'Penjualan QRIS', 'Penjualan Transfer', 'Penjualan Hutang', 'Refund', 'Penjualan Bersih', 'Bayar Hutang', 'Kas Seharusnya', 'Uang Fisik', 'Selisih', 'Setoran', 'Dibawa', 'Catatan'];
+      const head = ['No', 'Tanggal', 'No Buka', 'Waktu Buka', 'Kasir', 'Modal Awal', 'Penjualan', 'Penjualan Tunai', 'Penjualan QRIS', 'Penjualan Transfer', 'Penjualan Hutang', 'Refund', 'Penjualan Bersih', 'Bayar Hutang', 'Kas Seharusnya', 'Uang Fisik', 'Selisih', 'Setoran', 'Dibawa', 'Catatan'];
       const lines = [head.map(csvQ).join(';')];
       closingFilter().forEach((c) => {
         const s = c.summary;
-        lines.push([c.no, c.date, c.userName, c.opening, s.gross, s.byMethod.Tunai, s.byMethod.QRIS, s.byMethod.Transfer, s.byMethod.Hutang, s.refundTotal, s.netSales, s.payTotal, c.expected, c.counted, c.diff, c.deposit, c.carry, c.note || ''].map(csvQ).join(';'));
+        lines.push([c.no, c.date, c.openNo || '', (opOf(c) || {}).date || '', c.userName, c.opening, s.gross, s.byMethod.Tunai, s.byMethod.QRIS, s.byMethod.Transfer, s.byMethod.Hutang, s.refundTotal, s.netSales, s.payTotal, c.expected, c.counted, c.diff, c.deposit, c.carry, c.note || ''].map(csvQ).join(';'));
       });
       downloadCsv('laporan-tutup-kasir.csv', lines);
     }
