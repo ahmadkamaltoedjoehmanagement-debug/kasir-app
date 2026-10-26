@@ -1383,8 +1383,8 @@ function affiliateView_(b) {
       </div>
       <div class="box">
         <h2>Harga eceran tertinggi (HET)</h2>
-        <div class="muted" style="margin-bottom:8px;">Harga eceran tertinggi dihitung dari harga modal, lalu dibulatkan ke atas. Bila hasilnya lebih rendah dari harga eceran terendah, harga eceran tertinggi disamakan dengan harga eceran terendah. Di Stok Masuk, kolom harga eceran tertinggi terisi otomatis saat harga beli diketik (tetap bisa diubah).</div>
-        <label style="display:flex; gap:8px; align-items:center; margin-bottom:8px;"><input id="hetAutoChk" type="checkbox" style="width:auto;" /><span>Isi harga eceran tertinggi otomatis di Stok Masuk</span></label>
+        <div class="muted" style="margin-bottom:8px;">Harga eceran tertinggi dihitung dari harga modal, lalu dibulatkan ke atas. Bila hasilnya lebih rendah dari harga eceran terendah, harga eceran tertinggi disamakan dengan harga eceran terendah. Di Stok Masuk, harga eceran tertinggi diisi manual dan angka HET tampil sebagai petunjuk di kolomnya. Centang opsi di bawah bila ingin kolom itu terisi otomatis.</div>
+        <label style="display:flex; gap:8px; align-items:center; margin-bottom:8px;"><input id="hetAutoChk" type="checkbox" style="width:auto;" /><span>Isi harga eceran tertinggi otomatis di Stok Masuk (kosongkan centang bila ingin mengisi manual)</span></label>
         <div style="display:flex; flex-wrap:wrap; gap:8px;">
           <label class="muted" style="flex:1 1 150px;">Rumus
             <select id="hetMode"><option value="x">Harga modal × persen</option><option value="div">Harga modal ÷ persen</option></select>
@@ -1819,9 +1819,9 @@ function affiliateView_(b) {
       shiftOpens: [],
       hetPct: 64.73,
       hetMode: 'div',
-      hetVer: 2,
+      hetVer: 3,
       hetRound: 5000,
-      hetAuto: true,
+      hetAuto: false,
       bkseq: 1,
       journals: [],
       jseq: 1,
@@ -1921,7 +1921,8 @@ function affiliateView_(b) {
       if (!state.cseq) state.cseq = 1;
       if (!Array.isArray(state.shiftOpens) || state.shiftOpens === defaultState.shiftOpens) state.shiftOpens = [];
       if (!state.bkseq) state.bkseq = Math.max(1, ...state.shiftOpens.map((o) => (parseInt(String(o.no).replace(/\D/g, ''), 10) || 0) + 1));
-      if (state.hetVer !== 2) { state.hetMode = 'div'; state.hetPct = 64.73; state.hetVer = 2; }
+      if (!(state.hetVer >= 2)) { state.hetMode = 'div'; state.hetPct = 64.73; }
+      if (state.hetVer !== 3) { state.hetAuto = false; state.hetVer = 3; }
       if (!state.jseq) state.jseq = 1;
       if (!state.sseq) state.sseq = 1;
       if (!state.bseq) state.bseq = 1;
@@ -4639,12 +4640,12 @@ function affiliateView_(b) {
       if (!low && prod && Number(prod.price) > 0) low = minPriceOf(prod);
       const het = hetFinal(f.value, low);
       p.placeholder = 'Harga eceran tertinggi' + (het ? ' (HET ' + formatRp(het) + ')' : '');
-      if (state.hetAuto !== false && het && (p.value === '' || p.dataset.auto === '1')) { p.value = het; p.dataset.auto = '1'; }
-      else if (!het && p.dataset.auto === '1') { p.value = ''; p.dataset.auto = ''; }
+      if (state.hetAuto === true && het && (p.value === '' || p.dataset.auto === '1')) { p.value = het; p.dataset.auto = '1'; }
+      else if ((state.hetAuto !== true || !het) && p.dataset.auto === '1') { p.value = ''; p.dataset.auto = ''; }
     }
     function renderHetSettings() {
       if (!$('#hetPct')) return;
-      $('#hetAutoChk').checked = state.hetAuto !== false;
+      $('#hetAutoChk').checked = state.hetAuto === true;
       $('#hetMode').value = state.hetMode === 'div' ? 'div' : 'x';
       $('#hetPct').value = Number(state.hetPct) || 64.73;
       $('#hetRound').value = Number(state.hetRound) || 5000;
