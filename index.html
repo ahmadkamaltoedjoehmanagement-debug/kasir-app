@@ -324,6 +324,7 @@
       <button role="tab" data-tab="produk" aria-selected="false">Produk <span id="outBadge" class="hide" style="background:#b34036; color:#fff; border-radius:10px; padding:1px 7px; font-size:11px; margin-left:4px;">0</span><span id="lowBadge" class="hide" style="background:#d99a2a; color:#fff; border-radius:10px; padding:1px 7px; font-size:11px; margin-left:4px;">0</span></button>
       <button role="tab" data-tab="stok" aria-selected="false">Stok Masuk</button>
       <button role="tab" data-tab="opname" aria-selected="false">Stok Opname</button>
+      <button role="tab" data-tab="stokout" aria-selected="false">Tester &amp; Stok Keluar</button>
       <button role="tab" data-tab="riwayat" aria-selected="false">Riwayat</button>
       <button role="tab" data-tab="member" aria-selected="false">Member</button>
       <button role="tab" data-tab="broadcast" aria-selected="false">Broadcast WA</button>
@@ -508,6 +509,28 @@
         <div class="muted" style="margin-bottom:8px;">Kembalikan barang yang sudah dibeli ke supplier. Stok berkurang, dan nilainya memotong tagihan invoice (kelebihannya dikembalikan supplier sebagai uang).</div>
         <button id="srOpenBtn" class="action">Buat retur supplier</button>
         <div id="srList" style="margin-top:8px;"></div>
+      </div>
+    </section>
+
+    <section id="stokout" class="view">
+      <div class="box">
+        <h2>Tester &amp; stok keluar</h2>
+        <div class="muted" style="margin-bottom:10px;">Catat barang yang berkurang bukan karena dijual: dipakai tester, sampel atau hadiah, rusak, atau hilang. Stok berkurang, dan nilainya (harga modal) dicatat sebagai beban di Jurnal dan Laba rugi, jadi tidak muncul sebagai selisih saat stok opname.</div>
+        <label class="muted" style="display:block;">Produk <select id="skProd"></select></label>
+        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">
+          <label class="muted" style="flex:1 1 100px;">Jumlah<input id="skQty" type="number" min="1" step="1" inputmode="numeric" placeholder="1" /></label>
+          <label class="muted" style="flex:1 1 180px;">Alasan
+            <select id="skReason"><option value="tester">Tester</option><option value="sampel">Sampel / hadiah</option><option value="rusak">Rusak</option><option value="hilang">Hilang</option><option value="lain">Lainnya</option></select>
+          </label>
+        </div>
+        <input id="skNote" placeholder="Catatan (opsional)" autocomplete="off" style="margin-top:8px;" />
+        <div id="skMsg" class="err" role="alert"></div>
+        <button id="skSave" class="action success full">Simpan stok keluar</button>
+      </div>
+      <div class="box" style="margin-top:18px;">
+        <h2>Riwayat bulan ini</h2>
+        <div id="skSummary" style="margin-top:6px;"></div>
+        <div id="skList" style="margin-top:8px;"></div>
       </div>
     </section>
 
@@ -884,6 +907,7 @@
           <button data-rmode="bulanan" aria-pressed="false">Bulanan</button>
           <button data-rmode="aruskas" aria-pressed="false">Arus kas</button>
           <button data-rmode="afiliator" aria-pressed="false">Afiliator</button>
+          <button data-rmode="distributor" aria-pressed="false">Distributor</button>
           <button data-rmode="tutup" aria-pressed="false">Tutup kasir</button>
           <button data-rmode="supplier" aria-pressed="false">Supplier</button>
         </div>
@@ -897,6 +921,17 @@
           <div id="reportStats" class="stats"></div>
           <div id="reportChart" style="margin-top:14px;"></div>
           <div id="reportCashier" style="margin-top:14px;"></div>
+        </div>
+
+        <div id="rpDist" class="hide">
+          <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+            <button id="dsPrev" class="action ghost" aria-label="Sebelumnya">&lsaquo;</button>
+            <input id="dsMonth" type="month" style="max-width:190px;" />
+            <button id="dsNext" class="action ghost" aria-label="Berikutnya">&rsaquo;</button>
+            <button id="dsNow" class="action ghost">Bulan ini</button>
+            <button id="dsAll" class="chip" aria-pressed="false">Semua waktu</button>
+          </div>
+          <div id="dsOut"></div>
         </div>
 
         <div id="rpAff" class="hide">
@@ -1041,7 +1076,8 @@ const SHEET_NAMES = {
   stok_masuk: 'Stok Masuk',
   aktivitas: 'Log Aktivitas',
   buka_kasir: 'Buka Kasir',
-  pendapatan_lain: 'Pendapatan Lain'
+  pendapatan_lain: 'Pendapatan Lain',
+  stok_keluar: 'Stok Keluar'
 };
 
 const HEADERS = {
@@ -1067,7 +1103,8 @@ const HEADERS = {
   stok_masuk: ['Key', 'Perangkat', 'Tanggal', 'No Invoice', 'Supplier', 'Kode', 'Produk', 'Qty', 'Harga Modal', 'Subtotal'],
   aktivitas: ['Key', 'Perangkat', 'Waktu', 'Pengguna', 'Aksi', 'Modul', 'Referensi', 'Detail'],
   buka_kasir: ['Key', 'Perangkat', 'No', 'Tanggal', 'Kasir', 'Modal Awal', 'Kas Shift Sebelumnya', 'Selisih', 'Catatan', 'Ditutup Dengan'],
-  pendapatan_lain: ['Key', 'Perangkat', 'No', 'Tanggal', 'Kategori', 'Diterima di', 'Jumlah', 'Catatan', 'Dicatat oleh']
+  pendapatan_lain: ['Key', 'Perangkat', 'No', 'Tanggal', 'Kategori', 'Diterima di', 'Jumlah', 'Catatan', 'Dicatat oleh'],
+  stok_keluar: ['Key', 'Perangkat', 'No', 'Tanggal', 'Kode', 'Produk', 'Qty', 'Modal Satuan', 'Nilai', 'Alasan', 'Catatan', 'Dicatat oleh']
 };
 
 function doGet(e) {
@@ -1817,6 +1854,8 @@ function affiliateView_(b) {
       closings: [],
       cseq: 1,
       shiftOpens: [],
+      stockOuts: [],
+      koseq: 1,
       hetPct: 64.73,
       hetMode: 'div',
       hetVer: 3,
@@ -1840,12 +1879,14 @@ function affiliateView_(b) {
 
     let state = structuredClone(defaultState);
     let cart = {};
+    let cartPrice = {};
+    const unitPrice = (p) => (Number(cartPrice[p.id]) > 0 ? Number(cartPrice[p.id]) : Number(p.price));
     let paymentType = 'Tunai';
     let currentMember = null;
     let activeStockDraft = [];
     let currentUser = null;
     let currentReceiptTx = null;
-    const KASIR_TABS = ['broadcast', 'online', 'kasir', 'riwayat', 'member', 'preorder', 'request', 'piutang', 'tutup', 'produktivitas'];
+    const KASIR_TABS = ['stokout', 'broadcast', 'online', 'kasir', 'riwayat', 'member', 'preorder', 'request', 'piutang', 'tutup', 'produktivitas'];
     const canRefund = () => !!currentUser && (currentUser.role === 'owner' || !!state.kasirRefund);
     const nowLabel = () => new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
     const debtPaid = (d) => (d.payments || []).reduce((a, p) => a + Number(p.amount || 0), 0);
@@ -1920,6 +1961,8 @@ function affiliateView_(b) {
       state.products.forEach((p) => { if (p.minPrice === undefined || p.minPrice === null || p.minPrice === '') p.minPrice = Number(p.price) || 0; });
       if (!state.cseq) state.cseq = 1;
       if (!Array.isArray(state.shiftOpens) || state.shiftOpens === defaultState.shiftOpens) state.shiftOpens = [];
+      if (!Array.isArray(state.stockOuts) || state.stockOuts === defaultState.stockOuts) state.stockOuts = [];
+      if (!state.koseq) state.koseq = Math.max(1, ...state.stockOuts.map((o) => (parseInt(String(o.no).replace(/\D/g, ''), 10) || 0) + 1));
       if (!state.bkseq) state.bkseq = Math.max(1, ...state.shiftOpens.map((o) => (parseInt(String(o.no).replace(/\D/g, ''), 10) || 0) + 1));
       if (!(state.hetVer >= 2)) { state.hetMode = 'div'; state.hetPct = 64.73; }
       if (state.hetVer !== 3) { state.hetAuto = false; state.hetVer = 3; }
@@ -1947,7 +1990,7 @@ function affiliateView_(b) {
       ['refunds', 'Refund', (r) => r.no], ['debts', 'Piutang', (r) => r.id], ['stockHistory', 'Stok masuk', (r) => r.no],
       ['supReturns', 'Retur supplier', (r) => r.no], ['closings', 'Tutup kasir', (r) => r.no], ['journals', 'Jurnal/Biaya', (r) => r.no],
       ['preorders', 'Pre order', (r) => r.no || r.id], ['requests', 'Request produk', (r) => r.no || r.id], ['opnames', 'Stok opname', (r) => r.no || r.id],
-      ['shiftOpens', 'Buka kasir', (r) => r.no], ['users', 'Akun kasir', (r) => r.id], ['affiliates', 'Afiliator', (r) => r.id], ['affPaid', 'Bayar komisi', (r) => r.id]
+      ['shiftOpens', 'Buka kasir', (r) => r.no], ['stockOuts', 'Stok keluar', (r) => r.no], ['users', 'Akun kasir', (r) => r.id], ['affiliates', 'Afiliator', (r) => r.id], ['affPaid', 'Bayar komisi', (r) => r.id]
     ];
     const ACT_SECRET = ['pin', 'token', 'ownerPin', 'password'];
     let actPrev = null;
@@ -2056,13 +2099,13 @@ function affiliateView_(b) {
       Object.entries(cart).forEach(([id, qty]) => {
         const p = getProductById(id);
         if (!p) return;
-        sub += Number(p.price) * Number(qty);
+        sub += unitPrice(p) * Number(qty);
       });
       Object.entries(cart).forEach(([id, qty]) => {
         const p = getProductById(id);
         if (!p || !Number(p.price)) return;
         // diskon dibagi proporsional ke tiap item, jadi tiap item tidak boleh turun di bawah harga eceran terendahnya
-        const cap = sub * (Number(p.price) - minPriceOf(p)) / Number(p.price);
+        const cap = sub * Math.max(0, unitPrice(p) - minPriceOf(p)) / unitPrice(p);
         maxDisc = Math.min(maxDisc, Math.floor(cap + 1e-6));
       });
       if (!Number.isFinite(maxDisc)) maxDisc = 0;
@@ -2097,9 +2140,11 @@ function affiliateView_(b) {
       state.products.forEach((p) => {
         const qty = cart[p.id] || 0;
         if (!qty) return;
-        sub += Number(p.price) * qty;
+        const unit = unitPrice(p), custom = Number(cartPrice[p.id]) > 0;
+        sub += unit * qty;
         html += '<div class="line">' +
-          '<div class="n"><b>' + escapeHtml(p.name) + '</b><small>' + formatRp(p.price) + ' x ' + qty + '</small></div>' +
+          '<div class="n"><b>' + escapeHtml(p.name) + '</b><small>Rp <input class="cprice" data-cprice="' + p.id + '" type="number" inputmode="numeric" min="0" value="' + unit + '" style="width:120px; padding:4px 6px;" aria-label="Harga jual ' + escapeHtml(p.name) + '" /> x ' + qty + (custom ? ' · harga manual' : '') + '</small>' +
+          '<small class="muted">Rentang harga ' + formatRp(minPriceOf(p)) + ' - ' + formatRp(p.price) + '</small></div>' +
           '<div class="q"><button data-change="-' + p.id + '">-</button><b>' + qty + '</b><button data-change="+' + p.id + '">+</button></div>' +
           '</div>';
       });
@@ -3134,6 +3179,94 @@ function affiliateView_(b) {
         hist.map((h) => '<tr><td>' + MONN[Number(h.ym.slice(5)) - 1] + ' ' + h.ym.slice(0, 4) + '</td><td class="num">' + formatRp(h.inn) + '</td><td class="num hm">-' + formatRp(h.out) + '</td><td class="num"><b>' + signed(h.net) + '</b></td><td class="num hm">' + signed(h.end) + '</td></tr>').join('') + '</tbody></table></div>' +
         '<div class="muted" style="margin-top:8px;">Arus kas dihitung dari jurnal: semua uang yang masuk dan keluar lewat akun Kas dan Bank &amp; E-Wallet. Penjualan hutang dan pembelian yang belum dibayar baru terhitung saat dibayar.</div>';
     }
+    // ===== Tester & stok keluar =====
+    const SO_REASON = { tester: 'Tester', sampel: 'Sampel / hadiah', rusak: 'Rusak', hilang: 'Hilang', lain: 'Lainnya' };
+    function renderStockOut() {
+      if (!$('#skProd')) return;
+      const keep = $('#skProd').value;
+      $('#skProd').innerHTML = '<option value="">Pilih produk</option>' + state.products.filter((p) => Number(p.stock || 0) > 0).map((p) => '<option value="' + p.id + '">' + escapeHtml(p.name) + (p.code ? ' (' + escapeHtml(p.code) + ')' : '') + ' · stok ' + Number(p.stock) + '</option>').join('');
+      $('#skProd').value = keep;
+      const month = localISODate().slice(0, 7), list = state.stockOuts.filter((o) => String(o.day).slice(0, 7) === month).slice().reverse();
+      const owner = !!currentUser && currentUser.role === 'owner', per = {};
+      list.forEach((o) => { per[o.reason] = (per[o.reason] || 0) + Number(o.value || 0); });
+      $('#skSummary').innerHTML = '<div class="stats"><div class="stat"><span>Nilai stok keluar</span><b>' + formatRp(list.reduce((t, o) => t + Number(o.value || 0), 0)) + '</b></div>' +
+        Object.keys(per).map((r) => '<div class="stat"><span>' + escapeHtml(SO_REASON[r] || r) + '</span><b>' + formatRp(per[r]) + '</b></div>').join('') + '</div>';
+      $('#skList').innerHTML = list.map((o) => '<div class="line"><div class="n"><b>' + escapeHtml(o.name) + ' x' + o.qty + '</b><small>' + escapeHtml(o.date) + ' · ' + escapeHtml(o.no) + ' · ' + escapeHtml(SO_REASON[o.reason] || o.reason) + (o.note ? ' · ' + escapeHtml(o.note) : '') + '</small></div>' +
+        '<div class="q"><b>' + formatRp(o.value) + '</b>' + (owner ? '<button class="lnk" data-sk-del="' + o.no + '">Hapus</button>' : '') + '</div></div>').join('') || '<div class="muted">Belum ada stok keluar bulan ini.</div>';
+    }
+    function saveStockOut() {
+      const err = $('#skMsg');
+      err.style.color = '';
+      const p = getProductById($('#skProd').value), qty = Math.floor(Number($('#skQty').value));
+      if (!p) { err.textContent = 'Pilih produk.'; return; }
+      if (!(qty > 0)) { err.textContent = 'Jumlah harus lebih dari 0.'; return; }
+      if (qty > Number(p.stock || 0)) { err.textContent = 'Jumlah melebihi stok (' + Number(p.stock || 0) + ').'; return; }
+      const cost = Number(p.cost || 0), value = Math.round(cost * qty);
+      state.stockOuts.push({ no: 'SK-' + String(state.koseq++).padStart(4, '0'), id: p.id, code: p.code, name: p.name, qty, cost, value, reason: $('#skReason').value, note: $('#skNote').value.trim(), date: nowLabel(), day: localISODate(), ts: Date.now(), by: currentUser ? currentUser.name : '' });
+      p.stock = Number(p.stock || 0) - qty;
+      saveState();
+      $('#skQty').value = '';
+      $('#skNote').value = '';
+      renderStockOut();
+      renderProductGrid();
+      err.style.color = 'var(--accent)';
+      err.textContent = 'Tersimpan: ' + p.name + ' x' + qty + ' (' + formatRp(value) + ').';
+      setTimeout(() => { err.textContent = ''; err.style.color = ''; }, 4000);
+    }
+    function deleteStockOut(no) {
+      if (!currentUser || currentUser.role !== 'owner') return;
+      const o = state.stockOuts.find((x) => x.no === no);
+      if (!o) return;
+      askDel({ title: 'Hapus ' + no + '?', body: o.name + ' x' + o.qty + ' (' + formatRp(o.value) + ')\n\nStok produk dikembalikan sebesar jumlah ini, dan beban di jurnal ikut hilang.', yes: 'Hapus', onYes: () => {
+        const p = getProductById(o.id);
+        if (p) p.stock = Number(p.stock || 0) + Number(o.qty);
+        state.stockOuts = state.stockOuts.filter((x) => x !== o);
+        saveState();
+        renderStockOut();
+        renderProductGrid();
+      } });
+    }
+
+    // ===== Laporan penjualan per distributor =====
+    let dsAll = false;
+    function distMap() {
+      const m = {};
+      (state.stockHistory || []).forEach((e) => { if (e.supplier) (e.items || []).forEach((it) => { m[it.id] = e.supplier; }); });
+      return m;
+    }
+    function renderDistReport() {
+      const ym = $('#dsMonth').value || localISODate().slice(0, 7), map = distMap(), NONE = '(Tanpa distributor)', per = {};
+      const inPeriod = (day) => dsAll || String(day).slice(0, 7) === ym;
+      const row = (n) => (per[n] = per[n] || { name: n, qty: 0, sales: 0, cost: 0, tester: 0, items: new Set() });
+      state.history.forEach((tx) => {
+        if (!inPeriod(tx.day)) return;
+        (tx.items || []).forEach((it) => {
+          const r = row(map[it.id] || NONE);
+          const q = Number(it.qty || 0);
+          r.qty += q; r.sales += q * Number(it.price || 0); r.cost += q * Number(it.cost || 0); r.items.add(it.name);
+        });
+      });
+      state.stockOuts.forEach((o) => { if (inPeriod(o.day)) row(map[o.id] || NONE).tester += Number(o.value || 0); });
+      const list = Object.values(per).sort((a, b) => b.sales - a.sales), tot = list.reduce((t, r) => ({ qty: t.qty + r.qty, sales: t.sales + r.sales, cost: t.cost + r.cost, tester: t.tester + r.tester }), { qty: 0, sales: 0, cost: 0, tester: 0 });
+      const pct = (a, b) => (b ? (a / b * 100).toFixed(1).replace('.', ',') + '%' : '-');
+      const stat = (l, v) => '<div class="stat"><span>' + l + '</span><b>' + v + '</b></div>';
+      $('#dsMonth').disabled = dsAll;
+      $('#dsAll').setAttribute('aria-pressed', String(dsAll));
+      $('#dsOut').innerHTML = '<h2 style="margin-top:14px;">' + (dsAll ? 'Semua waktu' : MONN[Number(ym.slice(5)) - 1] + ' ' + ym.slice(0, 4)) + '</h2><div class="stats">' +
+        stat('Penjualan', formatRp(tot.sales)) + stat('Modal terjual', formatRp(tot.cost)) + stat('Laba kotor', formatRp(tot.sales - tot.cost)) + stat('Margin', pct(tot.sales - tot.cost, tot.sales)) +
+        stat('Tester & stok keluar', formatRp(tot.tester)) + stat('Laba setelah tester', formatRp(tot.sales - tot.cost - tot.tester)) + '</div>' +
+        '<h2 style="margin-top:14px;">Porsi penjualan per distributor</h2>' + hBars(list.map((r) => [r.name, r.sales, formatRp(r.sales) + ' · ' + pct(r.sales, tot.sales)])) +
+        (list.length ? '<div style="overflow-x:auto; margin-top:10px;"><table class="tbl" style="min-width:720px;"><thead><tr><th>Distributor</th><th class="num">Produk</th><th class="num">Qty</th><th class="num">Penjualan</th><th class="num">Modal</th><th class="num">Laba kotor</th><th class="num">Margin</th><th class="num">Tester</th></tr></thead><tbody>' +
+          list.map((r) => '<tr><td>' + escapeHtml(r.name) + '</td><td class="num">' + r.items.size + '</td><td class="num">' + r.qty + '</td><td class="num">' + formatRp(r.sales) + '</td><td class="num">' + formatRp(r.cost) + '</td><td class="num"><b>' + formatRp(r.sales - r.cost) + '</b></td><td class="num">' + pct(r.sales - r.cost, r.sales) + '</td><td class="num">' + formatRp(r.tester) + '</td></tr>').join('') + '</tbody></table></div>' : '<div class="muted" style="margin-top:8px;">Belum ada penjualan pada periode ini.</div>') +
+        '<div class="muted" style="margin-top:8px;">Distributor produk diambil dari invoice Stok Masuk terakhir yang memuat produk itu. Produk yang belum pernah masuk lewat Stok Masuk dihitung sebagai "(Tanpa distributor)". Angka belum dikurangi refund.</div>';
+    }
+    function shiftDistMonth(dir) {
+      const [y, m] = ($('#dsMonth').value || localISODate().slice(0, 7)).split('-').map(Number), dt = new Date(y, m - 1 + dir, 1);
+      $('#dsMonth').value = dt.getFullYear() + '-' + pad2(dt.getMonth() + 1);
+      dsAll = false;
+      renderDistReport();
+    }
+
     // ===== Laporan pendapatan afiliator =====
     async function renderAffReport() {
       const msg = $('#rpAffMsg');
@@ -3734,6 +3867,7 @@ function affiliateView_(b) {
         add('aktivitas', l.id, { Waktu: d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes()) + ':' + p2(d.getSeconds()), Pengguna: l.user, Aksi: l.act, Modul: l.mod, Referensi: l.ref, Detail: l.detail });
       });
       (state.shiftOpens || []).forEach((o) => add('buka_kasir', o.no, { No: o.no, Tanggal: o.date, Kasir: o.userName, 'Modal Awal': o.opening, 'Kas Shift Sebelumnya': o.expectedCarry, Selisih: o.diff, Catatan: o.note || '', 'Ditutup Dengan': o.closedNo || '' }));
+      state.stockOuts.forEach((o) => add('stok_keluar', o.no, { No: o.no, Tanggal: o.date, Kode: o.code || '', Produk: o.name, Qty: o.qty, 'Modal Satuan': o.cost, Nilai: o.value, Alasan: SO_REASON[o.reason] || o.reason, Catatan: o.note || '', 'Dicatat oleh': o.by || '' }));
       state.members.forEach((m) => add('member', m.id, { Nama: m.name, Telepon: m.phone, 'Tgl Lahir': m.dob || '', 'Batas Hutang': Number(m.limit || 0), Poin: Number(m.points || 0) }));
       state.history.forEach((tx) => add('penjualan', tx.no, {
         No: tx.no, Tanggal: tx.date, Hari: tx.day || '', Kasir: tx.cashier || '', Member: tx.member ? tx.member.name : '',
@@ -4228,6 +4362,7 @@ function affiliateView_(b) {
       { code: '6-1300', name: 'Beban Listrik, Air & Internet', normal: 'D' },
       { code: '6-1400', name: 'Beban Transportasi & Kirim', normal: 'D' },
       { code: '6-1500', name: 'Beban Pemasaran', normal: 'D' },
+      { code: '6-1800', name: 'Beban Tester & Stok Keluar', normal: 'D' },
       { code: '6-1900', name: 'Beban Operasional Lain', normal: 'D' },
       { code: '6-9100', name: 'Selisih Kas', normal: 'D' },
       { code: '6-9200', name: 'Selisih Stok (Opname)', normal: 'D' }
@@ -4237,7 +4372,7 @@ function affiliateView_(b) {
     const accName = (c) => (COA_MAP[c] ? COA_MAP[c].name : c);
     const JR_GROUPS = {
       preorder: ['Pre order (DP)', 'info'], penjualan: ['Penjualan', 'ok'], refund: ['Refund', 'bad'], bayar_hutang: ['Bayar hutang', 'ok'],
-      invoice: ['Barang masuk', 'info'], bayar_invoice: ['Bayar supplier', 'part'], retur_beli: ['Retur supplier', 'bad'], selisih: ['Selisih kas', 'bad'], opname: ['Stok opname', 'info'], manual: ['Manual', 'part']
+      invoice: ['Barang masuk', 'info'], bayar_invoice: ['Bayar supplier', 'part'], retur_beli: ['Retur supplier', 'bad'], selisih: ['Selisih kas', 'bad'], opname: ['Stok opname', 'info'], stokout: ['Tester & stok keluar', 'bad'], manual: ['Manual', 'part']
     };
     const ID_MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, mei: 5, jun: 6, jul: 7, agu: 8, agt: 8, sep: 9, okt: 10, nov: 11, des: 12 };
     let jrLimit = 100;
@@ -4338,6 +4473,11 @@ function affiliateView_(b) {
         const d = Math.abs(v);
         add('opname', o.no, o.day, o.ts, 'Stok opname ' + o.no + (v < 0 ? ' (kurang)' : ' (lebih)'),
           v < 0 ? [{ acc: '6-9200', debit: d }, { acc: '1-1400', credit: d }] : [{ acc: '1-1400', debit: d }, { acc: '6-9200', credit: d }]);
+      });
+      state.stockOuts.forEach((o) => {
+        const v = Math.round(Number(o.value || 0));
+        if (!v) return;
+        add('stokout', o.no, o.day, o.ts, 'Stok keluar ' + o.no + ' · ' + (SO_REASON[o.reason] || o.reason) + ' · ' + o.name + ' x' + o.qty, [{ acc: '6-1800', debit: v }, { acc: '1-1400', credit: v }]);
       });
       state.journals.forEach((j) => {
         add('manual', j.no, j.date, j.ts, j.memo, j.lines, { manualId: j.id });
@@ -5049,6 +5189,11 @@ function affiliateView_(b) {
       $('#rpPeriod').classList.toggle('hide', mode !== 'mingguan' && mode !== 'bulanan');
       $('#rpCash').classList.toggle('hide', mode !== 'aruskas');
       $('#rpAff').classList.toggle('hide', mode !== 'afiliator');
+      $('#rpDist').classList.toggle('hide', mode !== 'distributor');
+      if (mode === 'distributor') {
+        if (!$('#dsMonth').value) $('#dsMonth').value = localISODate().slice(0, 7);
+        renderDistReport();
+      }
       if (mode === 'afiliator') {
         if (!$('#rfMonth').value) $('#rfMonth').value = localISODate().slice(0, 7);
         renderAffReport();
@@ -5527,12 +5672,14 @@ function affiliateView_(b) {
       const items = Object.entries(cart).map(([id, qty]) => {
         const p = getProductById(id);
         if (!p) return null;
-        return { id: p.id, name: p.name, code: p.code, qty: Number(qty), price: Number(p.price), cost: Number(p.cost || 0) };
+        return { id: p.id, name: p.name, code: p.code, qty: Number(qty), price: unitPrice(p), cost: Number(p.cost || 0) };
       }).filter(Boolean);
       if (!items.length) {
         $('#saleErr').textContent = 'Pesanan masih kosong.';
         return;
       }
+      const outRange = items.find((it) => { const p = getProductById(it.id); return p && Number(cartPrice[it.id]) > 0 && (it.price < minPriceOf(p) || it.price > Number(p.price)); });
+      if (outRange) { $('#saleErr').textContent = 'Harga ' + outRange.name + ' di luar rentang harga eceran.'; return; }
       const noPrice = items.filter((it) => !(it.price > 0));
       if (noPrice.length) {
         $('#saleErr').textContent = 'Harga belum diisi untuk: ' + noPrice.map((it) => it.name).join(', ') + '. Isi lewat Stok Masuk atau Ubah produk.';
@@ -5631,6 +5778,7 @@ function affiliateView_(b) {
       renderProductList();
       renderDebts();
       cart = {};
+      cartPrice = {};
       $('#discount').value = '';
       $('#pointUse').value = '';
       $('#cashInput').value = '';
@@ -6042,6 +6190,7 @@ function affiliateView_(b) {
 
     function clearCart() {
       cart = {};
+      cartPrice = {};
       renderCart();
     }
 
@@ -6200,7 +6349,7 @@ function affiliateView_(b) {
     // ===== Menu per kategori =====
     const NAV_CATS = [
       ['Penjualan', '🛒', ['kasir', 'tutup', 'riwayat', 'preorder', 'online', 'request']],
-      ['Produk & Stok', '📦', ['produk', 'stok', 'opname']],
+      ['Produk & Stok', '📦', ['produk', 'stok', 'stokout', 'opname']],
       ['Pelanggan', '👥', ['member', 'broadcast', 'afiliator', 'piutang']],
       ['Keuangan', '💰', ['laporan', 'biaya', 'jurnal']],
       ['Lainnya', '⚙️', ['produktivitas', 'pengaturan']]
@@ -6246,6 +6395,7 @@ function affiliateView_(b) {
       if (currentUser) { logAct('Logout', 'Akun', currentUser.name, 'Keluar / kunci aplikasi'); saveState(); }
       currentUser = null;
       cart = {};
+      cartPrice = {};
       currentMember = null;
       $('#memberSelected').classList.add('hide');
       $('#memberSelected').innerHTML = '';
@@ -7842,8 +7992,23 @@ function affiliateView_(b) {
         const op = value.startsWith('+') ? 1 : -1;
         const id = value.slice(1);
         cart[id] = (cart[id] || 0) + op;
-        if ((cart[id] || 0) <= 0) delete cart[id];
+        if ((cart[id] || 0) <= 0) { delete cart[id]; delete cartPrice[id]; }
         renderCart();
+      });
+      $('#cartList').addEventListener('change', (e) => {
+        const inp = e.target.closest('[data-cprice]');
+        if (!inp) return;
+        const p = getProductById(inp.dataset.cprice), err = $('#saleErr'), v = Math.round(cleanNum(inp.value));
+        if (!p) return;
+        if (!(v > 0) || v === Number(p.price)) delete cartPrice[p.id];
+        else if (v < minPriceOf(p) || v > Number(p.price)) {
+          err.textContent = 'Harga ' + p.name + ' harus antara ' + formatRp(minPriceOf(p)) + ' dan ' + formatRp(p.price) + '.';
+          setTimeout(renderCart, 0);
+          return;
+        } else cartPrice[p.id] = v;
+        err.textContent = '';
+        // render ditunda: mengganti isi daftar saat kolom kehilangan fokus bisa memicu error DOM
+        setTimeout(renderCart, 0);
       });
       $('#discount').addEventListener('input', renderCart);
       $('#discMode').addEventListener('change', () => { $('#discount').value = ''; renderCart(); });
@@ -7910,6 +8075,13 @@ function affiliateView_(b) {
       initBirthdayFilters();
       ['#mbMonth', '#mbDay'].forEach((sel) => $(sel).addEventListener('change', () => { bdWeek = false; renderMembers(); }));
       document.querySelectorAll('[data-bd-preset]').forEach((b) => b.addEventListener('click', () => setBirthdayPreset(b.dataset.bdPreset)));
+      $('#skSave').addEventListener('click', saveStockOut);
+      $('#skList').addEventListener('click', (e) => { const b = e.target.closest('[data-sk-del]'); if (b) deleteStockOut(b.dataset.skDel); });
+      $('#dsPrev').addEventListener('click', () => shiftDistMonth(-1));
+      $('#dsNext').addEventListener('click', () => shiftDistMonth(1));
+      $('#dsNow').addEventListener('click', () => { $('#dsMonth').value = localISODate().slice(0, 7); dsAll = false; renderDistReport(); });
+      $('#dsAll').addEventListener('click', () => { dsAll = !dsAll; renderDistReport(); });
+      $('#dsMonth').addEventListener('change', () => { dsAll = false; renderDistReport(); });
       $('#rfPrev').addEventListener('click', () => shiftAffMonth(-1));
       $('#rfNext').addEventListener('click', () => shiftAffMonth(1));
       $('#rfNow').addEventListener('click', () => { $('#rfMonth').value = localISODate().slice(0, 7); drawAffReport(); });
@@ -8225,6 +8397,7 @@ function affiliateView_(b) {
           if (tab === 'opname') renderOpname();
           if (tab === 'biaya') renderBiaya();
           if (tab === 'online') renderOnline();
+          if (tab === 'stokout') renderStockOut();
           if (tab === 'pengaturan') { $('#reqOpen').checked = state.requireOpen !== false; renderHetSettings(); }
           if (tab === 'afiliator') renderAfiliator();
           if (tab === 'broadcast') renderBroadcast();
