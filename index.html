@@ -907,7 +907,6 @@
           <button data-rmode="bulanan" aria-pressed="false">Bulanan</button>
           <button data-rmode="aruskas" aria-pressed="false">Arus kas</button>
           <button data-rmode="afiliator" aria-pressed="false">Afiliator</button>
-          <button data-rmode="distributor" aria-pressed="false">Distributor</button>
           <button data-rmode="tutup" aria-pressed="false">Tutup kasir</button>
           <button data-rmode="supplier" aria-pressed="false">Supplier</button>
         </div>
@@ -921,17 +920,6 @@
           <div id="reportStats" class="stats"></div>
           <div id="reportChart" style="margin-top:14px;"></div>
           <div id="reportCashier" style="margin-top:14px;"></div>
-        </div>
-
-        <div id="rpDist" class="hide">
-          <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
-            <button id="dsPrev" class="action ghost" aria-label="Sebelumnya">&lsaquo;</button>
-            <input id="dsMonth" type="month" style="max-width:190px;" />
-            <button id="dsNext" class="action ghost" aria-label="Berikutnya">&rsaquo;</button>
-            <button id="dsNow" class="action ghost">Bulan ini</button>
-            <button id="dsAll" class="chip" aria-pressed="false">Semua waktu</button>
-          </div>
-          <div id="dsOut"></div>
         </div>
 
         <div id="rpAff" class="hide">
@@ -1417,19 +1405,6 @@ function affiliateView_(b) {
           <span>Wajib buka kasir sebelum berjualan</span>
         </label>
         <div class="muted" style="margin-top:6px;">Bila dicentang, penjualan, refund, pembayaran piutang, serta DP, pelunasan, dan pengembalian DP pre order ditolak sampai kasir dibuka (isi modal awal) di tab Buka/Tutup Kasir.</div>
-      </div>
-      <div class="box">
-        <h2>Harga eceran tertinggi (HET)</h2>
-        <div class="muted" style="margin-bottom:8px;">Harga eceran tertinggi dihitung dari harga modal, lalu dibulatkan ke atas. Bila hasilnya lebih rendah dari harga eceran terendah, harga eceran tertinggi disamakan dengan harga eceran terendah. Di Stok Masuk, harga eceran tertinggi diisi manual dan angka HET tampil sebagai petunjuk di kolomnya. Centang opsi di bawah bila ingin kolom itu terisi otomatis.</div>
-        <label style="display:flex; gap:8px; align-items:center; margin-bottom:8px;"><input id="hetAutoChk" type="checkbox" style="width:auto;" /><span>Isi harga eceran tertinggi otomatis di Stok Masuk (kosongkan centang bila ingin mengisi manual)</span></label>
-        <div style="display:flex; flex-wrap:wrap; gap:8px;">
-          <label class="muted" style="flex:1 1 150px;">Rumus
-            <select id="hetMode"><option value="x">Harga modal × persen</option><option value="div">Harga modal ÷ persen</option></select>
-          </label>
-          <label class="muted" style="flex:1 1 110px;">Persen (%)<input id="hetPct" type="number" min="1" step="0.01" inputmode="decimal" /></label>
-          <label class="muted" style="flex:1 1 150px;">Dibulatkan ke atas, kelipatan (Rp)<input id="hetRound" type="number" min="1" step="1" inputmode="numeric" /></label>
-        </div>
-        <div id="hetExample" class="muted" style="margin-top:8px;"></div>
       </div>
       <div class="box" style="border:1px solid #e3b4af;">
         <h2 style="color:#b34036;">Zona berbahaya</h2>
@@ -3227,46 +3202,6 @@ function affiliateView_(b) {
       } });
     }
 
-    // ===== Laporan penjualan per distributor =====
-    let dsAll = false;
-    function distMap() {
-      const m = {};
-      (state.stockHistory || []).forEach((e) => { if (e.supplier) (e.items || []).forEach((it) => { m[it.id] = e.supplier; }); });
-      return m;
-    }
-    function renderDistReport() {
-      const ym = $('#dsMonth').value || localISODate().slice(0, 7), map = distMap(), NONE = '(Tanpa distributor)', per = {};
-      const inPeriod = (day) => dsAll || String(day).slice(0, 7) === ym;
-      const row = (n) => (per[n] = per[n] || { name: n, qty: 0, sales: 0, cost: 0, tester: 0, items: new Set() });
-      state.history.forEach((tx) => {
-        if (!inPeriod(tx.day)) return;
-        (tx.items || []).forEach((it) => {
-          const r = row(map[it.id] || NONE);
-          const q = Number(it.qty || 0);
-          r.qty += q; r.sales += q * Number(it.price || 0); r.cost += q * Number(it.cost || 0); r.items.add(it.name);
-        });
-      });
-      state.stockOuts.forEach((o) => { if (inPeriod(o.day)) row(map[o.id] || NONE).tester += Number(o.value || 0); });
-      const list = Object.values(per).sort((a, b) => b.sales - a.sales), tot = list.reduce((t, r) => ({ qty: t.qty + r.qty, sales: t.sales + r.sales, cost: t.cost + r.cost, tester: t.tester + r.tester }), { qty: 0, sales: 0, cost: 0, tester: 0 });
-      const pct = (a, b) => (b ? (a / b * 100).toFixed(1).replace('.', ',') + '%' : '-');
-      const stat = (l, v) => '<div class="stat"><span>' + l + '</span><b>' + v + '</b></div>';
-      $('#dsMonth').disabled = dsAll;
-      $('#dsAll').setAttribute('aria-pressed', String(dsAll));
-      $('#dsOut').innerHTML = '<h2 style="margin-top:14px;">' + (dsAll ? 'Semua waktu' : MONN[Number(ym.slice(5)) - 1] + ' ' + ym.slice(0, 4)) + '</h2><div class="stats">' +
-        stat('Penjualan', formatRp(tot.sales)) + stat('Modal terjual', formatRp(tot.cost)) + stat('Laba kotor', formatRp(tot.sales - tot.cost)) + stat('Margin', pct(tot.sales - tot.cost, tot.sales)) +
-        stat('Tester & stok keluar', formatRp(tot.tester)) + stat('Laba setelah tester', formatRp(tot.sales - tot.cost - tot.tester)) + '</div>' +
-        '<h2 style="margin-top:14px;">Porsi penjualan per distributor</h2>' + hBars(list.map((r) => [r.name, r.sales, formatRp(r.sales) + ' · ' + pct(r.sales, tot.sales)])) +
-        (list.length ? '<div style="overflow-x:auto; margin-top:10px;"><table class="tbl" style="min-width:720px;"><thead><tr><th>Distributor</th><th class="num">Produk</th><th class="num">Qty</th><th class="num">Penjualan</th><th class="num">Modal</th><th class="num">Laba kotor</th><th class="num">Margin</th><th class="num">Tester</th></tr></thead><tbody>' +
-          list.map((r) => '<tr><td>' + escapeHtml(r.name) + '</td><td class="num">' + r.items.size + '</td><td class="num">' + r.qty + '</td><td class="num">' + formatRp(r.sales) + '</td><td class="num">' + formatRp(r.cost) + '</td><td class="num"><b>' + formatRp(r.sales - r.cost) + '</b></td><td class="num">' + pct(r.sales - r.cost, r.sales) + '</td><td class="num">' + formatRp(r.tester) + '</td></tr>').join('') + '</tbody></table></div>' : '<div class="muted" style="margin-top:8px;">Belum ada penjualan pada periode ini.</div>') +
-        '<div class="muted" style="margin-top:8px;">Distributor produk diambil dari invoice Stok Masuk terakhir yang memuat produk itu. Produk yang belum pernah masuk lewat Stok Masuk dihitung sebagai "(Tanpa distributor)". Angka belum dikurangi refund.</div>';
-    }
-    function shiftDistMonth(dir) {
-      const [y, m] = ($('#dsMonth').value || localISODate().slice(0, 7)).split('-').map(Number), dt = new Date(y, m - 1 + dir, 1);
-      $('#dsMonth').value = dt.getFullYear() + '-' + pad2(dt.getMonth() + 1);
-      dsAll = false;
-      renderDistReport();
-    }
-
     // ===== Laporan pendapatan afiliator =====
     async function renderAffReport() {
       const msg = $('#rpAffMsg');
@@ -3376,7 +3311,6 @@ function affiliateView_(b) {
       if (price > 0 && minRaw === '') minPrice = priced ? Math.min(minPriceOf(product), price) : price;
       activeStockDraft.push({ id: product.id, name: product.name, code: product.code, qty, cost, price, minPrice });
       ['#stockProductSearch', '#stockQty', '#stockCost', '#stockPrice', '#stockMinPrice'].forEach((s) => { $(s).value = ''; });
-      $('#stockPrice').dataset.auto = '';
       hetRefresh();
       $('#stockPriceHint').textContent = '';
       msg.textContent = '';
@@ -4771,7 +4705,6 @@ function affiliateView_(b) {
       return Math.ceil(raw / step - 1e-9) * step;
     }
     const hetFinal = (cost, low) => { const b = hetCalc(cost); return b ? Math.max(b, Number(low) || 0) : 0; };
-    const hetText = () => (state.hetMode === 'div' ? 'modal ÷ ' : 'modal × ') + String(Number(state.hetPct) || 64.73).replace('.', ',') + '%';
     function hetRefresh() {
       const f = $('#stockCost'), p = $('#stockPrice');
       if (!f || !p) return;
@@ -4780,16 +4713,6 @@ function affiliateView_(b) {
       if (!low && prod && Number(prod.price) > 0) low = minPriceOf(prod);
       const het = hetFinal(f.value, low);
       p.placeholder = 'Harga eceran tertinggi' + (het ? ' (HET ' + formatRp(het) + ')' : '');
-      if (state.hetAuto === true && het && (p.value === '' || p.dataset.auto === '1')) { p.value = het; p.dataset.auto = '1'; }
-      else if ((state.hetAuto !== true || !het) && p.dataset.auto === '1') { p.value = ''; p.dataset.auto = ''; }
-    }
-    function renderHetSettings() {
-      if (!$('#hetPct')) return;
-      $('#hetAutoChk').checked = state.hetAuto === true;
-      $('#hetMode').value = state.hetMode === 'div' ? 'div' : 'x';
-      $('#hetPct').value = Number(state.hetPct) || 64.73;
-      $('#hetRound').value = Number(state.hetRound) || 5000;
-      $('#hetExample').textContent = 'Contoh: harga modal ' + formatRp(1000000) + ' → harga eceran tertinggi ' + formatRp(hetCalc(1000000)) + ' (' + hetText() + ', dibulatkan ke atas).';
     }
     const NEED_OPEN_MSG = 'Kasir belum dibuka. Buka kasir dulu di tab Buka/Tutup Kasir.';
     const needOpenShift = () => state.requireOpen !== false && !!currentUser && !currentOpen(currentUser);
@@ -5189,11 +5112,6 @@ function affiliateView_(b) {
       $('#rpPeriod').classList.toggle('hide', mode !== 'mingguan' && mode !== 'bulanan');
       $('#rpCash').classList.toggle('hide', mode !== 'aruskas');
       $('#rpAff').classList.toggle('hide', mode !== 'afiliator');
-      $('#rpDist').classList.toggle('hide', mode !== 'distributor');
-      if (mode === 'distributor') {
-        if (!$('#dsMonth').value) $('#dsMonth').value = localISODate().slice(0, 7);
-        renderDistReport();
-      }
       if (mode === 'afiliator') {
         if (!$('#rfMonth').value) $('#rfMonth').value = localISODate().slice(0, 7);
         renderAffReport();
@@ -8042,7 +7960,7 @@ function affiliateView_(b) {
           $('#epBrand').value = prod.brand || '';
           $('#epCategory').value = prod.category || '';
           $('#epPrice').value = Number(prod.price) || '';
-          { const het = hetFinal(prod.cost, prod.minPrice), hb = $('#epHet'); hb.classList.toggle('hide', !het); hb.textContent = 'Isi dari modal: ' + formatRp(het) + ' (' + hetText() + ')'; hb.dataset.cost = Number(prod.cost) || 0; }
+          { const het = hetFinal(prod.cost, prod.minPrice), hb = $('#epHet'); hb.classList.toggle('hide', !het); hb.textContent = 'Isi dari modal: ' + formatRp(het); hb.dataset.cost = Number(prod.cost) || 0; }
           $('#epMin').value = minPriceOf(prod) || '';
           $('#epMinStock').value = minStockOf(prod) || '';
           $('#epErr').textContent = '';
@@ -8077,11 +7995,6 @@ function affiliateView_(b) {
       document.querySelectorAll('[data-bd-preset]').forEach((b) => b.addEventListener('click', () => setBirthdayPreset(b.dataset.bdPreset)));
       $('#skSave').addEventListener('click', saveStockOut);
       $('#skList').addEventListener('click', (e) => { const b = e.target.closest('[data-sk-del]'); if (b) deleteStockOut(b.dataset.skDel); });
-      $('#dsPrev').addEventListener('click', () => shiftDistMonth(-1));
-      $('#dsNext').addEventListener('click', () => shiftDistMonth(1));
-      $('#dsNow').addEventListener('click', () => { $('#dsMonth').value = localISODate().slice(0, 7); dsAll = false; renderDistReport(); });
-      $('#dsAll').addEventListener('click', () => { dsAll = !dsAll; renderDistReport(); });
-      $('#dsMonth').addEventListener('change', () => { dsAll = false; renderDistReport(); });
       $('#rfPrev').addEventListener('click', () => shiftAffMonth(-1));
       $('#rfNext').addEventListener('click', () => shiftAffMonth(1));
       $('#rfNow').addEventListener('click', () => { $('#rfMonth').value = localISODate().slice(0, 7); drawAffReport(); });
@@ -8090,18 +8003,7 @@ function affiliateView_(b) {
       $('#cfNext').addEventListener('click', () => shiftCash(1));
       $('#cfNow').addEventListener('click', () => { $('#cfMonth').value = localISODate().slice(0, 7); renderCash(); });
       $('#cfMonth').addEventListener('change', renderCash);
-      ['#hetAutoChk', '#hetMode', '#hetPct', '#hetRound'].forEach((sel) => $(sel).addEventListener('change', () => {
-        state.hetAuto = $('#hetAutoChk').checked;
-        state.hetMode = $('#hetMode').value;
-        const pct = Number($('#hetPct').value), step = Math.round(Number($('#hetRound').value));
-        if (pct > 0) state.hetPct = pct;
-        if (step > 0) state.hetRound = step;
-        saveState();
-        renderHetSettings();
-        hetRefresh();
-      }));
       ['#stockCost', '#stockMinPrice', '#stockProductSearch'].forEach((sel) => $(sel).addEventListener('input', hetRefresh));
-      $('#stockPrice').addEventListener('input', () => { $('#stockPrice').dataset.auto = ''; });
       $('#epHet').addEventListener('click', () => { $('#epPrice').value = hetFinal($('#epHet').dataset.cost, $('#epMin').value); });
       $('#reqOpen').addEventListener('change', () => { state.requireOpen = $('#reqOpen').checked; saveState(); });
       $('#openBox').addEventListener('click', (e) => { if (e.target.closest('#openShiftBtn')) openOpenDialog(); });
@@ -8398,7 +8300,7 @@ function affiliateView_(b) {
           if (tab === 'biaya') renderBiaya();
           if (tab === 'online') renderOnline();
           if (tab === 'stokout') renderStockOut();
-          if (tab === 'pengaturan') { $('#reqOpen').checked = state.requireOpen !== false; renderHetSettings(); }
+          if (tab === 'pengaturan') $('#reqOpen').checked = state.requireOpen !== false;
           if (tab === 'afiliator') renderAfiliator();
           if (tab === 'broadcast') renderBroadcast();
         });
