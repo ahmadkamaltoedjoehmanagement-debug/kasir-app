@@ -6334,8 +6334,12 @@ function syncPut_(b) {
         area.style.width = '100%';
         $('#pageStyle').textContent = '@page { size: A4; margin: 12mm; }';
       } else {
-        area.style.width = paper + 'mm';
-        $('#pageStyle').textContent = '@page { margin: 2mm; }';
+        // Tinggi kertas dihitung dari jumlah baris struk supaya kertas tidak keluar panjang (tanpa ruang kosong).
+        const w = Number(paper) || 58;
+        const lines = String(currentReceiptText).split('\n').length;
+        const hmm = Math.ceil(lines * parseFloat(fontSize) * 1.35 * 25.4 / 96) + 8;
+        area.style.width = w + 'mm';
+        $('#pageStyle').textContent = '@page { size: ' + w + 'mm ' + hmm + 'mm; margin: 0; } @media print { html, body { margin: 0 !important; padding: 0 !important; height: auto !important; min-height: 0 !important; } #printArea { padding: 1mm 2mm 3mm !important; box-sizing: border-box; overflow: hidden; } #printArea pre.rcpt { margin: 0; line-height: 1.35; } }';
       }
       window.print();
     }
