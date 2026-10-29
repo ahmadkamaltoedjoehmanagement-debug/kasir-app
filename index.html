@@ -1459,6 +1459,16 @@ function syncPut_(b) {
         </details>
       </div>
       <div class="box" style="margin-top:18px;">
+        <h2>Info toko di struk</h2>
+        <div class="muted">Tampil di bagian atas struk, di bawah nama toko. Kosongkan bila tidak ingin dicetak.</div>
+        <label class="blk" for="storeAddrInput">Alamat</label>
+        <textarea id="storeAddrInput" rows="2" maxlength="160" style="width:100%;" placeholder="mis. Jl. Contoh No. 1, Kota"></textarea>
+        <label class="blk" for="storePhoneInput">Nomor telepon / WhatsApp</label>
+        <input id="storePhoneInput" maxlength="40" autocomplete="off" placeholder="mis. 0812 3456 7890" />
+        <label class="blk" for="storeFooterInput">Teks penutup struk</label>
+        <input id="storeFooterInput" maxlength="80" autocomplete="off" placeholder="Terima kasih" />
+      </div>
+      <div class="box" style="margin-top:18px;">
         <h2>Logo struk</h2>
         <div class="muted">Logo dicetak di bagian atas struk (cetak printer). Gunakan gambar sederhana hitam-putih; otomatis diperkecil dan diubah menjadi hitam-putih agar jelas di printer thermal. Struk via WhatsApp tetap berupa teks.</div>
         <div style="display:flex; align-items:center; gap:12px; margin-top:10px; flex-wrap:wrap;">
@@ -1961,6 +1971,9 @@ function syncPut_(b) {
       logo: '',
       logoAspect: 0,
       supplierPrefix: {},
+      storeAddr: '',
+      storePhone: '',
+      storeFooter: 'Terima kasih',
       refunds: [],
       closings: [],
       cseq: 1,
@@ -2812,7 +2825,7 @@ function syncPut_(b) {
       next.actseq = Number(old.actseq || 1) + 1;
       next.activity = [{ id: Number(old.actseq || 1), ts: Date.now(), user: who, act: 'Reset', mod: 'Sistem', ref: '-', detail: 'Master reset: semua data dihapus' + (keep ? ' (pengaturan dipertahankan)' : '') }];
       if (keep) {
-        ['store', 'ownerPin', 'ownerUser', 'users', 'lockSalt', 'paper', 'receiptMode', 'kasirRefund', 'restrictPrice', 'logo', 'logoAspect', 'supplierPrefix', 'pointCfg', 'requireOpen', 'hetPct', 'hetMode', 'hetRound', 'hetAuto'].forEach((k) => { if (old[k] !== undefined) next[k] = structuredClone(old[k]); });
+        ['store', 'ownerPin', 'ownerUser', 'users', 'lockSalt', 'paper', 'receiptMode', 'kasirRefund', 'restrictPrice', 'logo', 'logoAspect', 'supplierPrefix', 'storeAddr', 'storePhone', 'storeFooter', 'pointCfg', 'requireOpen', 'hetPct', 'hetMode', 'hetRound', 'hetAuto'].forEach((k) => { if (old[k] !== undefined) next[k] = structuredClone(old[k]); });
         if (old.sync) { next.sync = structuredClone(old.sync); next.sync.sent = {}; next.sync.photos = {}; next.sync.s2 = null; next.sync.deviceId = 'D' + Math.random().toString(36).slice(2, 7).toUpperCase(); }
       }
       state = next;
@@ -4231,7 +4244,7 @@ function syncPut_(b) {
       ['affiliates', (r) => r.id, []], ['affPaid', (r) => r.id, []], ['pointLog', (r) => r.id, []],
       ['activity', (r) => [r.ts, r.user, r.act, r.mod, r.ref].join('|'), []]
     ];
-    const S2_SET = ['store', 'receiptMode', 'kasirRefund', 'restrictPrice', 'logo', 'logoAspect', 'supplierPrefix', 'pointCfg', 'ownerUser', 'ownerPin', 'lockSalt', 'requireOpen', 'hetPct', 'hetMode', 'hetVer', 'hetRound', 'hetAuto'];
+    const S2_SET = ['store', 'receiptMode', 'kasirRefund', 'restrictPrice', 'logo', 'logoAspect', 'supplierPrefix', 'storeAddr', 'storePhone', 'storeFooter', 'pointCfg', 'ownerUser', 'ownerPin', 'lockSalt', 'requireOpen', 'hetPct', 'hetMode', 'hetVer', 'hetRound', 'hetAuto'];
     let s2Busy = false, s2KeyP = null, s2KeyFor = '';
     const s2On = () => !!(syncReady() && state.sync.s2 && state.sync.s2.linked);
     const devTag = () => { const i = s2On() ? Number(state.sync.s2.idx) || 0 : 0; return i > 0 ? String.fromCharCode(64 + Math.min(i, 26)) : ''; };
@@ -6320,14 +6333,21 @@ function syncPut_(b) {
     function receiptHead(k, store, title, no, date, cashier, memberName) {
       const L = [];
       k.wrap(String(store).toUpperCase()).forEach((l) => L.push(k.center(l)));
+      if (state.storeAddr) k.wrap(state.storeAddr).forEach((l) => L.push(k.center(l)));
+      if (state.storePhone) k.wrap(state.storePhone).forEach((l) => L.push(k.center(l)));
+      if (state.storeAddr || state.storePhone) L.push('');
       if (title) L.push(k.center(title));
-      L.push(k.center(no));
-      L.push(k.center(date));
+      k.wrap('Waktu: ' + date).forEach((l) => L.push(l));
       if (cashier) k.wrap('Kasir: ' + cashier).forEach((l) => L.push(l));
+      k.wrap('No: ' + no).forEach((l) => L.push(l));
       if (memberName) k.wrap('Member: ' + memberName).forEach((l) => L.push(l));
       L.push(k.dash);
       return L;
     }
+    const footerLines = (k) => {
+      const f = state.storeFooter === undefined ? 'Terima kasih' : String(state.storeFooter).trim();
+      return f ? k.wrap(f).map((l) => k.center(l)) : [];
+    };
 
     function buildReceiptText(tx) {
       const k = receiptKit();
@@ -6363,7 +6383,7 @@ function syncPut_(b) {
         if (tx.pointsBalance !== undefined) L.push(k.lr('Saldo poin', String(tx.pointsBalance)));
       }
       L.push(k.dash);
-      L.push(k.center('Terima kasih'));
+      footerLines(k).forEach((l) => L.push(l));
       return L.join('\n');
     }
 
@@ -6379,7 +6399,7 @@ function syncPut_(b) {
       L.push(k.lr('SISA HUTANG', formatRp(pay.after)));
       if (pay.after <= 0) L.push(k.center('LUNAS'));
       L.push(k.dash);
-      L.push(k.center('Terima kasih'));
+      footerLines(k).forEach((l) => L.push(l));
       return L.join('\n');
     }
 
@@ -6407,7 +6427,7 @@ function syncPut_(b) {
       }
       if (r.reason) k.wrap('Alasan: ' + r.reason).forEach((l) => L.push(l));
       L.push(k.dash);
-      L.push(k.center('Terima kasih'));
+      footerLines(k).forEach((l) => L.push(l));
       return L.join('\n');
     }
 
@@ -6920,6 +6940,9 @@ function syncPut_(b) {
       updatePinWarn();
       $('#allowCashierRefund').checked = !!state.kasirRefund;
       $('#restrictPriceChk').checked = !!state.restrictPrice;
+      $('#storeAddrInput').value = state.storeAddr || '';
+      $('#storePhoneInput').value = state.storePhone || '';
+      $('#storeFooterInput').value = state.storeFooter === undefined ? 'Terima kasih' : state.storeFooter;
       renderLogoSettings();
       renderSyncSettings();
       renderPointCfg();
@@ -7288,7 +7311,7 @@ function syncPut_(b) {
       if (po.note) k.wrap('Catatan: ' + po.note).forEach((l) => L.push(l));
       L.push(k.dash);
       L.push(k.center('Simpan struk ini sebagai bukti pemesanan'));
-      L.push(k.center('Terima kasih'));
+      footerLines(k).forEach((l) => L.push(l));
       return L.join('\n');
     }
 
@@ -8939,6 +8962,9 @@ function syncPut_(b) {
       $('#refundItems').addEventListener('input', updateRefundPreview);
       $('#refundSubmit').addEventListener('click', processRefund);
       $('#refundCancel').addEventListener('click', () => $('#refundDialog').close());
+      [['#storeAddrInput', 'storeAddr'], ['#storePhoneInput', 'storePhone'], ['#storeFooterInput', 'storeFooter']].forEach(([sel, key]) => {
+        $(sel).addEventListener('input', () => { state[key] = $(sel).value; saveState(); });
+      });
       $('#logoFile').addEventListener('change', async () => {
         const f = $('#logoFile').files[0], err = $('#logoErr');
         err.textContent = '';
