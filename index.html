@@ -362,13 +362,6 @@
           <h2>Pesanan</h2>
           <div id="cartList"></div>
           <div class="row"><span>Subtotal</span><b id="subTotal">Rp0</b></div>
-          <div class="row"><label for="discount">Diskon</label>
-            <div style="display:flex; gap:6px; align-items:center;">
-              <select id="discMode" aria-label="Jenis diskon" style="width:72px; padding:10px 6px;"><option value="rp">Rp</option><option value="pct">%</option></select>
-              <input id="discount" class="field" type="number" min="0" step="any" inputmode="decimal" placeholder="0" style="width:110px;" />
-            </div>
-          </div>
-          <div id="discHint" class="muted" style="text-align:right;"></div>
           <div id="pointRow" class="hide">
             <div class="row"><label for="pointUse">Tukar poin</label>
               <div style="display:flex; gap:6px; align-items:center;">
@@ -1088,7 +1081,7 @@ const HEADERS = {
   bayar_invoice: ['Key', 'Perangkat', 'No Invoice', 'Tanggal', 'Hari', 'Pencatat', 'Jumlah', 'Metode', 'Catatan', 'Sisa Sesudah', 'Bukti Bayar'],
   tutup_kasir: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'Kasir', 'Periode Dari', 'Modal Awal', 'Penjualan Tunai', 'Penjualan QRIS', 'Penjualan Transfer', 'Penjualan Hutang', 'DP Hutang Tunai', 'Diskon', 'Refund', 'Refund Tunai', 'Bayar Hutang Tunai', 'Bayar Hutang Non-Tunai', 'Kas Seharusnya', 'Uang Fisik', 'Selisih', 'Setoran', 'Dibawa Shift Berikut', 'Catatan', 'No Buka', 'Waktu Buka'],
   retur_beli: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'Pencatat', 'Supplier', 'No Invoice', 'Item', 'Nilai Retur', 'Potong Tagihan', 'Uang Dikembalikan', 'Metode', 'Alasan', 'Foto Retur'],
-  penjualan_item: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'Kasir', 'Metode', 'Kode', 'Produk', 'Qty', 'Harga', 'Subtotal', 'Modal'],
+  penjualan_item: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'Kasir', 'Metode', 'Kode', 'Produk', 'Qty', 'Harga', 'Subtotal', 'Modal', 'Harga Normal', 'Diskon Item'],
   pre_order: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'Kasir', 'Pelanggan', 'Telepon', 'Item', 'Total', 'DP Tersimpan', 'Perkiraan Datang', 'Status', 'Catatan', 'No Transaksi', 'Alasan Batal', 'DP Hangus'],
   dp_preorder: ['Key', 'Perangkat', 'No', 'No PO', 'Tanggal', 'Hari', 'Kasir', 'Jenis', 'Jumlah', 'Metode'],
   opname: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'User', 'Produk Dihitung', 'Produk Selisih', 'Nilai Selisih', 'Catatan', 'Detail Selisih'],
@@ -1463,8 +1456,22 @@ function syncPut_(b) {
         </details>
       </div>
       <div class="box" style="margin-top:18px;">
+        <h2>Logo struk</h2>
+        <div class="muted">Logo dicetak di bagian atas struk (cetak printer). Gunakan gambar sederhana hitam-putih; otomatis diperkecil dan diubah menjadi hitam-putih agar jelas di printer thermal. Struk via WhatsApp tetap berupa teks.</div>
+        <div style="display:flex; align-items:center; gap:12px; margin-top:10px; flex-wrap:wrap;">
+          <img id="logoPreview" class="hide" alt="Logo toko" style="max-width:140px; max-height:90px; border:1px dashed #b9c9c5; padding:4px; background:#fff;" />
+          <div>
+            <input id="logoFile" type="file" accept="image/*" />
+            <button id="logoRemove" class="action ghost hide" style="margin-top:8px;">Hapus logo</button>
+          </div>
+        </div>
+        <div class="err" id="logoErr" role="alert"></div>
+      </div>
+      <div class="box" style="margin-top:18px;">
         <h2>Izin kasir</h2>
         <label style="display:flex; align-items:center; gap:8px;"><input id="allowCashierRefund" type="checkbox" style="width:auto;" /> Kasir boleh memproses refund</label>
+        <label style="display:flex; align-items:center; gap:8px; margin-top:8px;"><input id="restrictPriceChk" type="checkbox" style="width:auto;" /> Batasi harga jual manual &amp; diskon per produk sesuai rentang harga produk</label>
+        <div class="muted" style="margin-top:6px;">Bila dimatikan (bawaan), harga jual di keranjang boleh diisi bebas dan diskon per produk tidak dibatasi harga eceran terendah.</div>
         <div class="muted" style="margin-top:6px;">Menerima pembayaran hutang selalu boleh dilakukan kasir. Refund hanya untuk transaksi milik kasir itu sendiri.</div>
       </div>
       <div class="box" style="margin-top:18px;">
@@ -1870,6 +1877,7 @@ function syncPut_(b) {
 
   <dialog id="receiptDialog">
     <h2>Struk</h2>
+    <img id="receiptLogo" class="hide" alt="Logo toko" style="display:block; margin:0 auto 6px; max-width:150px;" />
     <pre id="receiptText" class="rcpt"></pre>
     <div class="seg" id="receiptMode">
       <button data-mode="print" aria-pressed="false">Cetak struk</button>
@@ -1935,6 +1943,9 @@ function syncPut_(b) {
       auth: { fails: 0, until: 0 },
       paper: '58',
       kasirRefund: false,
+      restrictPrice: false,
+      logo: '',
+      logoAspect: 0,
       refunds: [],
       closings: [],
       cseq: 1,
@@ -1965,7 +1976,18 @@ function syncPut_(b) {
     let state = structuredClone(defaultState);
     let cart = {};
     let cartPrice = {};
-    const unitPrice = (p) => (Number(cartPrice[p.id]) > 0 ? Number(cartPrice[p.id]) : Number(p.price));
+    let cartDisc = {};
+    let cartDiscMode = {};
+    const baseUnit = (p) => (Number(cartPrice[p.id]) > 0 ? Number(cartPrice[p.id]) : Number(p.price));
+    const itemDisc = (p) => {
+      const d = cartDisc[p.id];
+      if (!d || !(d.v > 0)) return 0;
+      const b = baseUnit(p);
+      const amt = d.m === 'pct' ? Math.round(b * Math.min(100, d.v) / 100) : Math.round(d.v);
+      return Math.max(0, Math.min(amt, b));
+    };
+    const unitPrice = (p) => Math.max(0, baseUnit(p) - itemDisc(p));
+    const restrictPrice = () => !!state.restrictPrice;
     let paymentType = 'Tunai';
     let currentMember = null;
     let activeStockDraft = [];
@@ -2189,30 +2211,22 @@ function syncPut_(b) {
       });
       Object.entries(cart).forEach(([id, qty]) => {
         const p = getProductById(id);
-        if (!p || !Number(p.price)) return;
+        if (!p || !Number(p.price) || !unitPrice(p)) return;
         // diskon dibagi proporsional ke tiap item, jadi tiap item tidak boleh turun di bawah harga eceran terendahnya
         const cap = sub * Math.max(0, unitPrice(p) - minPriceOf(p)) / unitPrice(p);
         maxDisc = Math.min(maxDisc, Math.floor(cap + 1e-6));
       });
       if (!Number.isFinite(maxDisc)) maxDisc = 0;
       maxDisc = Math.max(0, Math.min(maxDisc, sub));
-      const isPct = $('#discMode').value === 'pct';
-      let requested;
-      let discPct = 0;
-      if (isPct) {
-        discPct = Math.min(100, Math.max(0, parseFloat($('#discount').value) || 0));
-        requested = Math.min(sub, Math.round(sub * discPct / 100));
-      } else {
-        requested = Math.min(cleanNum($('#discount').value), sub);
-      }
+      const requested = 0, discPct = 0;
       const pc = pointCfg();
       const balance = currentMember ? Math.max(0, Math.floor(Number(currentMember.points) || 0)) : 0;
       const canRedeem = !!currentMember && pc.enabled && pc.redeemRp > 0;
       const ptsReq = canRedeem ? Math.min(balance, Math.max(0, Math.floor(parseFloat($('#pointUse').value) || 0))) : 0;
-      const disc = Math.min(requested, maxDisc);
-      const room = maxDisc - disc;
+      const disc = 0;
+      const room = maxDisc;
       const maxPts = canRedeem ? Math.min(balance, Math.floor(room / pc.redeemRp)) : 0;
-      const over = requested + ptsReq * pc.redeemRp > maxDisc;
+      const over = ptsReq * pc.redeemRp > maxDisc;
       const pts = Math.min(ptsReq, maxPts);
       const pointsValue = pts * pc.redeemRp;
       const total = sub - disc - pointsValue;
@@ -2226,11 +2240,17 @@ function syncPut_(b) {
       state.products.forEach((p) => {
         const qty = cart[p.id] || 0;
         if (!qty) return;
-        const unit = unitPrice(p), custom = Number(cartPrice[p.id]) > 0;
+        const unit = unitPrice(p), custom = Number(cartPrice[p.id]) > 0, dsc = itemDisc(p), isOwner = !!currentUser && currentUser.role === 'owner';
         sub += unit * qty;
+        let warn = '';
+        if (isOwner && Number(p.cost) > 0 && unit < Number(p.cost)) warn = '<small class="low">⚠ Di bawah modal (' + formatRp(p.cost) + '), rugi ' + formatRp((Number(p.cost) - unit) * qty) + '</small>';
+        else if (!restrictPrice() && Number(p.price) > 0 && unit < minPriceOf(p)) warn = '<small style="color:#8a5a00;">Di bawah harga eceran terendah (' + formatRp(minPriceOf(p)) + ')</small>';
         html += '<div class="line">' +
-          '<div class="n"><b>' + escapeHtml(p.name) + '</b><small>Rp <input class="cprice" data-cprice="' + p.id + '" type="number" inputmode="numeric" min="0" value="' + unit + '" style="width:120px; padding:4px 6px;" aria-label="Harga jual ' + escapeHtml(p.name) + '" /> x ' + qty + (custom ? ' · harga manual' : '') + '</small>' +
-          '<small class="muted">Rentang harga ' + formatRp(minPriceOf(p)) + ' - ' + formatRp(p.price) + '</small></div>' +
+          '<div class="n"><b>' + escapeHtml(p.name) + '</b><small>Harga Rp <input class="cprice" data-cprice="' + p.id + '" type="number" inputmode="numeric" min="0" value="' + baseUnit(p) + '" style="width:110px; padding:4px 6px;" aria-label="Harga jual ' + escapeHtml(p.name) + '" /> x ' + qty + (custom ? ' · harga manual' : '') + '</small>' +
+          '<small>Diskon <select class="cdmode" data-cdmode="' + p.id + '" aria-label="Jenis diskon ' + escapeHtml(p.name) + '" style="width:64px; padding:4px 4px;"><option value="rp"' + ((cartDiscMode[p.id] || (cartDisc[p.id] && cartDisc[p.id].m) || 'rp') === 'rp' ? ' selected' : '') + '>Rp</option><option value="pct"' + ((cartDiscMode[p.id] || (cartDisc[p.id] && cartDisc[p.id].m) || 'rp') === 'pct' ? ' selected' : '') + '>%</option></select> <input class="cdisc" data-cdisc="' + p.id + '" type="number" min="0" step="any" inputmode="decimal" value="' + (cartDisc[p.id] ? cartDisc[p.id].v : '') + '" placeholder="0" style="width:90px; padding:4px 6px;" aria-label="Diskon ' + escapeHtml(p.name) + '" /></small>' +
+          (dsc ? '<small class="muted">' + (cartDisc[p.id].m === 'pct' ? 'Diskon ' + cartDisc[p.id].v + '% = ' : 'Diskon ') + '-' + formatRp(dsc) + '/pcs → ' + formatRp(unit) + (restrictPrice() && Number(p.price) > 0 ? ' · maks. ' + formatRp(Math.max(0, baseUnit(p) - minPriceOf(p))) + ' (' + (Math.floor(Math.max(0, baseUnit(p) - minPriceOf(p)) / baseUnit(p) * 10000) / 100) + '%)' : '') + '</small>' : '') +
+          warn +
+          '<small class="muted">' + (restrictPrice() ? 'Rentang harga ' + formatRp(minPriceOf(p)) + ' - ' + formatRp(p.price) : 'Harga normal ' + formatRp(p.price) + ' · boleh diubah manual') + '</small></div>' +
           '<div class="q"><button data-change="-' + p.id + '">-</button><b>' + qty + '</b><button data-change="+' + p.id + '">+</button></div>' +
           '</div>';
       });
@@ -2239,19 +2259,6 @@ function syncPut_(b) {
       const t = totals();
       $('#subTotal').textContent = formatRp(t.sub);
       $('#totalAmount').textContent = formatRp(t.total);
-      const hint = $('#discHint');
-      if (!t.sub) {
-        hint.textContent = '';
-        hint.classList.remove('low');
-      } else {
-        const maxPct = Math.floor(t.maxDisc / t.sub * 10000) / 100;
-        let txt = '';
-        if (t.over) txt = 'Melebihi batas. Harga setelah diskon tidak boleh di bawah harga eceran terendah. ';
-        else if ($('#discMode').value === 'pct' && t.disc) txt = 'Diskon ' + t.discPct + '% = -' + formatRp(t.disc) + '. ';
-        txt += 'Diskon maks. ' + formatRp(t.maxDisc) + ' (' + maxPct + '%)';
-        hint.textContent = txt;
-        hint.classList.toggle('low', t.over);
-      }
       const pc = pointCfg();
       const showPts = !!currentMember && pc.enabled;
       $('#pointRow').classList.toggle('hide', !showPts);
@@ -2789,7 +2796,7 @@ function syncPut_(b) {
       next.actseq = Number(old.actseq || 1) + 1;
       next.activity = [{ id: Number(old.actseq || 1), ts: Date.now(), user: who, act: 'Reset', mod: 'Sistem', ref: '-', detail: 'Master reset: semua data dihapus' + (keep ? ' (pengaturan dipertahankan)' : '') }];
       if (keep) {
-        ['store', 'ownerPin', 'ownerUser', 'users', 'lockSalt', 'paper', 'receiptMode', 'kasirRefund', 'pointCfg', 'requireOpen', 'hetPct', 'hetMode', 'hetRound', 'hetAuto'].forEach((k) => { if (old[k] !== undefined) next[k] = structuredClone(old[k]); });
+        ['store', 'ownerPin', 'ownerUser', 'users', 'lockSalt', 'paper', 'receiptMode', 'kasirRefund', 'restrictPrice', 'logo', 'logoAspect', 'pointCfg', 'requireOpen', 'hetPct', 'hetMode', 'hetRound', 'hetAuto'].forEach((k) => { if (old[k] !== undefined) next[k] = structuredClone(old[k]); });
         if (old.sync) { next.sync = structuredClone(old.sync); next.sync.sent = {}; next.sync.photos = {}; next.sync.s2 = null; next.sync.deviceId = 'D' + Math.random().toString(36).slice(2, 7).toUpperCase(); }
       }
       state = next;
@@ -3946,7 +3953,8 @@ function syncPut_(b) {
       }));
       state.history.forEach((tx) => (tx.items || []).forEach((it, i) => add('penjualan_item', tx.no + ':' + i, {
         No: tx.no, Tanggal: tx.date, Hari: tx.day || '', Kasir: tx.cashier || '', Metode: tx.method, Kode: it.code || '', Produk: it.name,
-        Qty: it.qty, Harga: it.price, Subtotal: Number(it.qty) * Number(it.price || 0), Modal: Number(it.cost || 0) * Number(it.qty)
+        Qty: it.qty, Harga: it.price, Subtotal: Number(it.qty) * Number(it.price || 0), Modal: Number(it.cost || 0) * Number(it.qty),
+        'Harga Normal': Number(it.listPrice || it.price || 0), 'Diskon Item': Number(it.disc || 0) * Number(it.qty)
       })));
       state.preorders.forEach((po) => {
         add('pre_order', po.no, {
@@ -4107,7 +4115,7 @@ function syncPut_(b) {
       ['affiliates', (r) => r.id, []], ['affPaid', (r) => r.id, []], ['pointLog', (r) => r.id, []],
       ['activity', (r) => [r.ts, r.user, r.act, r.mod, r.ref].join('|'), []]
     ];
-    const S2_SET = ['store', 'receiptMode', 'kasirRefund', 'pointCfg', 'ownerUser', 'ownerPin', 'lockSalt', 'requireOpen', 'hetPct', 'hetMode', 'hetVer', 'hetRound', 'hetAuto'];
+    const S2_SET = ['store', 'receiptMode', 'kasirRefund', 'restrictPrice', 'logo', 'logoAspect', 'pointCfg', 'ownerUser', 'ownerPin', 'lockSalt', 'requireOpen', 'hetPct', 'hetMode', 'hetVer', 'hetRound', 'hetAuto'];
     let s2Busy = false, s2KeyP = null, s2KeyFor = '';
     const s2On = () => !!(syncReady() && state.sync.s2 && state.sync.s2.linked);
     const devTag = () => { const i = s2On() ? Number(state.sync.s2.idx) || 0 : 0; return i > 0 ? String.fromCharCode(64 + Math.min(i, 26)) : ''; };
@@ -6042,13 +6050,13 @@ function syncPut_(b) {
       const items = Object.entries(cart).map(([id, qty]) => {
         const p = getProductById(id);
         if (!p) return null;
-        return { id: p.id, name: p.name, code: p.code, qty: Number(qty), price: unitPrice(p), cost: Number(p.cost || 0) };
+        return { id: p.id, name: p.name, code: p.code, qty: Number(qty), price: unitPrice(p), listPrice: baseUnit(p), disc: itemDisc(p), cost: Number(p.cost || 0) };
       }).filter(Boolean);
       if (!items.length) {
         $('#saleErr').textContent = 'Pesanan masih kosong.';
         return;
       }
-      const outRange = items.find((it) => { const p = getProductById(it.id); return p && Number(cartPrice[it.id]) > 0 && (it.price < minPriceOf(p) || it.price > Number(p.price)); });
+      const outRange = restrictPrice() && items.find((it) => { const p = getProductById(it.id); return p && (Number(cartPrice[it.id]) > 0 || it.disc > 0) && (it.price < minPriceOf(p) || it.listPrice > Number(p.price)); });
       if (outRange) { $('#saleErr').textContent = 'Harga ' + outRange.name + ' di luar rentang harga eceran.'; return; }
       const noPrice = items.filter((it) => !(it.price > 0));
       if (noPrice.length) {
@@ -6057,7 +6065,7 @@ function syncPut_(b) {
       }
       const { sub, disc, discPct, total, over, maxDisc, pts, pointsValue, ptsReq, earned } = totals();
       if (over) {
-        $('#saleErr').textContent = 'Diskon melebihi batas. Harga setelah diskon tidak boleh di bawah harga eceran terendah (diskon maks. ' + formatRp(maxDisc) + ').';
+        $('#saleErr').textContent = 'Penukaran poin melebihi batas. Harga setelah potongan tidak boleh di bawah harga eceran terendah (maks. ' + formatRp(maxDisc) + ').';
         return;
       }
       if (ptsReq > 0 && ptsReq < pointCfg().minRedeem) {
@@ -6113,7 +6121,7 @@ function syncPut_(b) {
         items,
         sub,
         disc: disc + pointsValue,
-        discPct: $('#discMode').value === 'pct' && disc ? discPct : 0,
+        discPct: 0,
         pointsUsed: pts,
         pointsValue,
         pointsEarned: earned,
@@ -6149,7 +6157,8 @@ function syncPut_(b) {
       renderDebts();
       cart = {};
       cartPrice = {};
-      $('#discount').value = '';
+      cartDisc = {};
+      cartDiscMode = {};
       $('#pointUse').value = '';
       $('#cashInput').value = '';
       $('#dpInput').value = '';
@@ -6209,7 +6218,10 @@ function syncPut_(b) {
       const L = receiptHead(k, tx.store || state.store, '', tx.no, tx.date, tx.cashier, tx.member ? tx.member.name : '');
       tx.items.forEach((item) => {
         k.wrap(item.name).forEach((l) => L.push(l));
-        L.push(k.lr(item.qty + ' x ' + formatRp(item.price), formatRp(item.qty * item.price)));
+        if (Number(item.disc) > 0) {
+          L.push(k.lr(item.qty + ' x ' + formatRp(item.listPrice), formatRp(item.qty * item.listPrice)));
+          L.push(k.lr('  Diskon item', '-' + formatRp(item.qty * item.disc)));
+        } else L.push(k.lr(item.qty + ' x ' + formatRp(item.price), formatRp(item.qty * item.price)));
       });
       L.push(k.dash);
       L.push(k.lr('Subtotal', formatRp(tx.sub)));
@@ -6286,6 +6298,8 @@ function syncPut_(b) {
     function showReceiptText(text, phone) {
       currentReceiptText = text;
       $('#receiptText').textContent = text;
+      $('#receiptLogo').classList.toggle('hide', !state.logo);
+      if (state.logo) $('#receiptLogo').src = state.logo;
       $('#paperSize').value = state.paper || '58';
       $('#customerPhone').value = phone || '';
       setReceiptMode(state.receiptMode === 'print' ? 'print' : 'wa');
@@ -6327,9 +6341,14 @@ function syncPut_(b) {
       const paper = $('#paperSize').value;
       state.paper = paper;
       saveState();
-      const fontSize = { '58': '10.5px', '80': '14px', 'a4': '12px' }[paper] || '12px';
+      const fontSize = { '58': '9.4px', '80': '14px', 'a4': '12px' }[paper] || '12px';
       const area = $('#printArea');
-      area.innerHTML = '<pre class="rcpt" style="font-size:' + fontSize + ';">' + escapeHtml(currentReceiptText) + '</pre>';
+      // ukuran logo di kertas (mm): lebar dasar per kertas, tinggi dibatasi 25 mm
+      const aspect = Number(state.logoAspect) > 0 ? Number(state.logoAspect) : 0;
+      const logoW = state.logo && aspect ? Math.min(paper === '80' ? 50 : 40, 25 / aspect) : 0;
+      const logoH = logoW * aspect;
+      area.innerHTML = (logoW ? '<img src="' + state.logo + '" alt="" style="display:block; margin:0 auto 2mm; width:' + logoW.toFixed(1) + 'mm; height:' + logoH.toFixed(1) + 'mm; image-rendering:pixelated;" />' : '') +
+        '<pre class="rcpt" style="font-size:' + fontSize + ';">' + escapeHtml(currentReceiptText) + '</pre>';
       if (paper === 'a4') {
         area.style.width = '100%';
         $('#pageStyle').textContent = '@page { size: A4; margin: 12mm; }';
@@ -6337,11 +6356,42 @@ function syncPut_(b) {
         // Tinggi kertas dihitung dari jumlah baris struk supaya kertas tidak keluar panjang (tanpa ruang kosong).
         const w = Number(paper) || 58;
         const lines = String(currentReceiptText).split('\n').length;
-        const hmm = Math.ceil(lines * parseFloat(fontSize) * 1.35 * 25.4 / 96) + 8;
+        const hmm = Math.ceil(lines * parseFloat(fontSize) * 1.35 * 25.4 / 96 + (logoW ? logoH + 2 : 0)) + 8;
         area.style.width = w + 'mm';
-        $('#pageStyle').textContent = '@page { size: ' + w + 'mm ' + hmm + 'mm; margin: 0; } @media print { html, body { margin: 0 !important; padding: 0 !important; height: auto !important; min-height: 0 !important; } #printArea { padding: 1mm 2mm 3mm !important; box-sizing: border-box; overflow: hidden; } #printArea pre.rcpt { margin: 0; line-height: 1.35; } }';
+        $('#pageStyle').textContent = '@page { size: ' + w + 'mm ' + hmm + 'mm; margin: 0; } @media print { html, body { margin: 0 !important; padding: 0 !important; height: auto !important; min-height: 0 !important; } #printArea { padding: 1mm ' + (w <= 58 ? '5mm' : '2mm') + ' 3mm !important; box-sizing: border-box; overflow: hidden; } #printArea pre.rcpt { margin: 0; line-height: 1.35; } }';
       }
       window.print();
+    }
+
+    function loadLogoFile(file) {
+      return new Promise((resolve, reject) => {
+        if (!file || !/^image\//.test(file.type)) { reject(new Error('File harus berupa gambar.')); return; }
+        if (file.size > 5 * 1024 * 1024) { reject(new Error('Ukuran gambar maksimal 5 MB.')); return; }
+        const img = new Image(), url = URL.createObjectURL(file);
+        img.onload = () => {
+          const sc = Math.min(1, 384 / img.width), w = Math.max(1, Math.round(img.width * sc)), h = Math.max(1, Math.round(img.height * sc));
+          const cv = document.createElement('canvas');
+          cv.width = w; cv.height = h;
+          const ctx = cv.getContext('2d');
+          ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
+          ctx.drawImage(img, 0, 0, w, h);
+          const d = ctx.getImageData(0, 0, w, h), px = d.data;
+          for (let i = 0; i < px.length; i += 4) {
+            const v = (0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2]) < 160 ? 0 : 255;
+            px[i] = px[i + 1] = px[i + 2] = v; px[i + 3] = 255;
+          }
+          ctx.putImageData(d, 0, 0);
+          URL.revokeObjectURL(url);
+          resolve({ url: cv.toDataURL('image/png'), aspect: h / w });
+        };
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Gambar tidak bisa dibaca.')); };
+        img.src = url;
+      });
+    }
+    function renderLogoSettings() {
+      $('#logoPreview').classList.toggle('hide', !state.logo);
+      if (state.logo) $('#logoPreview').src = state.logo;
+      $('#logoRemove').classList.toggle('hide', !state.logo);
     }
 
     function openPayDebt(id) {
@@ -6565,6 +6615,8 @@ function syncPut_(b) {
     function clearCart() {
       cart = {};
       cartPrice = {};
+      cartDisc = {};
+      cartDiscMode = {};
       renderCart();
     }
 
@@ -6751,6 +6803,8 @@ function syncPut_(b) {
       $('#whoami').textContent = owner ? 'Administrator' : currentUser.name + ' (Kasir)';
       updatePinWarn();
       $('#allowCashierRefund').checked = !!state.kasirRefund;
+      $('#restrictPriceChk').checked = !!state.restrictPrice;
+      renderLogoSettings();
       renderSyncSettings();
       renderPointCfg();
       renderMembers();
@@ -6770,6 +6824,8 @@ function syncPut_(b) {
       currentUser = null;
       cart = {};
       cartPrice = {};
+      cartDisc = {};
+      cartDiscMode = {};
       currentMember = null;
       $('#memberSelected').classList.add('hide');
       $('#memberSelected').innerHTML = '';
@@ -7085,7 +7141,7 @@ function syncPut_(b) {
       const qty = Math.floor(Number($('#poQty').value));
       const price = cleanNum($('#poPrice').value);
       if (!(qty >= 1)) { err.textContent = 'Qty minimal 1.'; return; }
-      if (Number(p.price) > 0 ? (price < minPriceOf(p) || price > Number(p.price)) : !(price > 0)) {
+      if ((restrictPrice() && Number(p.price) > 0 && (price < minPriceOf(p) || price > Number(p.price))) || !(price > 0)) {
         err.textContent = Number(p.price) > 0 ? 'Harga harus antara ' + formatRp(minPriceOf(p)) + ' dan ' + formatRp(p.price) + '.' : 'Isi harga jual untuk produk ini.';
         return;
       }
@@ -8367,16 +8423,39 @@ function syncPut_(b) {
         const op = value.startsWith('+') ? 1 : -1;
         const id = value.slice(1);
         cart[id] = (cart[id] || 0) + op;
-        if ((cart[id] || 0) <= 0) { delete cart[id]; delete cartPrice[id]; }
+        if ((cart[id] || 0) <= 0) { delete cart[id]; delete cartPrice[id]; delete cartDisc[id]; delete cartDiscMode[id]; }
         renderCart();
       });
       $('#cartList').addEventListener('change', (e) => {
+        const mode = e.target.closest('[data-cdmode]');
+        if (mode) {
+          delete cartDisc[mode.dataset.cdmode];
+          cartDiscMode[mode.dataset.cdmode] = mode.value;
+          $('#saleErr').textContent = '';
+          setTimeout(renderCart, 0);
+          return;
+        }
+        const dinp = e.target.closest('[data-cdisc]');
+        if (dinp) {
+          const dp = getProductById(dinp.dataset.cdisc), derr = $('#saleErr');
+          if (!dp) return;
+          const m = cartDiscMode[dp.id] || 'rp';
+          const dv = m === 'pct' ? Math.min(100, Math.max(0, parseFloat(dinp.value) || 0)) : Math.round(cleanNum(dinp.value));
+          if (!(dv > 0)) delete cartDisc[dp.id];
+          else cartDisc[dp.id] = { m, v: dv };
+          if (restrictPrice() && Number(dp.price) > 0 && unitPrice(dp) < minPriceOf(dp)) {
+            derr.textContent = 'Diskon ' + dp.name + ' membuat harga di bawah harga eceran terendah (' + formatRp(minPriceOf(dp)) + ').';
+            delete cartDisc[dp.id];
+          } else derr.textContent = '';
+          setTimeout(renderCart, 0);
+          return;
+        }
         const inp = e.target.closest('[data-cprice]');
         if (!inp) return;
         const p = getProductById(inp.dataset.cprice), err = $('#saleErr'), v = Math.round(cleanNum(inp.value));
         if (!p) return;
         if (!(v > 0) || v === Number(p.price)) delete cartPrice[p.id];
-        else if (v < minPriceOf(p) || v > Number(p.price)) {
+        else if (restrictPrice() && (v < minPriceOf(p) || v > Number(p.price))) {
           err.textContent = 'Harga ' + p.name + ' harus antara ' + formatRp(minPriceOf(p)) + ' dan ' + formatRp(p.price) + '.';
           setTimeout(renderCart, 0);
           return;
@@ -8385,8 +8464,6 @@ function syncPut_(b) {
         // render ditunda: mengganti isi daftar saat kolom kehilangan fokus bisa memicu error DOM
         setTimeout(renderCart, 0);
       });
-      $('#discount').addEventListener('input', renderCart);
-      $('#discMode').addEventListener('change', () => { $('#discount').value = ''; renderCart(); });
       $('#payBtn').addEventListener('click', paySale);
       $('#clearCartBtn').addEventListener('click', clearCart);
       $('#paymentType').addEventListener('click', (e) => {
@@ -8741,6 +8818,24 @@ function syncPut_(b) {
       $('#refundItems').addEventListener('input', updateRefundPreview);
       $('#refundSubmit').addEventListener('click', processRefund);
       $('#refundCancel').addEventListener('click', () => $('#refundDialog').close());
+      $('#logoFile').addEventListener('change', async () => {
+        const f = $('#logoFile').files[0], err = $('#logoErr');
+        err.textContent = '';
+        if (!f) return;
+        try {
+          const r = await loadLogoFile(f);
+          state.logo = r.url; state.logoAspect = r.aspect;
+          saveState();
+          renderLogoSettings();
+        } catch (e) { err.textContent = e.message; }
+        $('#logoFile').value = '';
+      });
+      $('#logoRemove').addEventListener('click', () => { state.logo = ''; state.logoAspect = 0; saveState(); renderLogoSettings(); });
+      $('#restrictPriceChk').addEventListener('change', () => {
+        state.restrictPrice = $('#restrictPriceChk').checked;
+        saveState();
+        renderCart();
+      });
       $('#allowCashierRefund').addEventListener('change', () => {
         state.kasirRefund = $('#allowCashierRefund').checked;
         saveState();
