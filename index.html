@@ -403,10 +403,12 @@
         <h2>Tambah produk</h2>
         <div class="muted" style="margin-bottom:8px;">Cukup nama produk. Harga beli dan harga jual diisi nanti saat Stok Masuk.</div>
         <div class="row" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
-          <input id="prodCode" placeholder="Kode barang" style="flex:1 1 120px;" />
+          <input id="prodCode" placeholder="Kode (kosong = otomatis dari supplier)" style="flex:1 1 120px;" />
           <input id="prodName" placeholder="Nama produk" style="flex:2 1 180px;" />
           <input id="prodBrand" list="brandOptions" placeholder="Brand" style="flex:1 1 130px;" autocomplete="off" />
           <input id="prodCategory" list="categoryOptions" placeholder="Kategori" style="flex:1 1 130px;" autocomplete="off" />
+          <input id="prodSupplier" list="supplierOptions" placeholder="Supplier" style="flex:1 1 130px;" autocomplete="off" />
+          <datalist id="supplierOptions"></datalist>
           <datalist id="brandOptions"></datalist>
           <datalist id="categoryOptions"></datalist>
           <input id="prodMinStock" type="number" min="0" step="1" placeholder="Stok minimum (alert)" style="flex:1 1 150px;" />
@@ -418,6 +420,7 @@
           <button id="bulkProductBtn" class="action ghost">Tambah produk massal</button>
           <button id="bulkUpdateBtn" class="action ghost">Update produk massal</button>
           <button id="exportProductsBtn" class="action ghost">Unduh produk (CSV)</button>
+          <button id="brandCodeBtn" class="action ghost">Buat kode otomatis dari supplier</button>
           <button id="parfumDescBtn" class="action ghost">Isi deskripsi parfum otomatis</button>
         </div>
         <h2 style="margin-top:18px;">Daftar produk</h2>
@@ -1536,6 +1539,15 @@ function syncPut_(b) {
     <button id="pnCancel" class="action ghost full" style="margin-top:8px;">Batal</button>
   </dialog>
 
+  <dialog id="codeDialog">
+    <h2>Kode produk dari supplier</h2>
+    <div class="muted">Kode berbentuk awalan supplier + nomor urut, misalnya "PT Aroma Jaya" menjadi AJ-001, AJ-002. Supplier diambil dari isian produk, atau dari invoice Stok Masuk terakhir yang memuat produk itu. Supplier yang sama selalu memakai awalan yang sama, dan tiap kode unik.</div>
+    <label style="display:flex; align-items:center; gap:8px; margin-top:10px;"><input id="codeAll" type="checkbox" style="width:auto;" /> Ganti juga kode yang saya isi sendiri (bukan P001, P002, dst)</label>
+    <div id="codePreview" class="muted" style="margin-top:10px;"></div>
+    <button id="codeApply" class="action success full" style="margin-top:10px;">Terapkan</button>
+    <button id="codeCancel" class="action ghost full" style="margin-top:8px;">Batal</button>
+  </dialog>
+
   <dialog id="s2Dialog">
     <h2>Sinkron antar perangkat</h2>
     <div id="s2Info" class="muted" style="margin-bottom:8px;"></div>
@@ -1566,6 +1578,8 @@ function syncPut_(b) {
     <input id="epNameInput" autocomplete="off" />
     <label class="blk" for="epBrand">Brand</label>
     <input id="epBrand" list="brandOptions" autocomplete="off" />
+    <label class="blk" for="epSupplier">Supplier</label>
+    <input id="epSupplier" list="supplierOptions" autocomplete="off" />
     <label class="blk" for="epCategory">Kategori</label>
     <input id="epCategory" list="categoryOptions" autocomplete="off" />
     <label class="blk" for="epGender">Gender</label>
@@ -1946,6 +1960,7 @@ function syncPut_(b) {
       restrictPrice: false,
       logo: '',
       logoAspect: 0,
+      supplierPrefix: {},
       refunds: [],
       closings: [],
       cseq: 1,
@@ -2317,6 +2332,7 @@ function syncPut_(b) {
       const brands = uniqueValues('brand');
       $('#categoryOptions').innerHTML = cats.map((c) => '<option value="' + escapeHtml(c) + '"></option>').join('');
       $('#brandOptions').innerHTML = brands.map((b) => '<option value="' + escapeHtml(b) + '"></option>').join('');
+      refreshSupplierOptions();
       fillFilter('#filterCategory', 'Semua kategori', cats);
       fillFilter('#filterBrand', 'Semua brand', brands);
     }
@@ -2796,7 +2812,7 @@ function syncPut_(b) {
       next.actseq = Number(old.actseq || 1) + 1;
       next.activity = [{ id: Number(old.actseq || 1), ts: Date.now(), user: who, act: 'Reset', mod: 'Sistem', ref: '-', detail: 'Master reset: semua data dihapus' + (keep ? ' (pengaturan dipertahankan)' : '') }];
       if (keep) {
-        ['store', 'ownerPin', 'ownerUser', 'users', 'lockSalt', 'paper', 'receiptMode', 'kasirRefund', 'restrictPrice', 'logo', 'logoAspect', 'pointCfg', 'requireOpen', 'hetPct', 'hetMode', 'hetRound', 'hetAuto'].forEach((k) => { if (old[k] !== undefined) next[k] = structuredClone(old[k]); });
+        ['store', 'ownerPin', 'ownerUser', 'users', 'lockSalt', 'paper', 'receiptMode', 'kasirRefund', 'restrictPrice', 'logo', 'logoAspect', 'supplierPrefix', 'pointCfg', 'requireOpen', 'hetPct', 'hetMode', 'hetRound', 'hetAuto'].forEach((k) => { if (old[k] !== undefined) next[k] = structuredClone(old[k]); });
         if (old.sync) { next.sync = structuredClone(old.sync); next.sync.sent = {}; next.sync.photos = {}; next.sync.s2 = null; next.sync.deviceId = 'D' + Math.random().toString(36).slice(2, 7).toUpperCase(); }
       }
       state = next;
@@ -3719,6 +3735,7 @@ function syncPut_(b) {
           const product = getProductById(item.id);
           if (product) {
             product.stock = Number(product.stock || 0) + Number(item.qty);
+            if (supplier && !product.supplier) product.supplier = supplier;
             if (item.cost > 0) product.cost = Number(item.cost);
             if (item.price > 0) {
               product.price = Number(item.price);
@@ -3824,6 +3841,7 @@ function syncPut_(b) {
       if (dup) { err.textContent = 'Sudah ada produk lain dengan nama dan brand yang sama (kode ' + dup.code + ').'; return; }
       prod.name = newName;
       prod.brand = newBrand;
+      prod.supplier = canonSupplier($('#epSupplier').value);
       prod.category = $('#epCategory').value.trim();
       prod.gender = $('#epGender').value;
       prod.scentFamily = $('#epScent').value.trim();
@@ -3839,11 +3857,104 @@ function syncPut_(b) {
       $('#editProdDialog').close();
     }
 
+    // ===== Kode produk otomatis dari supplier =====
+    const supKey = (b) => String(b || '').toUpperCase().replace(/\s+/g, ' ').trim();
+    const SUP_SKIP = new Set(['PT', 'CV', 'UD', 'PD', 'TB', 'TOKO', 'FIRMA']);
+    function supPrefixBase(name) {
+      let words = supKey(name).replace(/[^A-Z0-9 ]+/g, ' ').split(/\s+/).filter(Boolean);
+      const core = words.filter((w) => !SUP_SKIP.has(w));
+      if (core.length) words = core;
+      if (!words.length) return '';
+      return words.length === 1 ? words[0].slice(0, 3) : words.map((w) => w[0]).join('').slice(0, 4);
+    }
+    function supPrefixFor(name, map) {
+      const key = supKey(name);
+      if (!key) return '';
+      if (map[key]) return map[key];
+      const used = new Set(Object.keys(map).map((k) => map[k]));
+      const base = supPrefixBase(name) || 'X';
+      const letters = key.replace(/[^A-Z0-9]/g, '');
+      let cand = base;
+      for (let len = base.length + 1; used.has(cand) && len <= Math.min(5, letters.length); len++) cand = letters.slice(0, len);
+      for (let i = 2; used.has(cand); i++) cand = base + i;
+      map[key] = cand;
+      return cand;
+    }
+    function nextSupCode(name, usedLower, map) {
+      const pre = supPrefixFor(name, map);
+      if (!pre) return '';
+      const re = new RegExp('^' + pre.toLowerCase() + '-(\\d+)$');
+      let max = 0;
+      usedLower.forEach((c) => { const m = re.exec(c); if (m) max = Math.max(max, Number(m[1])); });
+      let n = max + 1, code;
+      do { code = pre + '-' + String(n).padStart(3, '0'); n++; } while (usedLower.has(code.toLowerCase()));
+      usedLower.add(code.toLowerCase());
+      return code;
+    }
+    // supplier produk: isian di produk, kalau kosong pakai supplier invoice masuk terakhir yang memuat produk itu
+    function supplierOf(p) {
+      if (p.supplier) return String(p.supplier).trim();
+      let found = '';
+      (state.stockHistory || []).forEach((inv) => {
+        if (inv.supplier && (inv.items || []).some((it) => String(it.id) === String(p.id))) found = String(inv.supplier).trim();
+      });
+      return found;
+    }
+    function planSupplierCodes(includeCustom) {
+      const map = Object.assign({}, state.supplierPrefix || {});
+      const used = new Set(state.products.map((p) => String(p.code).toLowerCase()));
+      const plan = []; let noSupplier = 0;
+      state.products.forEach((p) => {
+        const sup = supplierOf(p);
+        if (!sup) { noSupplier++; return; }
+        const pre = supPrefixFor(sup, map), cur = String(p.code || '');
+        if (new RegExp('^' + pre + '-\\d+$', 'i').test(cur)) return;
+        if (!includeCustom && cur && !/^P\d+$/i.test(cur)) return;
+        plan.push({ p, sup, from: cur, to: nextSupCode(sup, used, map) });
+      });
+      return { plan, map, noSupplier };
+    }
+    function renderCodePlan() {
+      const r = planSupplierCodes($('#codeAll').checked);
+      const tail = r.noSupplier ? '<br>' + r.noSupplier + ' produk belum punya supplier (belum pernah masuk lewat Stok Masuk dan belum diisi) tidak diubah.' : '';
+      $('#codePreview').innerHTML = r.plan.length
+        ? '<b>' + r.plan.length + ' produk</b> akan diberi kode baru. Contoh:<br>' + r.plan.slice(0, 6).map((x) => escapeHtml(x.p.name) + ' (' + escapeHtml(x.sup) + '): ' + escapeHtml(x.from || '(kosong)') + ' → <b>' + escapeHtml(x.to) + '</b>').join('<br>') + tail
+        : 'Tidak ada kode yang perlu diganti.' + tail;
+      $('#codeApply').disabled = !r.plan.length;
+    }
+    function applyBrandCodes() {
+      const r = planSupplierCodes($('#codeAll').checked);
+      r.plan.forEach((x) => { x.p.code = x.to; if (!x.p.supplier) x.p.supplier = x.sup; });
+      state.supplierPrefix = r.map;
+      saveState();
+      renderProductList();
+      renderProductGrid();
+      $('#codeDialog').close();
+      const m = $('#prodMsg');
+      m.style.color = 'var(--accent)';
+      m.textContent = r.plan.length + ' kode produk diganti. Klik "Arsipkan ulang semua" di Pengaturan agar Google Sheets dan toko online ikut diperbarui.';
+      setTimeout(() => { m.textContent = ''; m.style.color = ''; }, 9000);
+    }
+    // samakan penulisan supplier dengan yang sudah ada (abaikan huruf besar/kecil)
+    function canonSupplier(name) {
+      const k = supKey(name);
+      if (!k) return '';
+      for (const o of document.querySelectorAll('#supplierOptions option')) if (supKey(o.value) === k) return o.value;
+      return String(name).trim();
+    }
+    function refreshSupplierOptions() {
+      const set = new Set();
+      state.products.forEach((p) => { if (p.supplier) set.add(String(p.supplier).trim()); });
+      (state.stockHistory || []).forEach((inv) => { if (inv.supplier) set.add(String(inv.supplier).trim()); });
+      $('#supplierOptions').innerHTML = [...set].sort((a, b) => a.localeCompare(b, 'id')).map((x) => '<option value="' + escapeHtml(x) + '"></option>').join('');
+    }
+
     function addProduct() {
       const msg = $('#prodMsg');
       const code = $('#prodCode').value.trim();
       const name = $('#prodName').value.trim();
       const brand = $('#prodBrand').value.trim();
+      const supplier = canonSupplier($('#prodSupplier').value);
       const category = $('#prodCategory').value.trim();
       msg.style.color = '';
       if (!name) { msg.textContent = 'Nama produk wajib diisi.'; return; }
@@ -3858,6 +3969,10 @@ function syncPut_(b) {
       const id = state.pid++;
       const used = new Set(state.products.map((x) => String(x.code).toLowerCase()));
       let finalCode = code;
+      if (!finalCode && supplier) {
+        state.supplierPrefix = state.supplierPrefix || {};
+        finalCode = nextSupCode(supplier, used, state.supplierPrefix);
+      }
       if (!finalCode) {
         let n = id;
         do { finalCode = 'P' + String(n).padStart(3, '0'); n++; } while (used.has(finalCode.toLowerCase()));
@@ -3867,6 +3982,7 @@ function syncPut_(b) {
         code: finalCode,
         name,
         brand,
+        supplier,
         category,
         cost: 0,
         price: 0,
@@ -3878,7 +3994,7 @@ function syncPut_(b) {
       saveState();
       renderProductList();
       renderProductGrid();
-      ['#prodCode', '#prodName', '#prodBrand', '#prodCategory', '#prodMinStock'].forEach((s) => { $(s).value = ''; });
+      ['#prodCode', '#prodName', '#prodBrand', '#prodSupplier', '#prodCategory', '#prodMinStock'].forEach((s) => { $(s).value = ''; });
       msg.style.color = 'var(--accent)';
       msg.textContent = 'Produk "' + name + '" ditambahkan. Isi harga saat Stok Masuk.';
       setTimeout(() => { msg.textContent = ''; msg.style.color = ''; }, 5000);
@@ -3927,7 +4043,7 @@ function syncPut_(b) {
         out.push({ key: keyDev + ':' + type + ':' + id, type, row, sig: hash8(JSON.stringify(row)) });
       };
       state.products.forEach((p) => {
-        if (Number(p.price) > 0) add('katalog', p.code || p.id, { Kode: p.code || String(p.id), Produk: p.name, Brand: p.brand || '', Kategori: p.category || '', Tipe: p.type || '', Harga: Number(p.price), Stok: (p.type === 'Decant' && !Number(p.stock)) ? 'ada' : Number(p.stock || 0), Gender: p.gender || '', 'Keluarga Aroma': p.scentFamily || '', Kelompok: (p.gender && p.scentFamily) ? p.gender + ' - ' + p.scentFamily : '', Deskripsi: p.description || '' });
+        if (Number(p.price) > 0) add('katalog', p.id, { Kode: p.code || String(p.id), Produk: p.name, Brand: p.brand || '', Kategori: p.category || '', Tipe: p.type || '', Harga: Number(p.price), Stok: (p.type === 'Decant' && !Number(p.stock)) ? 'ada' : Number(p.stock || 0), Gender: p.gender || '', 'Keluarga Aroma': p.scentFamily || '', Kelompok: (p.gender && p.scentFamily) ? p.gender + ' - ' + p.scentFamily : '', Deskripsi: p.description || '' });
       });
       state.journals.forEach((j) => {
         if (j.kind === 'biaya') {
@@ -4115,7 +4231,7 @@ function syncPut_(b) {
       ['affiliates', (r) => r.id, []], ['affPaid', (r) => r.id, []], ['pointLog', (r) => r.id, []],
       ['activity', (r) => [r.ts, r.user, r.act, r.mod, r.ref].join('|'), []]
     ];
-    const S2_SET = ['store', 'receiptMode', 'kasirRefund', 'restrictPrice', 'logo', 'logoAspect', 'pointCfg', 'ownerUser', 'ownerPin', 'lockSalt', 'requireOpen', 'hetPct', 'hetMode', 'hetVer', 'hetRound', 'hetAuto'];
+    const S2_SET = ['store', 'receiptMode', 'kasirRefund', 'restrictPrice', 'logo', 'logoAspect', 'supplierPrefix', 'pointCfg', 'ownerUser', 'ownerPin', 'lockSalt', 'requireOpen', 'hetPct', 'hetMode', 'hetVer', 'hetRound', 'hetAuto'];
     let s2Busy = false, s2KeyP = null, s2KeyFor = '';
     const s2On = () => !!(syncReady() && state.sync.s2 && state.sync.s2.linked);
     const devTag = () => { const i = s2On() ? Number(state.sync.s2.idx) || 0 : 0; return i > 0 ? String.fromCharCode(64 + Math.min(i, 26)) : ''; };
@@ -8389,6 +8505,10 @@ function syncPut_(b) {
       $('#bulkUpdateBtn').addEventListener('click', () => openBulk('update'));
       $('#exportProductsBtn').addEventListener('click', downloadProductsCsv);
       $('#parfumDescBtn').addEventListener('click', applyParfumDb);
+      $('#brandCodeBtn').addEventListener('click', () => { $('#codeAll').checked = false; renderCodePlan(); $('#codeDialog').showModal(); });
+      $('#codeAll').addEventListener('change', renderCodePlan);
+      $('#codeApply').addEventListener('click', applyBrandCodes);
+      $('#codeCancel').addEventListener('click', () => $('#codeDialog').close());
       $('#prodDelSelected').addEventListener('click', deleteSelectedProducts);
       $('#prodSelAll').addEventListener('change', (e) => {
         if (e.target.checked) prodVisible.forEach((id) => prodSel.add(id)); else prodSel.clear();
@@ -8492,6 +8612,7 @@ function syncPut_(b) {
           $('#epName').textContent = 'Kode ' + prod.code;
           $('#epNameInput').value = prod.name;
           $('#epBrand').value = prod.brand || '';
+          $('#epSupplier').value = prod.supplier || supplierOf(prod);
           $('#epCategory').value = prod.category || '';
           $('#epGender').value = prod.gender || '';
           $('#epScent').value = prod.scentFamily || '';
