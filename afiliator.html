@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="id"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Akun Afiliator</title>
+<style>
+:root{--g:#0f5d54;--s:#e7f2ef;--l:#dce7e4;--m:#5c726f;--r:#b34036}
+*{box-sizing:border-box}body{margin:0;background:#f3f7f5;color:#12312c;font:14px/1.45 "Segoe UI",Tahoma,sans-serif}
+header{background:var(--g);color:#fff;padding:12px 16px;box-shadow:0 6px 18px rgba(15,93,84,.2)}
+header h1{margin:0;font-size:1.1rem}header small{display:block;opacity:.8;font-size:12px}
+main{max-width:640px;margin:0 auto;padding:14px}
+input,button{font:inherit}input{width:100%;padding:12px;border:1px solid var(--l);border-radius:10px;background:#fff;font-size:16px}
+input:focus{outline:none;border-color:var(--g);box-shadow:0 0 0 3px rgba(15,93,84,.15)}
+.btn{border:0;border-radius:10px;background:var(--g);color:#fff;padding:12px 14px;font-weight:700;cursor:pointer;width:100%}
+.btn.alt{background:var(--s);color:#12312c}.btn:disabled{opacity:.5}
+.box{background:#fff;border:1px solid var(--l);border-radius:14px;padding:16px;margin-bottom:12px}
+label{display:block;margin:10px 0 4px;font-weight:700}.err{color:var(--r);min-height:20px;margin-top:8px}
+.big{font-size:1.8rem;font-weight:800;color:var(--g)}.muted{color:var(--m)}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.stat{background:var(--s);border-radius:10px;padding:10px}.stat span{display:block;color:var(--m);font-size:12px}.stat b{font-size:1rem}
+.ln{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--l)}
+.tag{font-size:11px;background:var(--s);border-radius:8px;padding:1px 7px}
+h2{margin:0 0 8px;font-size:1rem}
+</style></head><body>
+<header><h1>Akun Afiliator<small id="store"></small></h1></header>
+<main>
+<div class="box" id="login">
+<label for="kode">Kode afiliator</label><input id="kode" autocomplete="username" autocapitalize="characters">
+<label for="pin">PIN</label><input id="pin" type="password" autocomplete="current-password" autocapitalize="characters">
+<div class="err" id="err" role="alert"></div>
+<button class="btn" id="go">Lihat komisi saya</button>
+</div>
+<div id="dash" style="display:none">
+<div class="box">
+<div class="muted">Halo, <b id="nm"></b></div>
+<div class="muted">Komisi Anda: <span id="rule"></span></div>
+<div style="margin-top:10px" class="muted">Sisa komisi yang belum dibayar</div>
+<div class="big" id="sisa"></div>
+<div class="stats">
+<div class="stat"><span>Total komisi selesai</span><b id="komisi"></b></div>
+<div class="stat"><span>Sudah dibayar</span><b id="paid"></b></div>
+<div class="stat"><span>Pesanan berjalan</span><b id="pend"></b></div>
+<div class="stat"><span>Estimasi komisi berjalan</span><b id="est"></b></div>
+</div>
+<small class="muted" style="display:block;margin-top:8px">Komisi masuk ke "Total komisi selesai" setelah toko menandai pesanan Selesai. Estimasi bisa berubah bila pesanan dibatalkan.</small>
+</div>
+<div class="box"><h2>Pendapatan per bulan</h2><div id="months"></div></div>
+<div class="box"><h2>Pesanan dari link Anda</h2><div id="orders"></div></div>
+<div class="box"><h2>Riwayat pembayaran komisi</h2><div id="pays"></div></div>
+<button class="btn alt" id="again">Muat ulang</button>
+<button class="btn alt" id="out" style="margin-top:8px">Keluar</button>
+</div>
+</main>
+<script>
+// ISI SCRIPT_URL SEBELUM DIPAKAI (URL Apps Script berakhiran /exec, sama dengan di toko.html)
+const CFG={SCRIPT_URL:'',STORE:'Alkaff Fragrances'};
+const $=s=>document.querySelector(s),rp=n=>'Rp '+Number(n||0).toLocaleString('id-ID');
+const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let cred=null;
+$('#store').textContent=CFG.STORE;
+try{const k=new URLSearchParams(location.search).get('kode');if(k)$('#kode').value=k.toUpperCase().replace(/[^A-Z0-9_-]/g,'').slice(0,20)}catch(e){}
+async function load(){
+  const b=$('#go'),e=$('#err');
+  if(!CFG.SCRIPT_URL){e.textContent='Halaman belum dikonfigurasi (isi SCRIPT_URL).';return}
+  const code=$('#kode').value.trim(),pin=cred?cred.pin:$('#pin').value.trim();
+  if(!cred&&(!code||!pin)){e.textContent='Isi kode dan PIN.';return}
+  b.disabled=true;b.textContent='Memuat...';e.textContent='';
+  try{
+    const c=cred?cred.code:code;
+    const d=await (await fetch(CFG.SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'affiliate',code:c,pin:pin})})).json();
+    if(!d.ok)throw new Error(d.error);
+    cred={code:c,pin:pin};
+    show(d);
+  }catch(x){e.textContent=x.message||'Gagal memuat. Coba lagi.';cred=null}
+  b.disabled=false;b.textContent='Lihat komisi saya';
+}
+function show(d){
+  $('#login').style.display='none';$('#dash').style.display='block';
+  $('#nm').textContent=d.name;$('#rule').textContent=d.rule;
+  $('#sisa').textContent=rp(d.sisa);$('#komisi').textContent=rp(d.komisi);$('#paid').textContent=rp(d.paid);
+  $('#pend').textContent=d.pending+' pesanan';$('#est').textContent=rp(d.estimate);
+  const mx=Math.max(1,...(d.monthly||[]).map(m=>m.komisi));
+  const MN=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+  $('#months').innerHTML=(d.monthly||[]).map(m=>'<div style="margin:8px 0"><div style="display:flex;justify-content:space-between;gap:8px"><span>'+esc(MN[Number(m.bulan.slice(5,7))-1]+' '+m.bulan.slice(0,4))+' <small class="muted">· '+m.pesanan+' pesanan · penjualan '+rp(m.penjualan)+'</small></span><b>'+rp(m.komisi)+'</b></div><div style="background:var(--s);border-radius:6px;height:8px"><div style="background:var(--g);width:'+Math.round(m.komisi/mx*100)+'%;height:8px;border-radius:6px"></div></div></div>').join('')||'<div class="muted">Belum ada pendapatan.</div>';
+  $('#orders').innerHTML=d.orders.map(o=>'<div class="ln"><span>'+esc(o.No)+'<br><small class="muted">'+esc(o.Tanggal)+' · '+rp(o.Total)+'</small></span><span style="text-align:right"><span class="tag">'+esc(o.Status)+'</span><br><b>'+(o.Status==='Selesai'?rp(o.Komisi):'-')+'</b></span></div>').join('')||'<div class="muted">Belum ada pesanan.</div>';
+  $('#pays').innerHTML=d.payments.map(p=>'<div class="ln"><span>'+esc(p.Tanggal)+(p.Catatan?'<br><small class="muted">'+esc(p.Catatan)+'</small>':'')+'</span><b>'+rp(p.Jumlah)+'</b></div>').join('')||'<div class="muted">Belum ada pembayaran.</div>';
+}
+$('#go').onclick=load;
+$('#pin').onkeydown=e=>{if(e.key==='Enter')load()};
+$('#again').onclick=load;
+$('#out').onclick=()=>{cred=null;$('#pin').value='';$('#dash').style.display='none';$('#login').style.display='block'};
+</script></body></html>
