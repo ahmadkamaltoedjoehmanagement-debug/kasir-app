@@ -355,6 +355,7 @@
       <div class="layout">
         <div class="box">
           <input id="searchProduct" class="search" placeholder="Cari nama, kode, brand, kategori" />
+          <select id="kasirSort" aria-label="Urutan produk" style="margin-top:8px;"><option value="margin">Urutkan: margin tertinggi</option><option value="name">Urutkan: nama A-Z</option><option value="input">Urutkan: urutan input</option></select>
           <div id="kasirCats" role="group" aria-label="Kategori produk"></div>
           <div id="productGrid" class="grid"></div>
         </div>
@@ -412,16 +413,15 @@
           <datalist id="brandOptions"></datalist>
           <datalist id="categoryOptions"></datalist>
           <input id="prodMinStock" type="number" min="0" step="1" placeholder="Stok minimum (alert)" style="flex:1 1 150px;" />
+          <textarea id="prodDesc" rows="2" maxlength="300" placeholder="Deskripsi produk (tampil di toko online)" style="flex:1 1 100%; width:100%;"></textarea>
           <button id="addProductBtn" class="action">Simpan</button>
         </div>
         <div id="prodMsg" class="err"></div>
-        <div id="parfumMsg" class="muted" style="margin-top:4px;"></div>
         <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">
           <button id="bulkProductBtn" class="action ghost">Tambah produk massal</button>
           <button id="bulkUpdateBtn" class="action ghost">Update produk massal</button>
           <button id="exportProductsBtn" class="action ghost">Unduh produk (CSV)</button>
           <button id="brandCodeBtn" class="action ghost">Buat kode otomatis dari supplier</button>
-          <button id="parfumDescBtn" class="action ghost">Isi deskripsi parfum otomatis</button>
         </div>
         <h2 style="margin-top:18px;">Daftar produk</h2>
         <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:6px;">
@@ -1467,6 +1467,16 @@ function syncPut_(b) {
         <input id="storePhoneInput" maxlength="40" autocomplete="off" placeholder="mis. 0812 3456 7890" />
         <label class="blk" for="storeFooterInput">Teks penutup struk</label>
         <input id="storeFooterInput" maxlength="80" autocomplete="off" placeholder="Terima kasih" />
+        <h3 style="margin:14px 0 4px;">Media sosial (ditambahkan ke struk via WhatsApp)</h3>
+        <div class="muted">Boleh diisi @username atau link lengkap. Kosongkan yang tidak dipakai.</div>
+        <label class="blk" for="socIGInput">Instagram</label>
+        <input id="socIGInput" maxlength="120" autocomplete="off" placeholder="@namatoko" />
+        <label class="blk" for="socTTInput">TikTok</label>
+        <input id="socTTInput" maxlength="120" autocomplete="off" placeholder="@namatoko" />
+        <label class="blk" for="socFBInput">Facebook</label>
+        <input id="socFBInput" maxlength="120" autocomplete="off" placeholder="namahalaman" />
+        <label class="blk" for="socWebInput">Website / toko online</label>
+        <input id="socWebInput" maxlength="160" autocomplete="off" placeholder="https://..." />
       </div>
       <div class="box" style="margin-top:18px;">
         <h2>Logo struk</h2>
@@ -1592,11 +1602,6 @@ function syncPut_(b) {
     <input id="epSupplier" list="supplierOptions" autocomplete="off" />
     <label class="blk" for="epCategory">Kategori</label>
     <input id="epCategory" list="categoryOptions" autocomplete="off" />
-    <label class="blk" for="epGender">Gender</label>
-    <select id="epGender"><option value="">- belum diisi -</option><option>Pria</option><option>Wanita</option><option>Unisex</option></select>
-    <label class="blk" for="epScent">Keluarga aroma</label>
-    <input id="epScent" list="scentOptions" autocomplete="off" placeholder="mis. Woody, Floral, Oud" />
-    <datalist id="scentOptions"><option>Woody</option><option>Fresh Aquatic</option><option>Oriental Amber</option><option>Floral</option><option>Aromatic Fougere</option><option>Fruity</option><option>Gourmand</option><option>Oriental Spicy</option><option>Fresh Citrus</option><option>Oud</option><option>Musk &amp; Powdery</option><option>Green</option><option>Leather &amp; Tobacco</option></datalist>
     <label class="blk" for="epDesc">Deskripsi (tampil di toko online)</label>
     <textarea id="epDesc" rows="3" maxlength="300" style="width:100%;"></textarea>
     <label class="blk" for="epPrice">Harga eceran tertinggi</label>
@@ -1923,6 +1928,8 @@ function syncPut_(b) {
         <option value="a4">A4</option>
       </select>
       <button id="printReceiptBtn" class="action success full" style="margin-top:10px;">Cetak struk</button>
+      <button id="btPrintBtn" class="action ghost full hide" style="margin-top:8px;">Cetak langsung via Bluetooth (percobaan)</button>
+      <div id="btMsg" class="muted" style="margin-top:6px;"></div>
     </div>
 
     <button id="closeReceiptBtn" class="action full" style="margin-top:10px;">Selesai</button>
@@ -1967,6 +1974,7 @@ function syncPut_(b) {
       auth: { fails: 0, until: 0 },
       paper: '58',
       kasirRefund: false,
+      kasirSort: 'margin',
       restrictPrice: false,
       logo: '',
       logoAspect: 0,
@@ -1974,6 +1982,10 @@ function syncPut_(b) {
       storeAddr: '',
       storePhone: '',
       storeFooter: 'Terima kasih',
+      socIG: '',
+      socTT: '',
+      socFB: '',
+      socWeb: '',
       refunds: [],
       closings: [],
       cseq: 1,
@@ -2311,16 +2323,32 @@ function syncPut_(b) {
       if (kasirCat && !cats.includes(kasirCat)) kasirCat = '';
       $('#kasirCats').innerHTML = cats.length ? [''].concat(cats).map((c) => '<button type="button" class="chip" data-kcat="' + escapeHtml(c) + '" aria-pressed="' + (c === kasirCat) + '">' + (c ? escapeHtml(c) : 'Semua') + '</button>').join('') : '';
       let html = '';
-      state.products.filter((p) => {
+      const list = state.products.filter((p) => {
         if (kasirCat && String(p.category || '').trim() !== kasirCat) return false;
         const hay = (p.name + ' ' + p.code + ' ' + (p.brand || '') + ' ' + (p.category || '')).toLowerCase();
         return hay.includes(keyword);
-      }).forEach((p) => {
+      });
+      const sortMode = state.kasirSort || 'margin';
+      if ($('#kasirSort').value !== sortMode) $('#kasirSort').value = sortMode;
+      const byName = (a, b) => String(a.name).localeCompare(String(b.name), 'id');
+      if (sortMode === 'margin') {
+        // margin % = (harga - modal) / harga; produk tanpa harga/modal di urutan akhir
+        const mg = (p) => (Number(p.price) > 0 && Number(p.cost) > 0) ? (Number(p.price) - Number(p.cost)) / Number(p.price) * 100 : null;
+        list.sort((a, b) => {
+          const ma = mg(a), mb = mg(b);
+          if (ma === null && mb === null) return byName(a, b);
+          if (ma === null) return 1;
+          if (mb === null) return -1;
+          return (mb - ma) || ((Number(b.price) - Number(b.cost)) - (Number(a.price) - Number(a.cost))) || byName(a, b);
+        });
+      } else if (sortMode === 'name') list.sort(byName);
+      const isOwnerView = !!currentUser && currentUser.role === 'owner';
+      list.forEach((p) => {
         const qty = cart[p.id] || 0;
         html += '<button class="item' + (Number(p.stock || 0) <= 0 ? ' oos' : ((minStockOf(p) ? isLowStock(p) : p.stock <= 5) ? ' warn' : '')) + '" data-id="' + p.id + '" ' + (Number(p.stock || 0) <= 0 ? 'data-po="1"' : ((qty >= (p.stock || 0) || !(Number(p.price) > 0)) ? 'disabled' : '')) + '>' +
           '<b>' + escapeHtml(p.name) + '</b>' +
           ((p.brand || p.category) ? '<span>' + escapeHtml([p.brand, p.category].filter(Boolean).join(' · ')) + '</span>' : '') +
-          '<span>' + escapeHtml(p.code) + ' · ' + (Number(p.price) > 0 ? formatRp(p.price) : 'Belum ada harga') + '</span>' +
+          '<span>' + escapeHtml(p.code) + ' · ' + (Number(p.price) > 0 ? formatRp(p.price) : 'Belum ada harga') + (isOwnerView && Number(p.price) > 0 && Number(p.cost) > 0 ? ' · Margin ' + ((Number(p.price) - Number(p.cost)) / Number(p.price) * 100).toFixed(0) + '%' : '') + '</span>' +
           '<span>' + (Number(p.stock || 0) <= 0 ? '<span class="pill r">Habis · Pre Order</span>' : !(Number(p.price) > 0) ? '<span class="pill g">Harga belum diisi</span>' : ((minStockOf(p) ? isLowStock(p) : p.stock <= 5) ? '<span class="pill y">Stok ' + p.stock + (minStockOf(p) ? ' · Min ' + minStockOf(p) : '') + '</span>' : 'Stok ' + p.stock + (minStockOf(p) ? ' · Min ' + minStockOf(p) : ''))) + '</span>' +
           '</button>';
       });
@@ -2825,7 +2853,7 @@ function syncPut_(b) {
       next.actseq = Number(old.actseq || 1) + 1;
       next.activity = [{ id: Number(old.actseq || 1), ts: Date.now(), user: who, act: 'Reset', mod: 'Sistem', ref: '-', detail: 'Master reset: semua data dihapus' + (keep ? ' (pengaturan dipertahankan)' : '') }];
       if (keep) {
-        ['store', 'ownerPin', 'ownerUser', 'users', 'lockSalt', 'paper', 'receiptMode', 'kasirRefund', 'restrictPrice', 'logo', 'logoAspect', 'supplierPrefix', 'storeAddr', 'storePhone', 'storeFooter', 'pointCfg', 'requireOpen', 'hetPct', 'hetMode', 'hetRound', 'hetAuto'].forEach((k) => { if (old[k] !== undefined) next[k] = structuredClone(old[k]); });
+        ['store', 'ownerPin', 'ownerUser', 'users', 'lockSalt', 'paper', 'receiptMode', 'kasirRefund', 'restrictPrice', 'logo', 'logoAspect', 'supplierPrefix', 'storeAddr', 'storePhone', 'storeFooter', 'socIG', 'socTT', 'socFB', 'socWeb', 'pointCfg', 'requireOpen', 'hetPct', 'hetMode', 'hetRound', 'hetAuto'].forEach((k) => { if (old[k] !== undefined) next[k] = structuredClone(old[k]); });
         if (old.sync) { next.sync = structuredClone(old.sync); next.sync.sent = {}; next.sync.photos = {}; next.sync.s2 = null; next.sync.deviceId = 'D' + Math.random().toString(36).slice(2, 7).toUpperCase(); }
       }
       state = next;
@@ -3814,27 +3842,6 @@ function syncPut_(b) {
       }
     }
 
-    const PARFUM_DB = [["9 PM MAN","AFNAN","Pria","Oriental Spicy","Manis-rempah dengan vanila, apel, dan kayu manis; favorit untuk malam hari dan sering dibandingkan dengan Jean Paul Gaultier Ultra Male."],["9PM Rebel","AFNAN","Pria","Oriental Spicy","Seri 9PM dengan karakter lebih berani: manis, rempah, dan amber yang tahan lama."],["9AM Dive","AFNAN","Pria","Fresh Aquatic","Segar akuatik-citrus yang ringan dan bersih untuk aktivitas siang hari."],["Supremacy Not Only Intense","AFNAN","Pria","Woody","Woody-fruity yang intens dan maskulin dengan proyeksi kuat."],["Tapis Rouge","AFNAN","Unisex","Oriental Amber","Oriental hangat dengan sentuhan manis dan amber."],["Turathi Blue","AFNAN","Pria","Aromatic Fougere","Aromatik segar bernuansa biru, bersih, dan maskulin untuk harian."],["9AM Pour Femme","AFNAN","Wanita","Fruity","Fruity-floral ceria dan segar untuk wanita, cocok dipakai siang hari."],["Supremacy Silver","AFNAN","Pria","Fresh Citrus","Fresh woody-fruity yang elegan; sering dibandingkan dengan gaya Creed Aventus."],["Supremacy Collector Edition","AFNAN","Pria","Woody","Edisi koleksi seri Supremacy dengan karakter woody mewah dan tahan lama."],["Turathi Electric","AFNAN","Pria","Aromatic Fougere","Segar bertenaga dengan nuansa aromatik-citrus untuk pria aktif."],["Supremacy in Heaven","AFNAN","Pria","Woody","Woody-amber yang lembut dan elegan dengan kesan mewah."],["Turathi Brown","AFNAN","Unisex","Oriental Amber","Hangat woody-amber dengan kesan klasik."],["Rare Reef","AFNAN","Pria","Fresh Aquatic","Aquatic-marine yang segar dengan kesan laut yang bersih."],["9PM Elixir","AFNAN","Pria","Oriental Spicy","Versi lebih pekat dari 9PM dengan vanila, rempah, dan amber hangat."],["9AM Gold","AFNAN","Unisex","Oriental Amber","Amber-oriental hangat dengan sentuhan manis."],["9PM Night Out","AFNAN","Pria","Oriental Spicy","Manis-rempah bergaya clubbing yang tahan lama."],["Historic Sahara","AFNAN","Unisex","Oriental Amber","Oriental gurun yang hangat dengan nuansa kayu dan amber."],["Lynked Freedom","AFNAN","Pria","Aromatic Fougere","Aromatik segar yang ringan dan bersih."],["Lynked Forever","AFNAN","Pria","Woody","Woody hangat yang tahan lama dan maskulin."],["Rue Broca Nexa Immortal","RUE BROCA","Pria","Woody","Woody modern dengan karakter maskulin dan tahan lama."],["Theoremme Pour homme","RUE BROCA","Pria","Aromatic Fougere","Aromatik-woody yang rapi, cocok untuk kantor dan harian."],["On time Pour Homme","RUE BROCA","Pria","Woody","Varian Theoremme dengan sentuhan woody yang lebih dalam."],["Theoremme Matrix","RUE BROCA","Pria","Aromatic Fougere","Aromatik segar yang bersih untuk pemakaian harian."],["Hooked Azzure Pour Homme","RUE BROCA","Pria","Fresh Aquatic","Segar akuatik bernuansa biru, ringan, dan casual."],["Pride Pour Homme","RUE BROCA","Pria","Woody","Woody-aromatik maskulin dengan kesan percaya diri."],["Pride Pour Femme","RUE BROCA","Wanita","Floral","Floral feminin yang lembut dan elegan."],["Zimaya Sharaf Blend","ZIMAYA","Unisex","Oriental Amber","Oriental-amber hangat khas Arab dengan sentuhan manis."],["Sharaf the Club","ZIMAYA","Pria","Oriental Spicy","Rempah-oriental yang berkarakter untuk malam hari."],["Zimaya Tiramisu Choco","ZIMAYA","Unisex","Gourmand","Gourmand manis berbau kopi dan cokelat ala tiramisu."],["Modhesh Noble","ZIMAYA","Pria","Woody","Woody elegan dengan kesan mewah dan maskulin."],["Ghali Imperial","ZIMAYA","Pria","Oriental Amber","Amber-woody pekat dengan kesan mewah ala parfum Arab."],["Ode To Rose","ZIMAYA","Wanita","Floral","Floral bertema mawar yang romantis dan feminin."],["Zimaya Tiramisu Caramel","ZIMAYA","Unisex","Gourmand","Gourmand manis karamel dan kopi yang hangat."],["Zimaya Itqan Gold","ZIMAYA","Unisex","Oriental Amber","Amber-oriental hangat dengan kesan mewah."],["Zimaya Fatima","ZIMAYA","Wanita","Gourmand","Gourmand-floral manis yang lembut dan feminin."],["Oud is Great","ZIMAYA","Unisex","Oud","Berfokus pada oud (gaharu) dengan karakter hangat dan dalam."],["Amber is Great","ZIMAYA","Unisex","Oriental Amber","Berfokus pada amber yang hangat, manis, dan mewah."],["Mazaaj infused","ZIMAYA","Unisex","Oriental Amber","Perpaduan oriental hangat dengan karakter campuran (mazaaj)."],["Musk is Great","ZIMAYA","Unisex","Musk & Powdery","Berfokus pada musk yang bersih, lembut, dan menenangkan."],["Itqan Noir","ZIMAYA","Unisex","Woody","Woody gelap dengan nuansa misterius untuk malam hari."],["Abadi Opulent","ZIMAYA","Unisex","Oriental Amber","Oriental mewah dengan karakter hangat dan tahan lama."],["Charisma Pour Homme","ZIMAYA","Pria","Aromatic Fougere","Aromatik-maskulin yang rapi dan percaya diri."],["Modhesh Aura","ZIMAYA","Pria","Woody","Woody-aromatik dengan kesan bersih dan modern."],["Fatima Velvet Love","ZIMAYA","Wanita","Gourmand","Gourmand lembut bernuansa floral dan vanila."],["Al Embratur Elixir","ZIMAYA","Pria","Oriental Spicy","Oriental-rempah yang pekat dan berkesan kerajaan."],["Rabab Gems","ZIMAYA","Wanita","Fruity","Fruity manis yang ceria dan feminin."],["Rabab Pulp","ZIMAYA","Unisex","Fruity","Fruity juicy yang segar dan manis."],["Ramsh","ZIMAYA","Unisex","Oriental Amber","Oriental-amber hangat dengan karakter unik."],["Sharaf Divine","ZIMAYA","Pria","Woody","Woody halus dengan sentuhan elegan untuk pria."],["Mazaaj Rhythm","ZIMAYA","Unisex","Oriental Amber","Oriental hangat dengan karakter campuran yang dinamis."],["Hawwa Pink","ZIMAYA","Wanita","Fruity","Fruity-floral pink yang manis dan feminin."],["Al Barari Coral","ZIMAYA","Wanita","Fruity","Fruity segar bernuansa tropis dan cerah."],["Daiman Eden","ZIMAYA","Unisex","Floral","Floral-taman yang lembut dan segar."],["Daiman Eclipse","ZIMAYA","Unisex","Woody","Woody gelap dengan kesan misterius."],["Reverie Aqua","ZIMAYA","Unisex","Fresh Aquatic","Akuatik segar yang ringan dan menenangkan."],["Rose of Dreams","ZIMAYA","Wanita","Floral","Floral mawar yang lembut dan romantis."],["Rabab","ZIMAYA","Wanita","Floral","Floral manis yang feminin dan lembut."],["Oscar Platinum","ZIMAYA","Pria","Fresh Citrus","Citrus-segar yang bersih dan elegan untuk pria."],["French Avenue After Effect","FRENCH AVENUE","Pria","Woody","Woody-aromatik maskulin dengan kesan modern."],["Aether","FRENCH AVENUE","Unisex","Oriental Amber","Amber-oriental halus dengan karakter hangat."],["Glorious Oud","FRENCH AVENUE","Unisex","Oud","Oud elegan yang hangat dan tahan lama."],["Divin Asylum","FRENCH AVENUE","Unisex","Oriental Amber","Oriental pekat dengan kesan misterius."],["Royal Blend","FRENCH AVENUE","Pria","Woody","Woody-oriental mewah dengan karakter maskulin."],["Royal Blend Nero","FRENCH AVENUE","Pria","Woody","Varian gelap Royal Blend dengan nuansa woody pekat."],["Spectre Ghost","FRENCH AVENUE","Unisex","Aromatic Fougere","Aromatik dingin dengan kesan misterius."],["Liquid Brun","FRENCH AVENUE","Unisex","Gourmand","Gourmand manis hangat bernuansa kayu manis dan vanila."],["Essense de Blanc","FRENCH AVENUE","Unisex","Musk & Powdery","Musk bersih bernuansa putih yang lembut."],["Royal Blend Bourbon","FRENCH AVENUE","Pria","Woody","Woody hangat dengan sentuhan bourbon yang manis."],["Vulcan Fue","FRENCH AVENUE","Pria","Oriental Spicy","Rempah-oriental hangat dengan kesan \"api\"."],["Platine Blanc","FRENCH AVENUE","Unisex","Musk & Powdery","Musky-powdery yang bersih dan elegan."],["Royal Blend Vintage","FRENCH AVENUE","Pria","Woody","Woody klasik dengan kesan vintage yang mewah."],["Chocola Addict","FRENCH AVENUE","Unisex","Gourmand","Gourmand manis berbau cokelat."],["Vulcan Sable","FRENCH AVENUE","Pria","Woody","Woody-oriental gelap dari seri Vulcan."],["Vulcan Baie","FRENCH AVENUE","Pria","Fruity","Fruity-spicy dengan sentuhan buah beri."],["Pierce","FRENCH AVENUE","Pria","Aromatic Fougere","Aromatik segar dengan karakter maskulin."],["Nectare Extradose","FRENCH AVENUE","Wanita","Fruity","Fruity-nektar manis yang kaya."],["Atlantis","FRENCH AVENUE","Pria","Fresh Aquatic","Akuatik-marine yang segar dan bersih."],["Royal Blend Sequoia","FRENCH AVENUE","Pria","Woody","Woody dengan nuansa kayu pohon sequoia yang hangat."],["Obsidian","FRENCH AVENUE","Pria","Oriental Amber","Amber-oriental gelap dengan kesan misterius."],["Safari Breeze","FRENCH AVENUE","Unisex","Fresh Citrus","Citrus segar dengan kesan ringan dan terbuka."],["Zenith Deep","FRENCH AVENUE","Pria","Woody","Woody dalam dengan kesan tenang dan maskulin."],["Vulcan Black Friday","FRENCH AVENUE","Pria","Oriental Spicy","Edisi spesial Vulcan dengan karakter rempah gelap."],["Liquid Brun 150 ML","FRENCH AVENUE","Unisex","Gourmand","Liquid Brun ukuran 150 ml: gourmand manis hangat."],["Grow","FRENCH AVENUE","Unisex","Green","Segar hijau dengan kesan alami."],["Frostbite","FRENCH AVENUE","Pria","Fresh Aquatic","Segar dingin bak es dan akuatik."],["Marmara","FRENCH AVENUE","Unisex","Fresh Citrus","Citrus-mediterania yang segar dan cerah."],["Ravine Ginger","FRENCH AVENUE","Pria","Oriental Spicy","Rempah jahe yang hangat dan menyegarkan."],["Rose Explosion","FRENCH AVENUE","Wanita","Floral","Floral mawar yang intens dan feminin."],["Nabatieh","FRENCH AVENUE","Unisex","Oriental Amber","Oriental-amber hangat dengan nuansa timur tengah."],["Ravine Ice","FRENCH AVENUE","Pria","Fresh Aquatic","Akuatik dingin yang menyegarkan."],["Cocktail Intense","FRAGRANCE WORLD","Unisex","Fruity","Fruity-sweet seperti koktail, ceria dan manis."],["Infinite Pour Homme","FRAGRANCE WORLD","Pria","Woody","Woody-aromatik maskulin untuk harian."],["La Uno Intense Blue EDP","FRAGRANCE WORLD","Pria","Fresh Aquatic","Segar akuatik-aromatik bernuansa biru dan maskulin."],["La uno Forever Blue","FRAGRANCE WORLD","Pria","Fresh Aquatic","Segar biru yang bersih dan tahan lama."],["YYY","FRAGRANCE WORLD","Unisex","Oriental Amber","Nama produk ambigu; deskripsi bersifat umum."],["One Self","FRAGRANCE WORLD","Pria","Woody","Woody-aromatik modern untuk pria."],["Proud of You Intense","FRAGRANCE WORLD","Pria","Woody","Woody pekat versi intens dari Proud of You."],["Proud of You Absolute","FRAGRANCE WORLD","Pria","Oriental Amber","Amber-woody hangat dari seri Proud of You."],["Des Tentations Blue","FRAGRANCE WORLD","Pria","Fresh Aquatic","Segar biru akuatik-aromatik."],["Des Tentations Flame Red","FRAGRANCE WORLD","Pria","Oriental Spicy","Rempah hangat bernuansa \"api\" merah."],["Suits","FRAGRANCE WORLD","Pria","Aromatic Fougere","Aromatik rapi, cocok untuk suasana formal."],["Urban Man Elixir","FRAGRANCE WORLD","Pria","Oriental Spicy","Oriental-rempah pekat dengan kesan urban."],["Urban Man Le Parfum","FRAGRANCE WORLD","Pria","Woody","Woody-aromatik dengan konsentrasi parfum."],["Urban Man Paradise","FRAGRANCE WORLD","Pria","Fruity","Fruity segar dengan sentuhan tropis."],["Harmony Code Absolute","FRAGRANCE WORLD","Pria","Oriental Amber","Amber-oriental hangat dan pekat."],["Des Tentations Blue XDP","FRAGRANCE WORLD","Pria","Fresh Aquatic","Versi XDP (lebih pekat) dari Des Tentations Blue."],["Des Tentations Flame XDP","FRAGRANCE WORLD","Pria","Oriental Spicy","Versi XDP (lebih pekat) dari Des Tentations Flame."],["Harmony Code Intense","FRAGRANCE WORLD","Pria","Woody","Woody-aromatik versi intens."],["Proud of You Leather","FRAGRANCE WORLD","Pria","Leather & Tobacco","Kulit dengan sentuhan woody yang maskulin."],["F Le Parfum","FRAGRANCE WORLD","Wanita","Floral","Floral feminin dengan konsentrasi parfum."],["Hunted by Night Azure","FRAGRANCE WORLD","Pria","Fresh Aquatic","Segar biru dengan kesan malam yang sejuk."],["Vanille Drama","FRAGRANCE WORLD","Wanita","Gourmand","Gourmand vanila manis yang lembut."],["Des Tentations Star","FRAGRANCE WORLD","Unisex","Oriental Amber","Amber-manis hangat dari seri Des Tentations."],["Loui Ombre","FRAGRANCE WORLD","Pria","Woody","Woody gelap dengan kesan bayangan yang elegan."],["Savior","FRAGRANCE WORLD","Pria","Aromatic Fougere","Aromatik segar yang bersih dan maskulin."],["La Uno Intense Blue XDP","FRAGRANCE WORLD","Pria","Fresh Aquatic","Versi XDP (lebih pekat) dari La Uno Intense Blue."],["Liberty","FRAGRANCE WORLD","Pria","Aromatic Fougere","Aromatik segar yang bebas dan ringan."],["Liberty Intense","FRAGRANCE WORLD","Pria","Woody","Versi lebih intens dari Liberty dengan nuansa woody."],["Imaginari","FRAGRANCE WORLD","Unisex","Fruity","Fruity-floral manis dengan karakter playful."],["Homage","FRAGRANCE WORLD","Pria","Woody","Woody klasik dengan kesan penghormatan pada gaya lama."],["Pleasant","FRAGRANCE WORLD","Unisex","Fresh Citrus","Citrus ringan yang menyenangkan untuk harian."],["One Self Le Parfum","FRAGRANCE WORLD","Pria","Woody","One Self dengan konsentrasi parfum yang lebih pekat."],["J. Gustav Le Parfum","FRAGRANCE WORLD","Pria","Woody","Woody-aromatik elegan dengan konsentrasi parfum."],["Mocha Wood","FRAGRANCE WORLD","Unisex","Gourmand","Gourmand kopi mocha dengan kayu hangat."],["Valentia Rome Intense","FRAGRANCE WORLD","Wanita","Floral","Floral feminin intens bernuansa romantis."],["Golden Mirage","FRAGRANCE WORLD","Unisex","Oriental Amber","Amber emas yang hangat dan mewah."],["Ur Way","FRAGRANCE WORLD","Pria","Aromatic Fougere","Aromatik segar yang santai untuk harian."],["Ur Way Intense","FRAGRANCE WORLD","Pria","Woody","Versi intens Ur Way dengan nuansa woody."],["Proud of You Sandalo","FRAGRANCE WORLD","Pria","Woody","Cendana (sandalwood) yang hangat dan lembut."],["L Infinite JY","FRAGRANCE WORLD","Pria","Aromatic Fougere","Aromatik-woody modern untuk pria."],["Proud of You Parfum","FRAGRANCE WORLD","Pria","Woody","Proud of You dengan konsentrasi parfum."],["Montera Vanilla Petals","FRAGRANCE WORLD","Wanita","Gourmand","Vanila lembut dengan kelopak bunga yang manis."],["Proud of You Oud","FRAGRANCE WORLD","Pria","Oud","Oud dengan sentuhan woody maskulin."],["Khadlaj Karus Blue Spice","KHADLAJ","Pria","Oriental Spicy","Rempah segar bernuansa biru yang maskulin."],["Shiyaka Blue","KHADLAJ","Pria","Fresh Aquatic","Segar akuatik biru yang bersih dan maskulin."],["Shiyaka Silver","KHADLAJ","Pria","Fresh Citrus","Segar citrus-woody yang elegan dan bersih."],["Opus Reborn","KHADLAJ","Pria","Woody","Woody modern dengan karakter percaya diri."],["Rose & Romance","KHADLAJ","Wanita","Floral","Floral mawar romantis dan feminin."],["Rasayel Shagaf","KHADLAJ","Unisex","Oriental Amber","Oriental-amber hangat khas Arab."],["Rose Couture","KHADLAJ","Wanita","Floral","Mawar mewah dengan kesan elegan."],["Nafais Sharq","KHADLAJ","Unisex","Oriental Amber","Oriental timur yang kaya dan hangat."],["Cream Velvet","KHADLAJ","Wanita","Gourmand","Gourmand krim-vanila yang lembut seperti beludru."],["Aura Crisp Flower","KHADLAJ","Wanita","Floral","Floral segar yang renyah dan feminin."],["Empire Victor","KHADLAJ","Pria","Woody","Woody-aromatik dengan kesan percaya diri."],["Island","KHADLAJ","Unisex","Fresh Aquatic","Segar akuatik ala pulau tropis."],["Nuha","KHADLAJ","Wanita","Gourmand","Gourmand manis dan lembut untuk wanita."],["Celeste Aqua","KHADLAJ","Unisex","Fresh Aquatic","Akuatik langit biru yang ringan."],["Island Dreams","KHADLAJ","Unisex","Fruity","Fruity tropis yang manis dan ceria."],["Titan","KHADLAJ","Pria","Woody","Woody-aromatik kuat bertema \"titan\"."],["Shiyaaka Snow","KHADLAJ","Pria","Fresh Aquatic","Segar dingin bak salju, bersih dan modern."],["Shiyaaka Shadow","KHADLAJ","Pria","Woody","Woody gelap dengan kesan misterius."],["Caffe Latte","KHADLAJ","Unisex","Gourmand","Gourmand kopi susu yang hangat."],["Nuha Vanilla Pearl","KHADLAJ","Wanita","Gourmand","Vanila mutiara yang lembut dan manis."],["Nuha Bon Bon","KHADLAJ","Wanita","Gourmand","Gourmand permen manis yang ceria."],["Onyx Silver","KHADLAJ","Unisex","Woody","Woody-aromatik elegan dengan kesan dingin."],["Onyx Gold","KHADLAJ","Unisex","Oriental Amber","Amber hangat dengan kesan mewah."],["Icon","KHADLAJ","Pria","Aromatic Fougere","Aromatik-maskulin klasik."],["Ria","KHADLAJ","Wanita","Floral","Floral lembut dan feminin."],["La Fede Aura Manga Splash","KHADLAJ","Wanita","Fruity","Fruity mangga yang ceria dan segar."],["Panache Angel Dust","KHADLAJ","Wanita","Fruity","Fruity-manis yang berkilau dan feminin."],["Intoxicate Mystique","KHADLAJ","Unisex","Oriental Amber","Oriental misterius dengan kesan memabukkan."],["Daerej PH","RASASI","Pria","Woody","Woody-aromatik maskulin dari seri Daarej (Pour Homme)."],["Daerej PF","RASASI","Wanita","Floral","Floral-fruity feminin dari seri Daarej (Pour Femme)."],["Essential","RASASI","Pria","Aromatic Fougere","Aromatik klasik dengan kesan bersih."],["Prime","RASASI","Pria","Woody","Woody maskulin yang elegan."],["Pure","RASASI","Unisex","Musk & Powdery","Musk bersih yang lembut."],["Wood Excess","RASASI","Pria","Woody","Woody dalam dengan karakter kuat."],["Rasasi Classic","RASASI","Pria","Aromatic Fougere","Aromatik klasik ala parfum pria tradisional."],["Rasasi Hawas Ice","RASASI","Pria","Fresh Aquatic","Akuatik-citrus yang dingin dan menyegarkan; populer untuk cuaca panas."],["Rasasi Hawas for Her","RASASI","Wanita","Fruity","Fruity-floral segar yang ceria untuk wanita."],["Shurah Pour Homme","RASASI","Pria","Woody","Woody-oriental untuk pria dengan kesan mewah."],["Hawas Elixir","RASASI","Pria","Fresh Aquatic","Akuatik-fruity dengan karakter lebih pekat dari Hawas."],["Hawas for Him Fire","RASASI","Pria","Oriental Spicy","Citrus-rempah hangat dengan kesan energik."],["Hawas Black","RASASI","Pria","Fresh Aquatic","Akuatik gelap dengan nuansa malam hari."],["Style Ikon","RASASI","Pria","Aromatic Fougere","Aromatik modern bergaya ikon."],["Hawas for Him","RASASI","Pria","Fresh Aquatic","Akuatik-fruity segar dengan apel dan bergamot; salah satu parfum Rasasi terlaris."],["Hawas Kobra","RASASI","Pria","Oriental Spicy","Rempah-woody bertenaga dengan karakter berani."],["Daarej Pour Homme Extrait","RASASI","Pria","Woody","Woody pekat dengan konsentrasi extrait."],["Shuhrah Boisee","RASASI","Unisex","Woody","Woody lembut dengan kesan hangat."],["Fattan Pour Femme","RASASI","Wanita","Floral","Floral-oriental yang mewah dan feminin."],["Shuhrah Pour Femme","RASASI","Wanita","Floral","Floral feminin dengan kesan lembut."],["Nafaeis Al Shagaf","RASASI","Unisex","Oriental Amber","Oriental-amber hangat khas Arab."],["Hawas London","RASASI","Pria","Aromatic Fougere","Aromatik segar dengan sentuhan urban."],["Hawas Tropical","RASASI","Pria","Fruity","Fruity tropis yang segar dan ceria."],["Azure Royal","AHMED AL MAGHRIBI","Pria","Fresh Aquatic","Akuatik biru yang elegan dan segar."],["Rose Noir","AHMED AL MAGHRIBI","Wanita","Floral","Mawar gelap yang misterius dan feminin."],["Oud Couture","AHMED AL MAGHRIBI","Unisex","Oud","Oud mewah dengan kesan elegan."],["Green Pearl","AHMED AL MAGHRIBI","Unisex","Green","Segar hijau yang lembut dan alami."],["Royal Wood","AHMED AL MAGHRIBI","Pria","Woody","Woody klasik dengan kesan kerajaan."],["Hayana","AHMED AL MAGHRIBI","Wanita","Fruity","Fruity-floral manis dan feminin."],["Musk & rose","AHMED AL MAGHRIBI","Wanita","Musk & Powdery","Musk lembut berpadu mawar yang romantis."],["Ignite Oud","AHMED AL MAGHRIBI","Unisex","Oud","Oud hangat dengan karakter rempah."],["Kaaf","AHMED AL MAGHRIBI","Unisex","Oriental Amber","Oriental-amber hangat dengan karakter khas."],["Coco Blend","AHMED AL MAGHRIBI","Wanita","Gourmand","Gourmand kelapa dan vanila yang manis."],["Blu Oud","AHMED AL MAGHRIBI","Unisex","Oud","Oud segar bernuansa biru."],["Summer Oud","AHMED AL MAGHRIBI","Unisex","Oud","Oud yang lebih ringan untuk cuaca hangat."],["White Tiger","AHMED AL MAGHRIBI","Unisex","Musk & Powdery","Musk putih bersih dengan kesan elegan."],["Oud & Roses","AHMED AL MAGHRIBI","Unisex","Oud","Perpaduan oud dan mawar yang klasik."],["Anab","AHMED AL MAGHRIBI","Wanita","Fruity","Fruity manis bernuansa anggur."],["Blue","AHMED AL MAGHRIBI","Pria","Fresh Aquatic","Segar biru akuatik yang bersih."],["Muzn","AHMED AL MAGHRIBI","Unisex","Oriental Amber","Amber lembut dengan kesan hangat."],["Rawdha","AHMED AL MAGHRIBI","Wanita","Floral","Floral taman yang lembut dan segar."],["Frost Ice","AHMED AL MAGHRIBI","Pria","Fresh Aquatic","Segar dingin dan menyegarkan."],["Peachy Peach","AHMED AL MAGHRIBI","Wanita","Fruity","Fruity persik yang manis dan ceria."],["Kaaf Noir","AHMED AL MAGHRIBI","Unisex","Woody","Varian gelap Kaaf dengan nuansa woody."],["Nihlah","AHMED AL MAGHRIBI","Wanita","Floral","Floral lembut yang feminin."],["Marj","AHMED AL MAGHRIBI","Unisex","Green","Segar hijau seperti padang rumput."],["Oud Lavender","AHMED AL MAGHRIBI","Unisex","Oud","Oud dengan sentuhan lavender yang menenangkan."],["Black Fume","AHMED AL MAGHRIBI","Pria","Woody","Woody berasap dengan kesan gelap."],["Silk Noir","AHMED AL MAGHRIBI","Wanita","Oriental Amber","Amber lembut bak sutra, misterius dan feminin."],["Blush Noire","AHMED AL MAGHRIBI","Wanita","Floral","Floral-blush yang lembut dan romantis."],["Abaan","AHMED AL MAGHRIBI","Pria","Woody","Woody maskulin yang hangat."],["Rhea","AHMED AL MAGHRIBI","Wanita","Floral","Floral feminin yang elegan."],["Prometheus","AHMED AL MAGHRIBI","Pria","Woody","Woody-rempah bertenaga dan berani."],["Kaaf Pink","AHMED AL MAGHRIBI","Wanita","Fruity","Kaaf versi pink yang manis dan feminin."],["Bloom Spectrum","AHMED AL MAGHRIBI","Wanita","Floral","Floral mekar yang segar dan cerah."],["Taif Rose","AHMED AL MAGHRIBI","Wanita","Floral","Mawar Taif yang kaya dan klasik."],["Opaline Wave","AHMED AL MAGHRIBI","Wanita","Fresh Aquatic","Akuatik lembut dengan kesan berkilau."],["Chill Spectrum","AHMED AL MAGHRIBI","Unisex","Fresh Aquatic","Segar dingin yang ringan dan menyenangkan."],["Quantum","BONJOUR","Pria","Fresh Aquatic","Segar akuatik-aromatik modern."],["Absolute","BONJOUR","Pria","Woody","Woody pekat dengan karakter maskulin."],["Blue Icon","BONJOUR","Pria","Fresh Aquatic","Segar biru yang bersih dan ikonik."],["Forever Musk","BONJOUR","Unisex","Musk & Powdery","Musk bersih yang lembut dan tahan lama."],["Champion","BONJOUR","Pria","Aromatic Fougere","Aromatik sporty yang energik."],["Explorer","BONJOUR","Pria","Woody","Woody-aromatik bergaya petualang."],["Voyage","BONJOUR","Pria","Fresh Aquatic","Akuatik segar bertema perjalanan."],["Black Flame","BONJOUR","Pria","Oriental Spicy","Rempah-woody gelap dengan kesan berapi."],["Aura Radiance","BURGUNDY","Wanita","Floral","Floral cerah yang bersinar dan feminin."],["Most Desirable","BURGUNDY","Pria","Woody","Woody-aromatik dengan kesan memikat."],["Nuit Intense","BURGUNDY","Pria","Oriental Amber","Amber-oriental malam hari yang intens."],["Elixir Man","BURGUNDY","Pria","Oriental Spicy","Rempah hangat dan pekat untuk pria."],["Silver Gem","BURGUNDY","Pria","Fresh Citrus","Citrus segar dengan kesan bersih dan berkilau."],["Divine Nectar","BURGUNDY","Wanita","Gourmand","Gourmand manis seperti nektar."],["Ultimate","BURGUNDY","Pria","Woody","Woody-aromatik kuat untuk pria."],["Virtous","BURGUNDY","Pria","Aromatic Fougere","Aromatik bersih dengan kesan elegan."],["Himself","BURGUNDY","Pria","Aromatic Fougere","Aromatik klasik maskulin."],["Valerie","BURGUNDY","Wanita","Floral","Floral lembut dan feminin."],["Elixir","RAYHAAN","Pria","Oriental Spicy","Rempah-oriental pekat dan hangat."],["Tiger","RAYHAAN","Pria","Woody","Woody bertenaga dengan kesan buas."],["Lion","RAYHAAN","Pria","Woody","Woody kuat dan berkarisma."],["Ocean Rush","RAYHAAN","Pria","Fresh Aquatic","Akuatik segar bertenaga seperti ombak."],["Pacific Aura","RAYHAAN","Unisex","Fresh Aquatic","Akuatik tenang bernuansa samudra."],["Tropical Vibe","RAYHAAN","Unisex","Fruity","Fruity tropis yang ceria."],["Jungle Vibe","RAYHAAN","Unisex","Green","Segar hijau dengan kesan hutan tropis."],["Aquatica","RAYHAAN","Pria","Fresh Aquatic","Akuatik segar yang bersih."],["Kiss","RAYHAAN","Wanita","Fruity","Fruity manis yang genit dan feminin."],["Divine","RAYHAAN","Wanita","Floral","Floral lembut yang elegan."],["Azul","RAYHAAN","Pria","Fresh Aquatic","Segar biru akuatik yang maskulin."],["Wolf","RAYHAAN","Pria","Aromatic Fougere","Aromatik-woody dengan kesan liar."],["Nocturno Elixir","RAYHAAN","Pria","Oriental Amber","Amber-oriental malam hari yang pekat."],["Tonquin Giza","RAYHAAN","Unisex","Oriental Amber","Oriental hangat bernuansa tonka dan rempah."],["Pacific Aloha","RAYHAAN","Unisex","Fruity","Fruity tropis ala Hawaii."],["Terra","RAYHAAN","Pria","Woody","Woody tanah yang hangat dan alami."],["Obsidian","RAYHAAN","Pria","Oriental Amber","Amber-oriental gelap yang misterius."],["Blue Rain Sport","GEORGES MEZOTTI","Pria","Fresh Aquatic","Akuatik sporty yang segar untuk aktivitas aktif."],["Blue Rain Le Parfum","GEORGES MEZOTTI","Pria","Fresh Aquatic","Akuatik biru dengan konsentrasi parfum yang lebih tahan lama."],["Cotton C","OSMA","Unisex","Musk & Powdery","Kesan kapas bersih dan lembut."],["Amber S","OSMA","Unisex","Oriental Amber","Amber hangat dan manis."],["Ambry A","OSMA","Unisex","Oriental Amber","Amber-ambrox hangat dan halus."],["Citrus F","OSMA","Unisex","Fresh Citrus","Citrus segar dan ringan."],["Floral A","OSMA","Wanita","Floral","Floral lembut dan ringan."],["White F","OSMA","Unisex","Musk & Powdery","Aroma putih bersih bernuansa musk."],["Woody W","OSMA","Unisex","Woody","Woody hangat dan sederhana."],["Rose P","OSMA","Wanita","Floral","Mawar lembut dan feminin."],["Paudree F","OSMA","Unisex","Musk & Powdery","Powdery lembut dan bersih."],["11","REEF","Unisex","Fresh Aquatic","Seri bernomor Reef; nama ambigu sehingga deskripsi bersifat umum."],["19","REEF","Unisex","Fresh Aquatic","Seri bernomor Reef; nama ambigu sehingga deskripsi bersifat umum."],["21","REEF","Unisex","Fresh Aquatic","Seri bernomor Reef; nama ambigu sehingga deskripsi bersifat umum."],["33","REEF","Unisex","Fresh Aquatic","Seri bernomor Reef; nama ambigu sehingga deskripsi bersifat umum."],["Zenith","RIIFFS","Pria","Woody","Woody-aromatik elegan untuk pria."],["Freeze","RIIFFS","Pria","Fresh Aquatic","Segar dingin dan menyegarkan."],["Prive Platinum Silver","RIIFFS","Pria","Fresh Citrus","Citrus-woody bersih dengan kesan platinum."],["Momento","RIIFFS","Unisex","Oriental Amber","Amber lembut dengan kesan hangat."],["D'Espoir Arena","EMIR","Pria","Woody","Woody maskulin bernuansa arena yang tegas."],["D'Espoir Ambre","EMIR","Unisex","Oriental Amber","Amber hangat dan lembut."],["Voux Zingy","EMIR","Unisex","Fresh Citrus","Citrus zesty yang segar dan energik."],["Fire Your Desire","EMIR","Unisex","Oriental Spicy","Rempah hangat dengan kesan menggoda."],["Elania Pour Femme","EMIR","Wanita","Floral","Floral feminin yang lembut."],["Voux Turquoise","EMIR","Unisex","Fresh Aquatic","Akuatik tosca yang segar dan jernih."],["Rich Santal","EMIR","Unisex","Woody","Cendana yang kaya dan hangat."],["Camp Fire","EMIR","Unisex","Woody","Woody berasap seperti api unggun."],["Arcana","EMIR","Unisex","Oriental Amber","Oriental misterius dengan kesan mistis."],["Cedrat Essence","EMIR","Unisex","Fresh Citrus","Citrus cedrat yang segar dan bersih."],["Super Crush","EMIR","Wanita","Fruity","Fruity manis yang playful."],["Saviour Intense","PENDORA","Pria","Aromatic Fougere","Aromatik segar versi lebih intens."],["Liberte","PENDORA","Pria","Aromatic Fougere","Aromatik segar yang bebas dan ringan."],["Allusion","PENDORA","Wanita","Floral","Floral lembut yang feminin."],["Idyll","PENDORA","Wanita","Floral","Floral taman yang tenang dan manis."],["Ecstatic","PENDORA","Wanita","Fruity","Fruity manis yang ceria."],["Life is Beautiful","PENDORA","Wanita","Floral","Floral-gourmand manis yang ceria."],["Glorioud Oud","PENDORA","Unisex","Oud","Oud mewah yang hangat."],["Veteran Oud","PENDORA","Pria","Oud","Oud-woody maskulin dengan kesan klasik."],["Milano Platina","PENDORA","Pria","Fresh Aquatic","Segar akuatik-aromatik yang elegan."],["Protocol","PENDORA","Pria","Aromatic Fougere","Aromatik rapi, cocok untuk kerja."],["Enchantment","PENDORA","Pria","Woody","Woody hangat dengan kesan memikat."],["Intense Wayfarer","PENDORA","Pria","Woody","Woody intens dengan karakter petualang."],["Gravity Bleu","PENDORA","Pria","Fresh Aquatic","Segar biru dengan kesan modern."],["Camaro Intense","PENDORA","Pria","Woody","Woody-rempah sporty bertema otomotif."],["Away","PENDORA","Pria","Fresh Aquatic","Segar akuatik bertema liburan."],["Narceine Poudree","PENDORA","Wanita","Musk & Powdery","Powdery-floral lembut dan elegan."],["Thrill","PENDORA","Pria","Oriental Spicy","Rempah energik yang menggairahkan."],["Aventura","PENDORA","Pria","Fresh Citrus","Citrus segar bernuansa petualangan."],["Wayfarer Homme","PENDORA","Pria","Woody","Woody-aromatik casual untuk pria."],["Brave","PENDORA","Pria","Aromatic Fougere","Aromatik maskulin yang berani."],["Rose Addict","PENDORA","Wanita","Floral","Mawar yang menggoda dan feminin."],["Narceine Pour Femme","PENDORA","Wanita","Floral","Floral feminin yang lembut."],["Flawsome","PENDORA","Wanita","Fruity","Fruity manis dengan karakter percaya diri."],["Boozy Cherry","PENDORA","Unisex","Gourmand","Gourmand ceri dengan sentuhan \"boozy\"."],["Charuto Mysterious Tobacco","PENDORA","Pria","Leather & Tobacco","Tembakau misterius yang hangat dan manis."],["Titan","PENDORA","Pria","Woody","Woody-aromatik kuat bertema \"titan\"."],["Black Extremo","PENDORA","Pria","Woody","Woody gelap dengan karakter ekstrem."],["Enchantment Eternal Blue","PENDORA","Pria","Fresh Aquatic","Varian biru Enchantment yang segar."],["Veracious Blue","PENDORA","Pria","Fresh Aquatic","Segar biru dengan kesan jujur dan bersih."],["Enchantment Blue Intense","PENDORA","Pria","Fresh Aquatic","Enchantment biru versi intens dan lebih tahan lama."],["Rifaaqat","PARIS CORNER","Unisex","Oriental Amber","Oriental hangat yang halus."],["Rifaaqat Adorn","PARIS CORNER","Unisex","Oriental Amber","Varian Rifaaqat dengan kesan lebih mewah."],["Marshmallow Blush","PARIS CORNER","Wanita","Gourmand","Gourmand marshmallow manis bernuansa blush."],["Qissa Delicious","PARIS CORNER","Wanita","Gourmand","Gourmand manis dan lezat."],["Qissa Pink","PARIS CORNER","Wanita","Fruity","Fruity-floral pink yang manis."],["Light Blue Pour Homme","D&G","Pria","Aromatic Fougere","Aromatik-citrus mediterania (grapefruit, rosemary, kayu); ikon segar untuk pria."],["Light Blue Pour Homme Tester","D&G","Pria","Aromatic Fougere","Isi sama dengan Light Blue Pour Homme, dalam kemasan tester."],["Light Blue EDT","D&G","Wanita","Fresh Citrus","Citrus-floral segar dengan lemon sisilia, apel, dan cedar; klasik musim panas."],["Light Blue EDT Tester","D&G","Wanita","Fresh Citrus","Isi sama dengan Light Blue EDT, dalam kemasan tester."],["CDN INTENSE (M) 105ML (FIF)","ARMAF","Pria","Woody","Fruity-woody dengan nanas dan birch berasap; sangat populer dan sering dibandingkan dengan Creed Aventus."],["CDN URBAN MAN ELIXIR 105ML (UAE)","ARMAF","Pria","Oriental Spicy","Aromatik-rempah modern dengan karakter segar dan hangat."],["CDN WOMEN 105ML (EU) (UAE)","ARMAF","Wanita","Floral","Floral-fruity feminin dari seri Club de Nuit."],["CDN BLUE ICONIC 105ML (UAE)","ARMAF","Pria","Fresh Aquatic","Segar biru akuatik-aromatik."],["CDN INTENSE (M) 200ML (EU2) (UAE)","ARMAF","Pria","Woody","Club de Nuit Intense Man ukuran 200 ml: fruity-woody berasap."],["CDN MILESTONE 105ML (W) (UAE)","ARMAF","Wanita","Floral","Floral feminin dari seri Club de Nuit."],["CDN PRECIEUX I UNISEX 55ML (UAE)","ARMAF","Unisex","Oriental Amber","Amber-oriental mewah dengan karakter hangat."],["CDN SILLAGE 105ML (UE) (UAE)","ARMAF","Unisex","Aromatic Fougere","Aromatik segar dengan jejak aroma (sillage) yang kuat."],["CDN WHITE IMPERIALE 105ML EDP (MEN) (ARMAF SERIES)","ARMAF","Pria","Fresh Citrus","Citrus segar yang bersih dan elegan."],["CDN RED UNTOLD 105ML EDP (ARMAF SERIES)(UAE)","ARMAF","Unisex","Oriental Amber","Amber-manis hangat dengan karakter berkelas."],["CLUB DE NUIT INTENSE 105ML (W) (ARMAF SERIES)","ARMAF","Wanita","Floral","Floral-fruity feminin versi intens."],["CLUB DE NUIT INTENSE MEN -150ML EDP (ARMAF SERIES) (UAE)","ARMAF","Pria","Woody","Club de Nuit Intense Man ukuran 150 ml: fruity-woody berasap."],["CDN HERITAGE LIONHEART MAN EDT 100ML","ARMAF","Pria","Woody","Woody maskulin edisi heritage."],["CDN HERITAGE LIONHEART WOMAN EDT 100ML","ARMAF","Wanita","Floral","Floral feminin edisi heritage."],["ODYSSEY CANDEE SPECIAL EDITION 100 ML","ARMAF","Unisex","Gourmand","Gourmand permen manis yang ceria."],["ODYSSEY LIMONI EDITION 100 ML","ARMAF","Unisex","Fresh Citrus","Citrus lemon yang segar dan cerah."],["ODYSSEY MANDARIN SKY 100 ML","ARMAF","Unisex","Fresh Citrus","Citrus mandarin segar dengan kesan langit cerah."],["ODYSSEY MANDARIN SKY LIMITED EDITION 100ML (ARMAF SERIES)","ARMAF","Unisex","Fresh Citrus","Edisi terbatas Mandarin Sky: citrus mandarin segar."],["ODYSSEY MEGA LIMITED EDITION 100ML","ARMAF","Pria","Woody","Edisi terbatas Mega dengan karakter woody kuat."],["ODYSSEY HOMME 100ML (ARMAF SERIES) (UAE)","ARMAF","Pria","Aromatic Fougere","Aromatik maskulin untuk harian."],["VENTANA POUR HOMME -100ML (ARMAF SERIES) (FIF)","ARMAF","Pria","Aromatic Fougere","Aromatik-woody yang rapi dan maskulin."],["TRES NUIT -100ML (ARMAF SERIES)","ARMAF","Pria","Aromatic Fougere","Aromatik segar bernuansa malam yang maskulin."],["ODYSSEY SPECTRA RAINBOW EDITION 100 ML","ARMAF","Unisex","Fruity","Fruity warna-warni yang manis dan ceria."],["ODYSSEY DUBAI CHOCOLATE 100 ,ML","ARMAF","Unisex","Gourmand","Gourmand cokelat ala \"Dubai chocolate\" yang manis dan kaya."],["ODYSSEY AQUA 100ML (ARMAF SERIES) (FIF)","ARMAF","Pria","Fresh Aquatic","Akuatik segar yang bersih untuk harian."],["TAG HIM-100ML (ARMAF SERIES) (UAE)","ARMAF","Pria","Aromatic Fougere","Aromatik maskulin yang segar."],["VOYAGE HAWAII POUR FEMME PINK-100ML (ARMAF SERIES)(UAE)","ARMAF","Wanita","Fruity","Fruity-floral tropis yang manis dan ceria."],["ODYSSEY AOUD EDITION","ARMAF","Unisex","Oud","Oud dengan karakter hangat dan modern."],["HUNTER INTENSE FOR MEN-100ML (ARMAF SERIES) (FIF)","ARMAF","Pria","Woody","Woody-aromatik intens bertema pemburu."],["VENTANA MARINE - 100ML (ARMAF SERIES) (UAE)","ARMAF","Pria","Fresh Aquatic","Akuatik marine yang segar."],["EL-CIELO -100ML (ARMAF SERIES) (UAE)","ARMAF","Pria","Fresh Aquatic","Segar langit biru yang ringan."],["TRES NUIT VALENTINA POUR FEMME -100ML EDP (ARMAF","ARMAF","Wanita","Floral","Floral feminin dari seri Tres Nuit."],["ARMAF TAG DONNA COLORATA 100ML (ARMAF SERIES)(UAE)","ARMAF","Wanita","Fruity","Fruity-floral cerah untuk wanita."],["ARMAF TAG UOMO NERO 100ML (ARMAF SERIES)(UAE)","ARMAF","Pria","Woody","Woody gelap dan maskulin."],["UNIQ EFFECTS OF UNIQ EDP 100 ML","ARMAF","Unisex","Oriental Amber","Oriental unik dengan karakter hangat."],["UNIQ OUD FOREVER U EDP 100 ML","ARMAF","Unisex","Oud","Oud hangat yang tahan lama."],["ARMAF YUMYUM 100ML","ARMAF","Unisex","Gourmand","Gourmand manis dan lezat."],["DELIGHT ISLAND BLISS 100ML","ARMAF","Unisex","Fruity","Fruity tropis yang manis dan ceria."],["E BEACH PARTY 100ML (AYNL SERIES)","ARMAF","Unisex","Fresh Aquatic","Segar pantai yang ringan dan ceria."],["INFINITY GOLD","ARMAF","Unisex","Oriental Amber","Amber emas yang hangat."],["INFINITY SILVER","ARMAF","Unisex","Fresh Aquatic","Segar perak yang bersih."],["ARMAF CLUB DE NUIT 105 LTD OUD","ARMAF","Unisex","Oud","Edisi terbatas CDN dengan karakter oud."],["Q-325C ODYSSEY TYRANT 100ML","ARMAF","Pria","Woody","Woody kuat dengan kesan dominan."],["Q-530 HUNTER JUNGLE GREEN EDP 100ML","ARMAF","Pria","Green","Hijau segar bernuansa hutan."],["LE PARFAIT HOMME 100ML","ARMAF","Pria","Aromatic Fougere","Aromatik klasik maskulin."],["(E U) CLUB DE NUIT INTENSE (MALEKA 105 ml)","ARMAF","Unisex","Oriental Amber","Varian khusus Club de Nuit Intense (Maleka); deskripsi umum."],["ODYSSEY MEGA 60ML","ARMAF","Pria","Woody","Odyssey Mega ukuran 60 ml: woody kuat."],["ODYSSEY LIMONI FRESH EDITION 60ML","ARMAF","Unisex","Fresh Citrus","Limoni Fresh ukuran 60 ml: citrus lemon segar."],["PERLE D'OR 75ML EDP ARMAF","ARMAF","Wanita","Floral","Floral lembut dengan kesan mutiara emas."],["OMBRE D'or 75ML EDP ARMAF","ARMAF","Unisex","Oriental Amber","Amber emas yang hangat dan misterius."],["ARMAF ISLAND BREEZE 100ML-ARMAF SERIES","ARMAF","Unisex","Fresh Aquatic","Segar tropis angin pantai."],["CDN BLING 75ML EDP","ARMAF","Unisex","Oriental Amber","Amber manis berkilau dengan kesan glamor."],["ODYSSEY TOFFEE COFFEE 100ML (A","ARMAF","Unisex","Gourmand","Gourmand toffee dan kopi yang manis."],["CDN OVERDOSE 105ML","ARMAF","Pria","Oriental Spicy","Rempah-woody pekat dari seri Club de Nuit."],["ODYSSEY REVOLUTION ULTRA EDITION 100ML","ARMAF","Unisex","Oriental Spicy","Rempah-oriental dengan karakter berani."],["MISS ARMAF MYSTIQUE-100ML","ARMAF","Wanita","Floral","Floral misterius dan feminin."],["MISS ARMAF CHIC-100ML","ARMAF","Wanita","Fruity","Fruity chic yang ceria."],["MISS ARMAF ATTITUDE-100ML","ARMAF","Wanita","Floral","Floral berkarakter dan percaya diri."],["MISS ARMAF GRANDEUR-100ML","ARMAF","Wanita","Oriental Amber","Amber-floral mewah untuk wanita."],["ODYSSEY MARSHMALLOW 100ML (A","ARMAF","Unisex","Gourmand","Gourmand marshmallow yang manis dan lembut."],["ODYSSEY GO MANGO 100ML","ARMAF","Unisex","Fruity","Fruity mangga yang manis dan tropis."],["ODYSSEY BAHAMAS (A","ARMAF","Unisex","Fruity","Fruity tropis ala liburan pantai."],["ODYSSEY BLACK FOREST 100ML","ARMAF","Unisex","Gourmand","Gourmand cokelat-ceri ala kue Black Forest."],["BS AQUA","ARMAF BODY SPRAY","Pria","Fresh Aquatic","Body spray akuatik segar; ringan dan cepat hilang, untuk penyegar harian."],["BS MANDARIN SKY","ARMAF BODY SPRAY","Unisex","Fresh Citrus","Body spray citrus mandarin yang segar."],["BS CDN WOMAN","ARMAF BODY SPRAY","Wanita","Floral","Body spray floral-fruity feminin."],["BS ICONIC","ARMAF BODY SPRAY","Pria","Fresh Aquatic","Body spray segar biru yang ringan."],["BS CDNIM","ARMAF BODY SPRAY","Pria","Woody","Body spray fruity-woody terinspirasi Club de Nuit Intense Man."]]; // [nama, brand, gender, keluarga aroma, deskripsi]
-
-    function applyParfumDb() {
-      const norm = (v) => String(v || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
-      const byKey = {}, byName = {};
-      PARFUM_DB.forEach((r) => {
-        byKey[norm(r[0]) + '|' + norm(r[1])] = r;
-        (byName[norm(r[0])] = byName[norm(r[0])] || []).push(r);
-      });
-      let ok = 0; const miss = [];
-      state.products.forEach((p) => {
-        let r = byKey[norm(p.name) + '|' + norm(p.brand)];
-        if (!r) { const c = byName[norm(p.name)]; if (c && c.length === 1) r = c[0]; }
-        if (r) { p.gender = r[2]; p.scentFamily = r[3]; p.description = r[4]; ok++; } else miss.push(p.name);
-      });
-      saveState();
-      renderProductList();
-      const msg = $('#parfumMsg');
-      msg.textContent = ok + ' produk terisi gender, keluarga aroma & deskripsi.' + (miss.length ? ' ' + miss.length + ' produk tidak ditemukan di daftar deskripsi: ' + miss.slice(0, 8).join(', ') + (miss.length > 8 ? ', ...' : '') + '.' : '');
-    }
-
     let editProdId = null;
 
     function saveEditProduct() {
@@ -3855,10 +3862,8 @@ function syncPut_(b) {
       prod.name = newName;
       prod.brand = newBrand;
       prod.supplier = canonSupplier($('#epSupplier').value);
-      prod.category = $('#epCategory').value.trim();
-      prod.gender = $('#epGender').value;
-      prod.scentFamily = $('#epScent').value.trim();
       prod.description = $('#epDesc').value.trim();
+      prod.category = $('#epCategory').value.trim();
       prod.price = price;
       prod.minPrice = minPrice;
       prod.minStock = Math.max(0, Math.floor(cleanNum($('#epMinStock').value)));
@@ -4000,6 +4005,7 @@ function syncPut_(b) {
         cost: 0,
         price: 0,
         minPrice: 0,
+        description: $('#prodDesc').value.trim(),
         minStock: Math.max(0, Math.floor(cleanNum($('#prodMinStock').value))),
         stock: 0,
         type: 'BNIB'
@@ -4007,7 +4013,7 @@ function syncPut_(b) {
       saveState();
       renderProductList();
       renderProductGrid();
-      ['#prodCode', '#prodName', '#prodBrand', '#prodSupplier', '#prodCategory', '#prodMinStock'].forEach((s) => { $(s).value = ''; });
+      ['#prodCode', '#prodName', '#prodBrand', '#prodSupplier', '#prodCategory', '#prodMinStock', '#prodDesc'].forEach((s) => { $(s).value = ''; });
       msg.style.color = 'var(--accent)';
       msg.textContent = 'Produk "' + name + '" ditambahkan. Isi harga saat Stok Masuk.';
       setTimeout(() => { msg.textContent = ''; msg.style.color = ''; }, 5000);
@@ -4056,7 +4062,7 @@ function syncPut_(b) {
         out.push({ key: keyDev + ':' + type + ':' + id, type, row, sig: hash8(JSON.stringify(row)) });
       };
       state.products.forEach((p) => {
-        if (Number(p.price) > 0) add('katalog', p.id, { Kode: p.code || String(p.id), Produk: p.name, Brand: p.brand || '', Kategori: p.category || '', Tipe: p.type || '', Harga: Number(p.price), Stok: (p.type === 'Decant' && !Number(p.stock)) ? 'ada' : Number(p.stock || 0), Gender: p.gender || '', 'Keluarga Aroma': p.scentFamily || '', Kelompok: (p.gender && p.scentFamily) ? p.gender + ' - ' + p.scentFamily : '', Deskripsi: p.description || '' });
+        add('katalog', p.id, { Kode: p.code || String(p.id), Produk: p.name, Brand: p.brand || '', Kategori: p.category || '', Tipe: p.type || '', Harga: Number(p.price), Stok: (p.type === 'Decant' && !Number(p.stock)) ? 'ada' : Number(p.stock || 0), Deskripsi: p.description || '' });
       });
       state.journals.forEach((j) => {
         if (j.kind === 'biaya') {
@@ -4244,7 +4250,7 @@ function syncPut_(b) {
       ['affiliates', (r) => r.id, []], ['affPaid', (r) => r.id, []], ['pointLog', (r) => r.id, []],
       ['activity', (r) => [r.ts, r.user, r.act, r.mod, r.ref].join('|'), []]
     ];
-    const S2_SET = ['store', 'receiptMode', 'kasirRefund', 'restrictPrice', 'logo', 'logoAspect', 'supplierPrefix', 'storeAddr', 'storePhone', 'storeFooter', 'pointCfg', 'ownerUser', 'ownerPin', 'lockSalt', 'requireOpen', 'hetPct', 'hetMode', 'hetVer', 'hetRound', 'hetAuto'];
+    const S2_SET = ['store', 'receiptMode', 'kasirRefund', 'restrictPrice', 'logo', 'logoAspect', 'supplierPrefix', 'storeAddr', 'storePhone', 'storeFooter', 'socIG', 'socTT', 'socFB', 'socWeb', 'pointCfg', 'ownerUser', 'ownerPin', 'lockSalt', 'requireOpen', 'hetPct', 'hetMode', 'hetVer', 'hetRound', 'hetAuto'];
     let s2Busy = false, s2KeyP = null, s2KeyFor = '';
     const s2On = () => !!(syncReady() && state.sync.s2 && state.sync.s2.linked);
     const devTag = () => { const i = s2On() ? Number(state.sync.s2.idx) || 0 : 0; return i > 0 ? String.fromCharCode(64 + Math.min(i, 26)) : ''; };
@@ -6448,13 +6454,29 @@ function syncPut_(b) {
       showReceiptText(buildReceiptText(tx), tx.member ? tx.member.phone : '');
     }
 
+    // blok media sosial untuk struk via WhatsApp (menerima @username atau link lengkap)
+    function socialUrl(kind, v) {
+      v = String(v || '').trim();
+      if (!v) return '';
+      if (/^https?:\/\//i.test(v)) return v;
+      const u = v.replace(/^@/, '');
+      if (kind === 'ig') return 'https://instagram.com/' + u;
+      if (kind === 'tt') return 'https://tiktok.com/@' + u;
+      if (kind === 'fb') return 'https://facebook.com/' + u;
+      return 'https://' + v.replace(/^\/+/, '');
+    }
+    function socialText() {
+      const rows = [['Instagram', socialUrl('ig', state.socIG)], ['TikTok', socialUrl('tt', state.socTT)], ['Facebook', socialUrl('fb', state.socFB)], ['Website', socialUrl('web', state.socWeb)]].filter((r) => r[1]);
+      return rows.length ? '\n\nIkuti kami:\n' + rows.map((r) => r[0] + ': ' + r[1]).join('\n') : '';
+    }
+
     function updateReceiptLink() {
       const raw = $('#customerPhone').value.replace(/\D/g, '');
       let wa = raw;
       if (wa.startsWith('0')) wa = '62' + wa.slice(1);
       const link = $('#waLink');
       if (/^62\d{9,13}$/.test(wa)) {
-        link.href = 'https://wa.me/' + wa + '?text=' + encodeURIComponent('```\n' + $('#receiptText').textContent + '\n```');
+        link.href = 'https://wa.me/' + wa + '?text=' + encodeURIComponent('```\n' + $('#receiptText').textContent + '\n```' + socialText());
         link.style.opacity = '1';
       } else {
         link.href = '#';
@@ -6470,6 +6492,91 @@ function syncPut_(b) {
       });
       $('#waPanel').classList.toggle('hide', mode !== 'wa');
       $('#printPanel').classList.toggle('hide', mode !== 'print');
+    }
+
+    // ===== Cetak langsung via Bluetooth BLE (percobaan, ESC/POS) =====
+    const BT_SERVICES = [0x18f0, 0xff00, 0xffe0, 0xfff0, 0xfee7, 0xae30, '49535343-fe7d-4ae5-8fa9-9fafd205e455', 'e7810a71-73ae-499d-8c15-faa9aef0c3f2'];
+    let btDevice = null, btChar = null;
+    async function btConnect() {
+      if (!navigator.bluetooth) throw new Error('Browser ini tidak mendukung Bluetooth. Gunakan Chrome di Android atau Windows.');
+      if (btChar && btDevice && btDevice.gatt.connected) return btChar;
+      if (!btDevice) {
+        btDevice = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: BT_SERVICES });
+        btDevice.addEventListener('gattserverdisconnected', () => { btChar = null; });
+      }
+      const server = await btDevice.gatt.connect();
+      const services = await server.getPrimaryServices();
+      for (const sv of services) {
+        const chars = await sv.getCharacteristics();
+        const c = chars.find((x) => x.properties.writeWithoutResponse) || chars.find((x) => x.properties.write);
+        if (c) { btChar = c; return c; }
+      }
+      btDevice = null;
+      throw new Error('Printer terhubung, tetapi jalur kirim data tidak dikenali. Gunakan RawBT atau driver USB.');
+    }
+    async function btWrite(bytes) {
+      const c = await btConnect();
+      for (let i = 0; i < bytes.length; i += 20) {
+        const chunk = bytes.slice(i, i + 20);
+        if (c.properties.writeWithoutResponse) await c.writeValueWithoutResponse(chunk); else await c.writeValue(chunk);
+        await new Promise((r) => setTimeout(r, 12));
+      }
+    }
+    const escAscii = (t) => String(t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[·•]/g, '-').replace(/→/g, '>').replace(/[^\n\x20-\x7e]/g, '?');
+    async function escLogo(dotsW) {
+      if (!state.logo || !(Number(state.logoAspect) > 0)) return null;
+      const img = new Image();
+      await new Promise((res, rej) => { img.onload = res; img.onerror = () => rej(new Error('Logo tidak bisa dibaca.')); img.src = state.logo; });
+      const w = Math.floor(dotsW / 8) * 8, h = Math.max(1, Math.round(w * Number(state.logoAspect)));
+      const cv = document.createElement('canvas');
+      cv.width = w; cv.height = h;
+      const ctx = cv.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      const px = ctx.getImageData(0, 0, w, h).data, bpr = w / 8, out = [];
+      for (let y0 = 0; y0 < h; y0 += 32) {
+        const rows = Math.min(32, h - y0);
+        out.push(0x1d, 0x76, 0x30, 0x00, bpr & 255, bpr >> 8, rows & 255, rows >> 8);
+        for (let y = y0; y < y0 + rows; y++) {
+          for (let bx = 0; bx < bpr; bx++) {
+            let b = 0;
+            for (let k = 0; k < 8; k++) {
+              const i = (y * w + bx * 8 + k) * 4;
+              if ((0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2]) < 128) b |= 0x80 >> k;
+            }
+            out.push(b);
+          }
+        }
+      }
+      return out;
+    }
+    async function buildEscPos(text, paper) {
+      const out = [0x1b, 0x40];
+      const logo = await escLogo(paper === '80' ? 400 : 320);
+      if (logo) { out.push(0x1b, 0x61, 0x01); logo.forEach((b) => out.push(b)); out.push(0x0a, 0x1b, 0x61, 0x00); }
+      Array.from(new TextEncoder().encode(escAscii(text) + '\n')).forEach((b) => out.push(b));
+      out.push(0x1b, 0x64, 0x04);
+      return Uint8Array.from(out);
+    }
+    async function printViaBluetooth() {
+      const msg = $('#btMsg'), btn = $('#btPrintBtn');
+      msg.style.color = '';
+      msg.textContent = 'Menghubungkan ke printer… pilih printer pada daftar yang muncul.';
+      btn.disabled = true;
+      try {
+        await btConnect();
+        msg.textContent = 'Mengirim struk ke printer…';
+        const paper = $('#paperSize').value === '80' ? '80' : '58';
+        await btWrite(await buildEscPos(currentReceiptText, paper));
+        msg.style.color = 'var(--accent)';
+        msg.textContent = 'Struk terkirim ke ' + (btDevice && btDevice.name ? btDevice.name : 'printer') + '.';
+      } catch (e) {
+        msg.style.color = 'var(--danger)';
+        msg.textContent = (e && e.name === 'NotFoundError') ? 'Tidak ada printer yang dipilih. Jika printer tidak muncul di daftar, kemungkinan memakai Bluetooth klasik: gunakan RawBT atau driver USB.' : ((e && e.message) || 'Gagal mencetak lewat Bluetooth.');
+        btChar = null;
+      } finally {
+        btn.disabled = false;
+      }
     }
 
     function printReceipt() {
@@ -6906,6 +7013,7 @@ function syncPut_(b) {
       $('#lockErr').textContent = '';
       $('#pinInput').value = '';
       applyAccess();
+      renderProductGrid();
     }
 
     // ===== Menu per kategori =====
@@ -6943,6 +7051,7 @@ function syncPut_(b) {
       $('#storeAddrInput').value = state.storeAddr || '';
       $('#storePhoneInput').value = state.storePhone || '';
       $('#storeFooterInput').value = state.storeFooter === undefined ? 'Terima kasih' : state.storeFooter;
+      [['#socIGInput', 'socIG'], ['#socTTInput', 'socTT'], ['#socFBInput', 'socFB'], ['#socWebInput', 'socWeb']].forEach(([sel, key]) => { $(sel).value = state[key] || ''; });
       renderLogoSettings();
       renderSyncSettings();
       renderPointCfg();
@@ -8527,7 +8636,6 @@ function syncPut_(b) {
     function bindProductBulkEvents() {
       $('#bulkUpdateBtn').addEventListener('click', () => openBulk('update'));
       $('#exportProductsBtn').addEventListener('click', downloadProductsCsv);
-      $('#parfumDescBtn').addEventListener('click', applyParfumDb);
       $('#brandCodeBtn').addEventListener('click', () => { $('#codeAll').checked = false; renderCodePlan(); $('#codeDialog').showModal(); });
       $('#codeAll').addEventListener('change', renderCodePlan);
       $('#codeApply').addEventListener('click', applyBrandCodes);
@@ -8548,6 +8656,7 @@ function syncPut_(b) {
 
     function bindEvents() {
       $('#searchProduct').addEventListener('input', renderProductGrid);
+      $('#kasirSort').addEventListener('change', () => { state.kasirSort = $('#kasirSort').value; saveState(); renderProductGrid(); });
       $('#productGrid').addEventListener('click', (e) => {
         const btn = e.target.closest('.item');
         if (!btn) return;
@@ -8636,10 +8745,8 @@ function syncPut_(b) {
           $('#epNameInput').value = prod.name;
           $('#epBrand').value = prod.brand || '';
           $('#epSupplier').value = prod.supplier || supplierOf(prod);
-          $('#epCategory').value = prod.category || '';
-          $('#epGender').value = prod.gender || '';
-          $('#epScent').value = prod.scentFamily || '';
           $('#epDesc').value = prod.description || '';
+          $('#epCategory').value = prod.category || '';
           $('#epPrice').value = Number(prod.price) || '';
           $('#epMin').value = minPriceOf(prod) || '';
           $('#epMinStock').value = minStockOf(prod) || '';
@@ -8962,7 +9069,7 @@ function syncPut_(b) {
       $('#refundItems').addEventListener('input', updateRefundPreview);
       $('#refundSubmit').addEventListener('click', processRefund);
       $('#refundCancel').addEventListener('click', () => $('#refundDialog').close());
-      [['#storeAddrInput', 'storeAddr'], ['#storePhoneInput', 'storePhone'], ['#storeFooterInput', 'storeFooter']].forEach(([sel, key]) => {
+      [['#storeAddrInput', 'storeAddr'], ['#storePhoneInput', 'storePhone'], ['#storeFooterInput', 'storeFooter'], ['#socIGInput', 'socIG'], ['#socTTInput', 'socTT'], ['#socFBInput', 'socFB'], ['#socWebInput', 'socWeb']].forEach(([sel, key]) => {
         $(sel).addEventListener('input', () => { state[key] = $(sel).value; saveState(); });
       });
       $('#logoFile').addEventListener('change', async () => {
@@ -8996,6 +9103,8 @@ function syncPut_(b) {
 
       $('#changePinBtn').addEventListener('click', changeOwnerPin);
       $('#printReceiptBtn').addEventListener('click', printReceipt);
+      if (navigator.bluetooth) $('#btPrintBtn').classList.remove('hide');
+      $('#btPrintBtn').addEventListener('click', printViaBluetooth);
       $('#receiptMode').addEventListener('click', (e) => {
         const btn = e.target.closest('[data-mode]');
         if (btn) setReceiptMode(btn.dataset.mode);
