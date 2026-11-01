@@ -1461,6 +1461,8 @@ function syncPut_(b) {
       <div class="box" style="margin-top:18px;">
         <h2>Info toko di struk</h2>
         <div class="muted">Tampil di bagian atas struk, di bawah nama toko. Kosongkan bila tidak ingin dicetak.</div>
+        <label class="blk" for="storeGreetingInput">Salam / kalimat pembuka (opsional)</label>
+        <input id="storeGreetingInput" maxlength="80" autocomplete="off" placeholder="mis. Assalamualaikum" />
         <label class="blk" for="storeAddrInput">Alamat</label>
         <textarea id="storeAddrInput" rows="2" maxlength="160" style="width:100%;" placeholder="mis. Jl. Contoh No. 1, Kota"></textarea>
         <label class="blk" for="storePhoneInput">Nomor telepon / WhatsApp</label>
@@ -1477,6 +1479,7 @@ function syncPut_(b) {
         <input id="socFBInput" maxlength="120" autocomplete="off" placeholder="namahalaman" />
         <label class="blk" for="socWebInput">Website / toko online</label>
         <input id="socWebInput" maxlength="160" autocomplete="off" placeholder="https://..." />
+        <label style="display:flex; align-items:center; gap:8px; margin-top:10px;"><input id="socPrintChk" type="checkbox" style="width:auto;" /> Cetak juga media sosial di struk cetak printer (format singkat)</label>
       </div>
       <div class="box" style="margin-top:18px;">
         <h2>Logo struk</h2>
@@ -1986,6 +1989,8 @@ function syncPut_(b) {
       socTT: '',
       socFB: '',
       socWeb: '',
+      storeGreeting: '',
+      socPrint: true,
       refunds: [],
       closings: [],
       cseq: 1,
@@ -2853,7 +2858,7 @@ function syncPut_(b) {
       next.actseq = Number(old.actseq || 1) + 1;
       next.activity = [{ id: Number(old.actseq || 1), ts: Date.now(), user: who, act: 'Reset', mod: 'Sistem', ref: '-', detail: 'Master reset: semua data dihapus' + (keep ? ' (pengaturan dipertahankan)' : '') }];
       if (keep) {
-        ['store', 'ownerPin', 'ownerUser', 'users', 'lockSalt', 'paper', 'receiptMode', 'kasirRefund', 'restrictPrice', 'logo', 'logoAspect', 'supplierPrefix', 'storeAddr', 'storePhone', 'storeFooter', 'socIG', 'socTT', 'socFB', 'socWeb', 'pointCfg', 'requireOpen', 'hetPct', 'hetMode', 'hetRound', 'hetAuto'].forEach((k) => { if (old[k] !== undefined) next[k] = structuredClone(old[k]); });
+        ['store', 'ownerPin', 'ownerUser', 'users', 'lockSalt', 'paper', 'receiptMode', 'kasirRefund', 'restrictPrice', 'logo', 'logoAspect', 'supplierPrefix', 'storeAddr', 'storePhone', 'storeFooter', 'socIG', 'socTT', 'socFB', 'socWeb', 'storeGreeting', 'socPrint', 'pointCfg', 'requireOpen', 'hetPct', 'hetMode', 'hetRound', 'hetAuto'].forEach((k) => { if (old[k] !== undefined) next[k] = structuredClone(old[k]); });
         if (old.sync) { next.sync = structuredClone(old.sync); next.sync.sent = {}; next.sync.photos = {}; next.sync.s2 = null; next.sync.deviceId = 'D' + Math.random().toString(36).slice(2, 7).toUpperCase(); }
       }
       state = next;
@@ -4250,7 +4255,7 @@ function syncPut_(b) {
       ['affiliates', (r) => r.id, []], ['affPaid', (r) => r.id, []], ['pointLog', (r) => r.id, []],
       ['activity', (r) => [r.ts, r.user, r.act, r.mod, r.ref].join('|'), []]
     ];
-    const S2_SET = ['store', 'receiptMode', 'kasirRefund', 'restrictPrice', 'logo', 'logoAspect', 'supplierPrefix', 'storeAddr', 'storePhone', 'storeFooter', 'socIG', 'socTT', 'socFB', 'socWeb', 'pointCfg', 'ownerUser', 'ownerPin', 'lockSalt', 'requireOpen', 'hetPct', 'hetMode', 'hetVer', 'hetRound', 'hetAuto'];
+    const S2_SET = ['store', 'receiptMode', 'kasirRefund', 'restrictPrice', 'logo', 'logoAspect', 'supplierPrefix', 'storeAddr', 'storePhone', 'storeFooter', 'socIG', 'socTT', 'socFB', 'socWeb', 'storeGreeting', 'socPrint', 'pointCfg', 'ownerUser', 'ownerPin', 'lockSalt', 'requireOpen', 'hetPct', 'hetMode', 'hetVer', 'hetRound', 'hetAuto'];
     let s2Busy = false, s2KeyP = null, s2KeyFor = '';
     const s2On = () => !!(syncReady() && state.sync.s2 && state.sync.s2.linked);
     const devTag = () => { const i = s2On() ? Number(state.sync.s2.idx) || 0 : 0; return i > 0 ? String.fromCharCode(64 + Math.min(i, 26)) : ''; };
@@ -6341,7 +6346,8 @@ function syncPut_(b) {
       k.wrap(String(store).toUpperCase()).forEach((l) => L.push(k.center(l)));
       if (state.storeAddr) k.wrap(state.storeAddr).forEach((l) => L.push(k.center(l)));
       if (state.storePhone) k.wrap(state.storePhone).forEach((l) => L.push(k.center(l)));
-      if (state.storeAddr || state.storePhone) L.push('');
+      if (state.storeGreeting) k.wrap(state.storeGreeting).forEach((l) => L.push(k.center(l)));
+      if (state.storeAddr || state.storePhone || state.storeGreeting) L.push('');
       if (title) L.push(k.center(title));
       k.wrap('Waktu: ' + date).forEach((l) => L.push(l));
       if (cashier) k.wrap('Kasir: ' + cashier).forEach((l) => L.push(l));
@@ -6470,6 +6476,30 @@ function syncPut_(b) {
       return rows.length ? '\n\nIkuti kami:\n' + rows.map((r) => r[0] + ': ' + r[1]).join('\n') : '';
     }
 
+    // blok media sosial singkat untuk struk cetak (printer): @username / alamat tanpa https://
+    function socialShort(kind, v) {
+      v = String(v || '').trim().replace(/^https?:\/\/(www\.)?/i, '');
+      if (kind === 'ig') v = v.replace(/^instagram\.com\//i, '');
+      if (kind === 'tt') v = v.replace(/^tiktok\.com\//i, '');
+      if (kind === 'fb') v = v.replace(/^(facebook|fb)\.com\//i, '');
+      return v.replace(/^@/, '').replace(/\/+$/, '');
+    }
+    function printExtra() {
+      if (state.socPrint === false) return '';
+      const rows = [['IG', socialShort('ig', state.socIG)], ['TikTok', socialShort('tt', state.socTT)], ['FB', socialShort('fb', state.socFB)], ['Web', socialShort('web', state.socWeb)]].filter((r) => r[1]);
+      if (!rows.length) return '';
+      const c = (t) => ' '.repeat(Math.max(0, Math.floor((32 - t.length) / 2))) + t;
+      const lines = ['', c('Find us online:')];
+      rows.forEach((r) => {
+        const full = '- ' + r[0] + ': ' + r[1];
+        if (full.length <= 32) { lines.push(c(full)); return; }
+        lines.push(c('- ' + r[0] + ':'));
+        r[1].match(/.{1,32}/g).forEach((x) => lines.push(c(x)));
+      });
+      return '\n' + lines.join('\n');
+    }
+    const printText = () => String(currentReceiptText) + printExtra();
+
     function updateReceiptLink() {
       const raw = $('#customerPhone').value.replace(/\D/g, '');
       let wa = raw;
@@ -6567,7 +6597,7 @@ function syncPut_(b) {
         await btConnect();
         msg.textContent = 'Mengirim struk ke printer…';
         const paper = $('#paperSize').value === '80' ? '80' : '58';
-        await btWrite(await buildEscPos(currentReceiptText, paper));
+        await btWrite(await buildEscPos(printText(), paper));
         msg.style.color = 'var(--accent)';
         msg.textContent = 'Struk terkirim ke ' + (btDevice && btDevice.name ? btDevice.name : 'printer') + '.';
       } catch (e) {
@@ -6591,14 +6621,14 @@ function syncPut_(b) {
       const logoW = state.logo && aspect ? Math.min(paper === '80' ? 50 : 40, 25 / aspect) : 0;
       const logoH = logoW * aspect;
       area.innerHTML = (logoW ? '<img src="' + state.logo + '" alt="" style="display:block; margin:0 auto 2mm; width:' + logoW.toFixed(1) + 'mm; height:' + logoH.toFixed(1) + 'mm; image-rendering:pixelated;" />' : '') +
-        '<pre class="rcpt" style="font-size:' + fontSize + ';">' + escapeHtml(currentReceiptText) + '</pre>';
+        '<pre class="rcpt" style="font-size:' + fontSize + ';">' + escapeHtml(printText()) + '</pre>';
       if (paper === 'a4') {
         area.style.width = '100%';
         $('#pageStyle').textContent = '@page { size: A4; margin: 12mm; }';
       } else {
         // Tinggi kertas dihitung dari jumlah baris struk supaya kertas tidak keluar panjang (tanpa ruang kosong).
         const w = Number(paper) || 58;
-        const lines = String(currentReceiptText).split('\n').length;
+        const lines = printText().split('\n').length;
         const hmm = Math.ceil(lines * parseFloat(fontSize) * 1.35 * 25.4 / 96 + (logoW ? logoH + 2 : 0)) + 8;
         area.style.width = w + 'mm';
         $('#pageStyle').textContent = '@page { size: ' + w + 'mm ' + hmm + 'mm; margin: 0; } @media print { html, body { margin: 0 !important; padding: 0 !important; height: auto !important; min-height: 0 !important; } #printArea { padding: 1mm ' + (w <= 58 ? '5mm' : '2mm') + ' 3mm !important; box-sizing: border-box; overflow: hidden; } #printArea pre.rcpt { margin: 0; line-height: 1.35; } }';
@@ -7051,7 +7081,8 @@ function syncPut_(b) {
       $('#storeAddrInput').value = state.storeAddr || '';
       $('#storePhoneInput').value = state.storePhone || '';
       $('#storeFooterInput').value = state.storeFooter === undefined ? 'Terima kasih' : state.storeFooter;
-      [['#socIGInput', 'socIG'], ['#socTTInput', 'socTT'], ['#socFBInput', 'socFB'], ['#socWebInput', 'socWeb']].forEach(([sel, key]) => { $(sel).value = state[key] || ''; });
+      [['#socIGInput', 'socIG'], ['#socTTInput', 'socTT'], ['#socFBInput', 'socFB'], ['#socWebInput', 'socWeb'], ['#storeGreetingInput', 'storeGreeting']].forEach(([sel, key]) => { $(sel).value = state[key] || ''; });
+      $('#socPrintChk').checked = state.socPrint !== false;
       renderLogoSettings();
       renderSyncSettings();
       renderPointCfg();
@@ -9069,9 +9100,10 @@ function syncPut_(b) {
       $('#refundItems').addEventListener('input', updateRefundPreview);
       $('#refundSubmit').addEventListener('click', processRefund);
       $('#refundCancel').addEventListener('click', () => $('#refundDialog').close());
-      [['#storeAddrInput', 'storeAddr'], ['#storePhoneInput', 'storePhone'], ['#storeFooterInput', 'storeFooter'], ['#socIGInput', 'socIG'], ['#socTTInput', 'socTT'], ['#socFBInput', 'socFB'], ['#socWebInput', 'socWeb']].forEach(([sel, key]) => {
+      [['#storeAddrInput', 'storeAddr'], ['#storePhoneInput', 'storePhone'], ['#storeFooterInput', 'storeFooter'], ['#socIGInput', 'socIG'], ['#socTTInput', 'socTT'], ['#socFBInput', 'socFB'], ['#socWebInput', 'socWeb'], ['#storeGreetingInput', 'storeGreeting']].forEach(([sel, key]) => {
         $(sel).addEventListener('input', () => { state[key] = $(sel).value; saveState(); });
       });
+      $('#socPrintChk').addEventListener('change', () => { state.socPrint = $('#socPrintChk').checked; saveState(); });
       $('#logoFile').addEventListener('change', async () => {
         const f = $('#logoFile').files[0], err = $('#logoErr');
         err.textContent = '';
