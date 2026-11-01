@@ -387,6 +387,11 @@
             <button data-type="Hutang" aria-pressed="false">Hutang</button>
           </div>
 
+          <div id="txDateRow" class="hide" style="margin:8px 0;">
+            <label class="blk" for="txDate">Tanggal transaksi (khusus admin)</label>
+            <input id="txDate" class="field" type="datetime-local" />
+            <div class="muted" style="font-size:12px; margin-top:2px;">Kosongkan untuk memakai waktu sekarang. Penjualan bertanggal lalu masuk ke laporan tanggal itu dan tidak dihitung di shift kasir yang sedang berjalan.</div>
+          </div>
           <div id="cashRow" class="row"><label for="cashInput">Uang diterima</label><input id="cashInput" class="field" type="number" min="0" placeholder="0" /></div>
           <div id="dpRow" class="hide">
             <div class="row"><label for="dpInput">Uang muka / DP</label><input id="dpInput" class="field" type="number" min="0" placeholder="0" /></div>
@@ -1469,6 +1474,7 @@ function syncPut_(b) {
         <input id="storePhoneInput" maxlength="40" autocomplete="off" placeholder="mis. 0812 3456 7890" />
         <label class="blk" for="storeFooterInput">Teks penutup struk</label>
         <input id="storeFooterInput" maxlength="80" autocomplete="off" placeholder="Terima kasih" />
+        <label style="display:flex; align-items:center; gap:8px; margin-top:12px;"><input id="confirmPrintChk" type="checkbox" style="width:auto;" /> Minta konfirmasi sebelum mencetak struk</label>
         <h3 style="margin:14px 0 4px;">Media sosial (ditambahkan ke struk via WhatsApp)</h3>
         <div class="muted">Boleh diisi @username atau link lengkap. Kosongkan yang tidak dipakai.</div>
         <label class="blk" for="socIGInput">Instagram</label>
@@ -1912,7 +1918,7 @@ function syncPut_(b) {
     <img id="receiptLogo" class="hide" alt="Logo toko" style="display:block; margin:0 auto 6px; max-width:150px;" />
     <pre id="receiptText" class="rcpt"></pre>
     <div class="seg" id="receiptMode">
-      <button data-mode="print" aria-pressed="false">Cetak struk</button>
+      <button data-mode="print" aria-pressed="false">Cetak struk via Bluetooth</button>
       <button data-mode="wa" aria-pressed="true">Struk via WhatsApp</button>
     </div>
 
@@ -1928,11 +1934,10 @@ function syncPut_(b) {
       <select id="paperSize">
         <option value="58">58 mm</option>
         <option value="80">80 mm</option>
-        <option value="a4">A4</option>
       </select>
-      <button id="printReceiptBtn" class="action success full" style="margin-top:10px;">Cetak struk</button>
-      <button id="btPrintBtn" class="action ghost full hide" style="margin-top:8px;">Cetak langsung via Bluetooth (percobaan)</button>
-      <div id="btMsg" class="muted" style="margin-top:6px;"></div>
+      <button id="btPrintBtn" class="action success full" style="margin-top:12px;">Cetak sekarang</button>
+      <div id="btMsg" class="muted" style="margin-top:8px;"></div>
+      <div id="printHint" class="muted" style="margin-top:4px; font-size:12px;">Pastikan printer menyala. Printer harus berjenis Bluetooth BLE dan aplikasi dibuka di Chrome.</div>
     </div>
 
     <button id="closeReceiptBtn" class="action full" style="margin-top:10px;">Selesai</button>
@@ -1985,6 +1990,7 @@ function syncPut_(b) {
       storeAddr: '',
       storePhone: '',
       storeFooter: 'Terima kasih',
+      confirmPrint: true,
       socIG: '',
       socTT: '',
       socFB: '',
@@ -2858,7 +2864,7 @@ function syncPut_(b) {
       next.actseq = Number(old.actseq || 1) + 1;
       next.activity = [{ id: Number(old.actseq || 1), ts: Date.now(), user: who, act: 'Reset', mod: 'Sistem', ref: '-', detail: 'Master reset: semua data dihapus' + (keep ? ' (pengaturan dipertahankan)' : '') }];
       if (keep) {
-        ['store', 'ownerPin', 'ownerUser', 'users', 'lockSalt', 'paper', 'receiptMode', 'kasirRefund', 'restrictPrice', 'logo', 'logoAspect', 'supplierPrefix', 'storeAddr', 'storePhone', 'storeFooter', 'socIG', 'socTT', 'socFB', 'socWeb', 'storeGreeting', 'socPrint', 'pointCfg', 'requireOpen', 'hetPct', 'hetMode', 'hetRound', 'hetAuto'].forEach((k) => { if (old[k] !== undefined) next[k] = structuredClone(old[k]); });
+        ['store', 'ownerPin', 'ownerUser', 'users', 'lockSalt', 'paper', 'receiptMode', 'kasirRefund', 'restrictPrice', 'logo', 'logoAspect', 'supplierPrefix', 'storeAddr', 'storePhone', 'storeFooter', 'confirmPrint', 'socIG', 'socTT', 'socFB', 'socWeb', 'storeGreeting', 'socPrint', 'pointCfg', 'requireOpen', 'hetPct', 'hetMode', 'hetRound', 'hetAuto'].forEach((k) => { if (old[k] !== undefined) next[k] = structuredClone(old[k]); });
         if (old.sync) { next.sync = structuredClone(old.sync); next.sync.sent = {}; next.sync.photos = {}; next.sync.s2 = null; next.sync.deviceId = 'D' + Math.random().toString(36).slice(2, 7).toUpperCase(); }
       }
       state = next;
@@ -4255,7 +4261,7 @@ function syncPut_(b) {
       ['affiliates', (r) => r.id, []], ['affPaid', (r) => r.id, []], ['pointLog', (r) => r.id, []],
       ['activity', (r) => [r.ts, r.user, r.act, r.mod, r.ref].join('|'), []]
     ];
-    const S2_SET = ['store', 'receiptMode', 'kasirRefund', 'restrictPrice', 'logo', 'logoAspect', 'supplierPrefix', 'storeAddr', 'storePhone', 'storeFooter', 'socIG', 'socTT', 'socFB', 'socWeb', 'storeGreeting', 'socPrint', 'pointCfg', 'ownerUser', 'ownerPin', 'lockSalt', 'requireOpen', 'hetPct', 'hetMode', 'hetVer', 'hetRound', 'hetAuto'];
+    const S2_SET = ['store', 'receiptMode', 'kasirRefund', 'restrictPrice', 'logo', 'logoAspect', 'supplierPrefix', 'storeAddr', 'storePhone', 'storeFooter', 'confirmPrint', 'socIG', 'socTT', 'socFB', 'socWeb', 'storeGreeting', 'socPrint', 'pointCfg', 'ownerUser', 'ownerPin', 'lockSalt', 'requireOpen', 'hetPct', 'hetMode', 'hetVer', 'hetRound', 'hetAuto'];
     let s2Busy = false, s2KeyP = null, s2KeyFor = '';
     const s2On = () => !!(syncReady() && state.sync.s2 && state.sync.s2.linked);
     const devTag = () => { const i = s2On() ? Number(state.sync.s2.idx) || 0 : 0; return i > 0 ? String.fromCharCode(64 + Math.min(i, 26)) : ''; };
@@ -5253,7 +5259,7 @@ function syncPut_(b) {
         payCount: 0, payTotal: 0, payByMethod: { Tunai: 0, QRIS: 0, Transfer: 0 }, items: []
       };
       const itemMap = {};
-      state.history.slice(h0).filter((tx) => mine(tx.cashierId)).forEach((tx) => {
+      state.history.slice(h0).filter((tx) => mine(tx.cashierId) && !tx.backdated).forEach((tx) => {
         s.count++;
         s.gross += Number(tx.total || 0);
         s.disc += Number(tx.disc || 0);
@@ -6181,8 +6187,22 @@ function syncPut_(b) {
       $('#memberSuggest').innerHTML = list.map((m) => '<div class="line" data-member-phone="' + m.phone + '"><div class="n"><b>' + escapeHtml(m.name) + '</b><small>' + escapeHtml(m.phone) + '</small></div></div>').join('');
     }
 
+    // tanggal transaksi manual (khusus admin); kosong = sekarang
+    let backdateOk = false;
+    function readTxDate() {
+      const raw = $('#txDate') ? $('#txDate').value : '';
+      if (!raw || !currentUser || currentUser.role !== 'owner') return { when: false, back: false };
+      const d = new Date(raw);
+      if (isNaN(d.getTime())) return { error: 'Tanggal transaksi tidak valid.' };
+      if (d.getTime() > Date.now() + 60000) return { error: 'Tanggal transaksi tidak boleh di masa depan.' };
+      const day = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+      return { when: true, back: day < localISODate(), day, ts: d.getTime(), label: d.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) };
+    }
+
     function paySale() {
-      if (needOpenShift()) {
+      const bd = readTxDate();
+      if (bd.error) { $('#saleErr').textContent = bd.error; return; }
+      if (!bd.back && needOpenShift()) {
         $('#saleErr').textContent = 'Kasir belum dibuka. Isi modal awal dulu, lalu tekan Bayar lagi.';
         openOpenDialog();
         return;
@@ -6210,6 +6230,15 @@ function syncPut_(b) {
       }
       if (ptsReq > 0 && ptsReq < pointCfg().minRedeem) {
         $('#saleErr').textContent = 'Minimal penukaran ' + pointCfg().minRedeem + ' poin.';
+        return;
+      }
+      if (bd.back && !backdateOk) {
+        askDel({
+          title: 'Catat penjualan bertanggal lalu?',
+          body: 'Penjualan ini dicatat pada ' + bd.label + '.\nStok berkurang sekarang, laporan memakai tanggal itu, dan tidak dihitung di shift kasir yang sedang berjalan.',
+          yes: 'Catat', safe: true,
+          onYes: () => { backdateOk = true; try { paySale(); } finally { backdateOk = false; } }
+        });
         return;
       }
       let cashNeeded = total;
@@ -6273,6 +6302,15 @@ function syncPut_(b) {
         cashier: currentUser ? currentUser.name : '',
         cashierId: currentUser ? currentUser.id : ''
       };
+      if (bd.when) {
+        tx.day = bd.day; tx.ts = bd.ts; tx.date = bd.label;
+        if (bd.back) {
+          tx.backdated = true;
+          tx.backdateBy = currentUser.name;
+          logAct('Catat', 'Penjualan bertanggal lalu', tx.no, 'Tanggal ' + bd.label + ' · ' + formatRp(total));
+        }
+      }
+      if ($('#txDate')) $('#txDate').value = '';
       if (newDebt) newDebt.txNo = tx.no;
       if (currentMember && (pts || earned)) {
         const mem = state.members.find((m) => m.phone === currentMember.phone);
@@ -6542,7 +6580,7 @@ function syncPut_(b) {
         if (c) { btChar = c; return c; }
       }
       btDevice = null;
-      throw new Error('Printer terhubung, tetapi jalur kirim data tidak dikenali. Gunakan RawBT atau driver USB.');
+      throw new Error('Printer terhubung, tetapi jalur kirim data tidak dikenali. Coba nyalakan ulang printer lalu pilih lagi.');
     }
     async function btWrite(bytes) {
       const c = await btConnect();
@@ -6588,6 +6626,18 @@ function syncPut_(b) {
       out.push(0x1b, 0x64, 0x04);
       return Uint8Array.from(out);
     }
+    // konfirmasi sebelum mencetak (bisa dimatikan di Pengaturan)
+    function confirmPrint() {
+      if (state.confirmPrint === false) { printViaBluetooth(); return; }
+      const size = $('#paperSize').value === '80' ? '80 mm' : '58 mm';
+      const no = (String(currentReceiptText).match(/No:\s*(\S+)/) || [])[1];
+      askDel({
+        title: 'Cetak struk sekarang?',
+        body: (no ? 'No. ' + no + '\n' : '') + 'Kertas ' + size + ' · langsung via Bluetooth',
+        yes: 'Cetak', safe: true, onYes: printViaBluetooth
+      });
+    }
+
     async function printViaBluetooth() {
       const msg = $('#btMsg'), btn = $('#btPrintBtn');
       msg.style.color = '';
@@ -6600,40 +6650,20 @@ function syncPut_(b) {
         await btWrite(await buildEscPos(printText(), paper));
         msg.style.color = 'var(--accent)';
         msg.textContent = 'Struk terkirim ke ' + (btDevice && btDevice.name ? btDevice.name : 'printer') + '.';
+        // selesai mencetak: tutup struk dan kembali ke menu Kasir
+        setTimeout(() => {
+          const dlg = $('#receiptDialog');
+          if (dlg.open) dlg.close();
+          const kb = document.querySelector('nav button[data-tab="kasir"]');
+          if (kb) kb.click();
+        }, 1200);
       } catch (e) {
         msg.style.color = 'var(--danger)';
-        msg.textContent = (e && e.name === 'NotFoundError') ? 'Tidak ada printer yang dipilih. Jika printer tidak muncul di daftar, kemungkinan memakai Bluetooth klasik: gunakan RawBT atau driver USB.' : ((e && e.message) || 'Gagal mencetak lewat Bluetooth.');
+        msg.textContent = (e && e.name === 'NotFoundError') ? 'Tidak ada printer yang dipilih. Jika printer tidak muncul di daftar, kemungkinan printer memakai Bluetooth klasik (bukan BLE) dan tidak didukung.' : ((e && e.message) || 'Gagal mencetak lewat Bluetooth.');
         btChar = null;
       } finally {
         btn.disabled = false;
       }
-    }
-
-    function printReceipt() {
-      if (!currentReceiptText) return;
-      const paper = $('#paperSize').value;
-      state.paper = paper;
-      saveState();
-      const fontSize = { '58': '9.4px', '80': '14px', 'a4': '12px' }[paper] || '12px';
-      const area = $('#printArea');
-      // ukuran logo di kertas (mm): lebar dasar per kertas, tinggi dibatasi 25 mm
-      const aspect = Number(state.logoAspect) > 0 ? Number(state.logoAspect) : 0;
-      const logoW = state.logo && aspect ? Math.min(paper === '80' ? 50 : 40, 25 / aspect) : 0;
-      const logoH = logoW * aspect;
-      area.innerHTML = (logoW ? '<img src="' + state.logo + '" alt="" style="display:block; margin:0 auto 2mm; width:' + logoW.toFixed(1) + 'mm; height:' + logoH.toFixed(1) + 'mm; image-rendering:pixelated;" />' : '') +
-        '<pre class="rcpt" style="font-size:' + fontSize + ';">' + escapeHtml(printText()) + '</pre>';
-      if (paper === 'a4') {
-        area.style.width = '100%';
-        $('#pageStyle').textContent = '@page { size: A4; margin: 12mm; }';
-      } else {
-        // Tinggi kertas dihitung dari jumlah baris struk supaya kertas tidak keluar panjang (tanpa ruang kosong).
-        const w = Number(paper) || 58;
-        const lines = printText().split('\n').length;
-        const hmm = Math.ceil(lines * parseFloat(fontSize) * 1.35 * 25.4 / 96 + (logoW ? logoH + 2 : 0)) + 8;
-        area.style.width = w + 'mm';
-        $('#pageStyle').textContent = '@page { size: ' + w + 'mm ' + hmm + 'mm; margin: 0; } @media print { html, body { margin: 0 !important; padding: 0 !important; height: auto !important; min-height: 0 !important; } #printArea { padding: 1mm ' + (w <= 58 ? '5mm' : '2mm') + ' 3mm !important; box-sizing: border-box; overflow: hidden; } #printArea pre.rcpt { margin: 0; line-height: 1.35; } }';
-      }
-      window.print();
     }
 
     function loadLogoFile(file) {
@@ -7075,12 +7105,15 @@ function syncPut_(b) {
         b.classList.toggle('hide', !canAccess(b.dataset.tab));
       });
       $('#whoami').textContent = owner ? 'Administrator' : currentUser.name + ' (Kasir)';
+      $('#txDateRow').classList.toggle('hide', !owner);
+      if (!owner) $('#txDate').value = '';
       updatePinWarn();
       $('#allowCashierRefund').checked = !!state.kasirRefund;
       $('#restrictPriceChk').checked = !!state.restrictPrice;
       $('#storeAddrInput').value = state.storeAddr || '';
       $('#storePhoneInput').value = state.storePhone || '';
       $('#storeFooterInput').value = state.storeFooter === undefined ? 'Terima kasih' : state.storeFooter;
+      $('#confirmPrintChk').checked = state.confirmPrint !== false;
       [['#socIGInput', 'socIG'], ['#socTTInput', 'socTT'], ['#socFBInput', 'socFB'], ['#socWebInput', 'socWeb'], ['#storeGreetingInput', 'storeGreeting']].forEach(([sel, key]) => { $(sel).value = state[key] || ''; });
       $('#socPrintChk').checked = state.socPrint !== false;
       renderLogoSettings();
@@ -9134,9 +9167,12 @@ function syncPut_(b) {
       });
 
       $('#changePinBtn').addEventListener('click', changeOwnerPin);
-      $('#printReceiptBtn').addEventListener('click', printReceipt);
-      if (navigator.bluetooth) $('#btPrintBtn').classList.remove('hide');
-      $('#btPrintBtn').addEventListener('click', printViaBluetooth);
+      if (!navigator.bluetooth) {
+        $('#btPrintBtn').disabled = true;
+        $('#printHint').textContent = 'Browser ini tidak mendukung cetak Bluetooth. Buka aplikasi di Chrome (Android atau Windows), atau gunakan Struk via WhatsApp.';
+      }
+      $('#btPrintBtn').addEventListener('click', confirmPrint);
+      $('#confirmPrintChk').addEventListener('change', () => { state.confirmPrint = $('#confirmPrintChk').checked; saveState(); });
       $('#receiptMode').addEventListener('click', (e) => {
         const btn = e.target.closest('[data-mode]');
         if (btn) setReceiptMode(btn.dataset.mode);
