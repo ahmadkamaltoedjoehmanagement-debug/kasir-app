@@ -350,6 +350,7 @@
   <div id="pinWarn" class="hide"><span>PIN Anda masih PIN bawaan (1234), mudah ditebak. Segera ganti dengan PIN baru.</span><button id="pinWarnBtn" class="action" style="padding:6px 10px;">Ganti PIN</button></div>
 
   <main id="app" class="hide">
+    <div id="viewerBar" class="hide" style="margin-bottom:10px; padding:8px 12px; border-radius:10px; background:#fff4d6; color:#7a5a00; font-size:13px;">Mode lihat saja: akun Owner dapat melihat data dan laporan, tetapi tidak dapat mengubahnya.</div>
     <section id="kasir" class="view on">
       <div id="poKasirBanner" class="hide" style="background:#e7f6ec; color:#0b5a2b; border:1px solid #bfe3cb; border-radius:12px; padding:10px 12px; margin-bottom:12px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between;"></div>
       <div class="layout">
@@ -417,6 +418,7 @@
           <datalist id="supplierOptions"></datalist>
           <datalist id="brandOptions"></datalist>
           <datalist id="categoryOptions"></datalist>
+          <input id="prodCost" type="number" min="0" step="1" inputmode="numeric" placeholder="Modal per pcs (opsional)" style="flex:1 1 150px;" />
           <input id="prodMinStock" type="number" min="0" step="1" placeholder="Stok minimum (alert)" style="flex:1 1 150px;" />
           <textarea id="prodDesc" rows="2" maxlength="300" placeholder="Deskripsi produk (tampil di toko online)" style="flex:1 1 100%; width:100%;"></textarea>
           <button id="addProductBtn" class="action">Simpan</button>
@@ -433,7 +435,7 @@
           <input id="listSearch" class="search" placeholder="Cari nama, kode, brand, kategori" style="flex:2 1 200px;" />
           <select id="filterCategory" style="flex:1 1 140px;"></select>
           <select id="filterBrand" style="flex:1 1 140px;"></select>
-          <select id="filterStock" style="flex:1 1 140px;"><option value="">Semua stok</option><option value="low">Menipis &amp; habis</option></select>
+          <select id="filterStock" style="flex:1 1 140px;"><option value="">Semua stok</option><option value="low">Menipis &amp; habis</option><option value="nocost">Modal belum diisi</option></select>
         </div>
         <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin:6px 0;">
           <label class="muted" style="display:flex; align-items:center; gap:6px;"><input id="prodSelAll" type="checkbox" style="width:auto;" /> Pilih semua hasil</label>
@@ -1507,11 +1509,12 @@ function syncPut_(b) {
         <div class="muted" style="margin-top:6px;">Menerima pembayaran hutang selalu boleh dilakukan kasir. Refund hanya untuk transaksi milik kasir itu sendiri.</div>
       </div>
       <div class="box" style="margin-top:18px;">
-        <h2>Kelola kasir</h2>
+        <h2>Kelola akun</h2>
         <div class="row" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
-          <input id="cashierName" placeholder="Nama kasir" style="flex:1 1 130px;" autocomplete="off" />
+          <input id="cashierName" placeholder="Nama akun" style="flex:1 1 130px;" autocomplete="off" />
+          <select id="cashierRole" aria-label="Jenis akun" style="flex:1 1 150px;"><option value="kasir">Kasir</option><option value="owner">Owner (hanya lihat)</option></select>
           <input id="cashierPin" inputmode="numeric" maxlength="12" placeholder="PIN kasir (4-12 angka)" style="flex:1 1 150px;" autocomplete="off" />
-          <button id="addCashierBtn" class="action">Tambah kasir</button>
+          <button id="addCashierBtn" class="action">Tambah akun</button>
         </div>
         <div id="cashierMsg" class="err"></div>
         <div id="cashierList"></div>
@@ -1568,6 +1571,40 @@ function syncPut_(b) {
     <button id="pnCancel" class="action ghost full" style="margin-top:8px;">Batal</button>
   </dialog>
 
+  <dialog id="txDateEditDialog">
+    <h2>Ubah tanggal transaksi</h2>
+    <div id="tdeInfo" class="muted" style="margin-bottom:8px;"></div>
+    <label class="blk" for="tdeInput">Tanggal dan jam</label>
+    <input id="tdeInput" type="datetime-local" />
+    <div class="muted" style="font-size:12px; margin-top:4px;">Laporan, jurnal, dan struk memakai tanggal baru. Hitungan shift kasir tidak berubah.</div>
+    <div class="err" id="tdeErr" role="alert"></div>
+    <button id="tdeSave" class="action success full" style="margin-top:10px;">Simpan tanggal</button>
+    <button id="tdeCancel" class="action ghost full" style="margin-top:8px;">Batal</button>
+  </dialog>
+
+  <dialog id="shiftEditDialog">
+    <h2>Ubah buka/tutup kasir</h2>
+    <div id="seInfo" class="muted" style="margin-bottom:8px;"></div>
+    <label class="blk" for="seOpening">Modal awal di laci</label>
+    <input id="seOpening" type="number" min="0" inputmode="numeric" />
+    <div id="seBkBox">
+      <label class="blk" for="seBkNote">Catatan buka kasir</label>
+      <input id="seBkNote" autocomplete="off" />
+    </div>
+    <div id="seCloseBox" class="hide">
+      <label class="blk" for="seCounted">Uang fisik di laci saat tutup</label>
+      <input id="seCounted" type="number" min="0" inputmode="numeric" />
+      <label class="blk" for="seDeposit">Setoran</label>
+      <input id="seDeposit" type="number" min="0" inputmode="numeric" />
+      <label class="blk" for="seNote">Catatan tutup kasir</label>
+      <input id="seNote" autocomplete="off" />
+      <div id="seCalc" class="muted" style="margin-top:8px;"></div>
+    </div>
+    <div class="err" id="seErr" role="alert"></div>
+    <button id="seSave" class="action success full" style="margin-top:10px;">Simpan perubahan</button>
+    <button id="seCancel" class="action ghost full" style="margin-top:8px;">Batal</button>
+  </dialog>
+
   <dialog id="codeDialog">
     <h2>Kode produk dari supplier</h2>
     <div class="muted">Kode berbentuk awalan supplier + nomor urut, misalnya "PT Aroma Jaya" menjadi AJ-001, AJ-002. Supplier diambil dari isian produk, atau dari invoice Stok Masuk terakhir yang memuat produk itu. Supplier yang sama selalu memakai awalan yang sama, dan tiap kode unik.</div>
@@ -1618,6 +1655,9 @@ function syncPut_(b) {
     <label class="blk" for="epMin">Harga eceran terendah</label>
     <input id="epMin" type="number" min="0" />
     <div class="muted" style="margin-top:6px;">Harga setelah diskon tidak bisa lebih rendah dari harga eceran terendah.</div>
+    <label class="blk" for="epCost">Modal per pcs (harga pokok)</label>
+    <input id="epCost" type="number" min="0" step="1" inputmode="numeric" placeholder="0 = belum diisi" />
+    <div class="muted" style="margin-top:6px;">Dipakai untuk menghitung laba dan margin. Stok Masuk berikutnya yang mengisi harga beli akan memperbarui modal ini.</div>
     <label class="blk" for="epMinStock">Stok minimum (alert)</label>
     <input id="epMinStock" type="number" min="0" step="1" placeholder="0 = tanpa alert" />
     <div class="err" id="epErr" role="alert"></div>
@@ -2073,7 +2113,11 @@ function syncPut_(b) {
       const d = new Date();
       return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     };
-    const canAccess = (tab) => !!currentUser && (currentUser.role === 'owner' || KASIR_TABS.includes(tab));
+    const VIEWER_BLOCK_TABS = ['kasir', 'broadcast', 'pengaturan'];
+    const isViewer = () => !!currentUser && currentUser.role === 'viewer';
+    const seesAll = () => !!currentUser && (currentUser.role === 'owner' || currentUser.role === 'viewer');
+    const isViewerAcc = (u) => u.role === 'owner' || u.role === 'viewer';
+    const canAccess = (tab) => !!currentUser && (currentUser.role === 'owner' || (currentUser.role === 'viewer' ? !VIEWER_BLOCK_TABS.includes(tab) : KASIR_TABS.includes(tab)));
 
     function loadState() {
       try {
@@ -2205,7 +2249,100 @@ function syncPut_(b) {
       if (state.activity.length > 3000) state.activity.splice(0, state.activity.length - 3000);
     }
 
+    // ===== Ubah tanggal transaksi (Administrator) =====
+    let tdeNo = null;
+    function openTxDateEdit(no) {
+      if (!currentUser || currentUser.role !== 'owner') return;
+      const tx = state.history.find((h) => h.no === no);
+      if (!tx) return;
+      tdeNo = no;
+      const d = new Date(Number(tx.ts) || Date.now());
+      $('#tdeInput').value = d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) + 'T' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+      $('#tdeInfo').textContent = tx.no + ' · ' + tx.date + ' · ' + formatRp(tx.total);
+      $('#tdeErr').textContent = '';
+      $('#txDateEditDialog').showModal();
+    }
+    function saveTxDateEdit() {
+      const tx = state.history.find((h) => h.no === tdeNo);
+      if (!tx || !currentUser || currentUser.role !== 'owner') { $('#txDateEditDialog').close(); return; }
+      const raw = $('#tdeInput').value, d = new Date(raw);
+      if (!raw || isNaN(d.getTime())) { $('#tdeErr').textContent = 'Tanggal tidak valid.'; return; }
+      if (d.getTime() > Date.now() + 60000) { $('#tdeErr').textContent = 'Tanggal tidak boleh di masa depan.'; return; }
+      if (!tx.dateOrig) tx.dateOrig = tx.date;
+      tx.day = d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+      tx.ts = d.getTime();
+      tx.date = d.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
+      tx.dateEditedBy = currentUser.name;
+      tx.dateEditedAt = nowLabel();
+      saveState();
+      $('#txDateEditDialog').close();
+      renderAll();
+    }
+
+    // ===== Akun Owner: hanya lihat =====
+    const VIEWER_OK_BTN = '[data-open-receipt],[data-open-closing],[data-rmode],[data-jmode],[data-bd-preset],[data-pd-preset],#todayBtn,#rfPrev,#rfNext,#rfNow,#cfPrev,#cfNext,#cfNow,#pdPrev,#pdNext,#pdNow,#pdExport,#clExport,#spExport,#spPrint,#jrExport,#jrPrint,#invExportBtn,#exportProductsBtn,#onRefresh,#afRefresh,#srOpenBtn';
+    const VIEWER_OK_TXT = /^(buka|lihat|detail|unduh|ekspor|export|cetak|print|muat|segarkan|refresh|hari ini|sebelum|berikut|sekarang|bulan ini)/i;
+    let viewerObs = null;
+    function applyViewerLock() {
+      if (!isViewer()) return;
+      document.querySelectorAll('.view button').forEach((b) => {
+        if (b.matches(VIEWER_OK_BTN) || VIEWER_OK_TXT.test(b.textContent.trim())) return;
+        b.disabled = true;
+        b.title = 'Akun Owner hanya bisa melihat data';
+      });
+      document.querySelectorAll('.view select').forEach((x) => {
+        if (Object.keys(x.dataset).length) { x.disabled = true; x.title = 'Akun Owner hanya bisa melihat data'; }
+      });
+      if (!viewerObs) {
+        let queued = false;
+        viewerObs = new MutationObserver(() => {
+          if (queued) return;
+          queued = true;
+          requestAnimationFrame(() => { queued = false; applyViewerLock(); });
+        });
+        viewerObs.observe(document.querySelector('#app'), { childList: true, subtree: true });
+      }
+    }
+    function showToast(msg) {
+      let t = $('#appToast');
+      if (!t) {
+        t = document.createElement('div');
+        t.id = 'appToast';
+        t.setAttribute('role', 'status');
+        t.style.cssText = 'position:fixed; left:50%; bottom:22px; transform:translateX(-50%); max-width:90%; background:#22302e; color:#fff; padding:10px 16px; border-radius:12px; font-size:14px; z-index:9999; display:none;';
+        document.body.appendChild(t);
+      }
+      t.textContent = msg;
+      t.style.display = 'block';
+      clearTimeout(showToast.tm);
+      showToast.tm = setTimeout(() => { t.style.display = 'none'; }, 3500);
+    }
+    // jaring pengaman: perubahan data oleh akun Owner dibatalkan dan dicatat
+    function viewerGuard() {
+      if (!isViewer()) return false;
+      const cur = actSnap();
+      if (!actPrev) { actPrev = cur; return false; }
+      let changed = actPrev.set !== cur.set;
+      ACT_COLLS.forEach(([c]) => {
+        if (c === 'users') return;
+        const a = actPrev.colls[c], b = cur.colls[c];
+        if (a.size !== b.size) { changed = true; return; }
+        b.forEach((json, k) => { if (a.get(k) !== json) changed = true; });
+      });
+      if (!changed) return false;
+      const who = currentUser;
+      loadState();
+      currentUser = who;
+      actPrev = actSnap();
+      logAct('Ditolak', 'Akun', who.name, 'Akun Owner hanya bisa melihat; perubahan data dibatalkan');
+      persistState();
+      renderAll();
+      showToast('Akun Owner hanya bisa melihat data. Perubahan dibatalkan.');
+      return true;
+    }
+
     function saveState() {
+      if (viewerGuard()) return;
       trackActivity();
       persistState();
       scheduleSync();
@@ -2448,6 +2585,7 @@ function syncPut_(b) {
         if (fc && (p.category || '') !== fc) return false;
         if (fb && (p.brand || '') !== fb) return false;
         if ($('#filterStock').value === 'low' && !isLowStock(p)) return false;
+        if ($('#filterStock').value === 'nocost' && Number(p.cost) > 0) return false;
         const hay = (p.name + ' ' + p.code + ' ' + (p.brand || '') + ' ' + (p.category || '')).toLowerCase();
         return hay.includes(q);
       });
@@ -2459,6 +2597,7 @@ function syncPut_(b) {
           '<div class="n"><b>' + escapeHtml(p.name) + '</b>' +
           '<small>Brand ' + escapeHtml(p.brand || '-') + ' · Kategori ' + escapeHtml(p.category || '-') + '</small>' +
           '<small>Kode ' + escapeHtml(p.code) + (Number(p.price) > 0 ? ' · Modal ' + formatRp(p.cost) + ' · Eceran ' + formatRp(minPriceOf(p)) + ' - ' + formatRp(p.price) : ' · Harga belum diisi') + ' · Stok ' + (p.stock || 0) + ' · Min ' + (minStockOf(p) || '-') + '</small>' +
+          (Number(p.cost) > 0 ? '' : '<small><span class="pill y">Modal belum diisi</span></small>') +
           (Number(p.stock || 0) <= 0 ? '<small><span class="pill r">Habis</span></small>' : (isLowStock(p) ? '<small><span class="pill y">Sudah minimum stock</span></small>' : '')) + '</div>' +
           '<div class="q"><button class="action ghost" data-edit-product="' + p.id + '" style="padding:6px 10px;">Ubah</button>' +
           '<button class="x" data-del-product="' + p.id + '">Hapus</button></div>' +
@@ -2678,16 +2817,17 @@ function syncPut_(b) {
 
     function renderHistory() {
       const isOwner = !!currentUser && currentUser.role === 'owner';
-      const visible = currentUser ? state.history.filter((tx) => isOwner || tx.cashierId === currentUser.id) : [];
+      const visible = currentUser ? state.history.filter((tx) => seesAll() || tx.cashierId === currentUser.id) : [];
       const html = visible.slice().reverse().map((tx) => {
         const refunded = Number(tx.refundedAmount || 0);
         const canBtn = canRefund() && !txFullyRefunded(tx);
         return '<div class="line">' +
-          '<div class="n"><b>' + escapeHtml(tx.no) + '</b><small>' + escapeHtml(tx.date) + ' · ' + escapeHtml(tx.method) + (tx.member ? ' · ' + escapeHtml(tx.member.name) : '') + (tx.cashier ? ' · Kasir ' + escapeHtml(tx.cashier) : '') + '</small>' +
+          '<div class="n"><b>' + escapeHtml(tx.no) + '</b><small>' + escapeHtml(tx.date) + ' · ' + escapeHtml(tx.method) + (tx.member ? ' · ' + escapeHtml(tx.member.name) : '') + (tx.cashier ? ' · Kasir ' + escapeHtml(tx.cashier) : '') + (tx.dateEditedBy ? ' · tanggal diubah' : '') + '</small>' +
           (refunded ? '<small class="low">' + (txFullyRefunded(tx) ? 'Direfund penuh' : 'Direfund sebagian') + ' · -' + formatRp(refunded) + '</small>' : '') +
           '</div>' +
           '<div class="q"><b>' + formatRp(tx.total) + '</b>' +
           '<button class="action ghost" data-open-receipt="' + tx.no + '" style="padding:8px 10px;">Buka</button>' +
+          (isOwner ? '<button class="action ghost" data-edit-txdate="' + tx.no + '" style="padding:8px 10px;">Ubah tanggal</button>' : '') +
           (canBtn ? '<button class="action ghost" data-refund-tx="' + tx.no + '" style="padding:8px 10px;">Refund</button>' : '') +
           (isOwner ? '<button class="action ghost" data-del-tx="' + tx.no + '" style="padding:8px 10px; color:#b34036;">Hapus</button>' : '') +
           '</div></div>';
@@ -2887,7 +3027,7 @@ function syncPut_(b) {
 
     function renderRefunds() {
       const isOwner = !!currentUser && currentUser.role === 'owner';
-      const list = currentUser ? state.refunds.filter((r) => isOwner || r.cashierId === currentUser.id) : [];
+      const list = currentUser ? state.refunds.filter((r) => seesAll() || r.cashierId === currentUser.id) : [];
       const html = list.slice().reverse().map((r) => {
         return '<div class="line"><div class="n"><b>' + escapeHtml(r.no) + '</b><small>' + escapeHtml(r.date) + ' · ' + escapeHtml(r.txNo) + (r.cashier ? ' · Kasir ' + escapeHtml(r.cashier) : '') + (r.reason ? ' · ' + escapeHtml(r.reason) : '') + '</small></div>' +
           '<div class="q"><b>-' + formatRp(r.amount) + '</b><button class="action ghost" data-open-refund="' + r.no + '" style="padding:8px 10px;">Buka</button>' + (isOwner ? '<button class="action ghost" data-del-refund="' + r.no + '" style="padding:8px 10px; color:#b34036;">Hapus</button>' : '') + '</div></div>';
@@ -3878,6 +4018,9 @@ function syncPut_(b) {
       prod.price = price;
       prod.minPrice = minPrice;
       prod.minStock = Math.max(0, Math.floor(cleanNum($('#epMinStock').value)));
+      const newCost = Math.round(cleanNum($('#epCost').value));
+      if (newCost < 0) { err.textContent = 'Modal tidak boleh negatif.'; return; }
+      prod.cost = newCost;
       saveState();
       renderProductList();
       renderProductGrid();
@@ -4013,7 +4156,7 @@ function syncPut_(b) {
         brand,
         supplier,
         category,
-        cost: 0,
+        cost: Math.max(0, Math.round(cleanNum($('#prodCost').value))),
         price: 0,
         minPrice: 0,
         description: $('#prodDesc').value.trim(),
@@ -4024,7 +4167,7 @@ function syncPut_(b) {
       saveState();
       renderProductList();
       renderProductGrid();
-      ['#prodCode', '#prodName', '#prodBrand', '#prodSupplier', '#prodCategory', '#prodMinStock', '#prodDesc'].forEach((s) => { $(s).value = ''; });
+      ['#prodCode', '#prodName', '#prodBrand', '#prodSupplier', '#prodCategory', '#prodMinStock', '#prodDesc', '#prodCost'].forEach((s) => { $(s).value = ''; });
       msg.style.color = 'var(--accent)';
       msg.textContent = 'Produk "' + name + '" ditambahkan. Isi harga saat Stok Masuk.';
       setTimeout(() => { msg.textContent = ''; msg.style.color = ''; }, 5000);
@@ -5337,7 +5480,7 @@ function syncPut_(b) {
           (op.note ? row('Catatan', escapeHtml(op.note)) : '')
         : '<div class="muted" style="margin-bottom:8px;">Kasir belum dibuka. Catat modal awal di laci sebelum mulai berjualan.</div><button id="openShiftBtn" class="action full">Buka kasir</button>';
       const mine = (state.shiftOpens || []).filter((o) => o.userId === currentUser.id).slice(-10).reverse();
-      $('#openList').innerHTML = mine.map((o) => '<div class="line"><div class="n"><b>' + escapeHtml(o.no) + '</b><small>' + escapeHtml(o.date) + ' · Modal awal ' + formatRp(o.opening) + '</small></div><small>' + (o.closedNo ? 'Ditutup ' + escapeHtml(o.closedNo) : 'Berjalan') + '</small></div>').join('') || '<div class="muted">Belum ada buka kasir.</div>';
+      $('#openList').innerHTML = mine.map((o) => '<div class="line"><div class="n"><b>' + escapeHtml(o.no) + '</b><small>' + escapeHtml(o.date) + ' · Modal awal ' + formatRp(o.opening) + '</small></div><small>' + (o.closedNo ? 'Ditutup ' + escapeHtml(o.closedNo) : 'Berjalan') + (o.editedBy ? ' · diubah ' + escapeHtml(o.editedBy) : '') + '</small>' + (canEditShift() ? '<button class="action ghost" data-edit-shift="' + o.no + '" style="padding:6px 10px;">Ubah</button>' : '') + '</div>').join('') || '<div class="muted">Belum ada buka kasir.</div>';
     }
     function openOpenDialog() {
       if (!currentUser || currentOpen(currentUser)) return;
@@ -5380,12 +5523,71 @@ function syncPut_(b) {
       renderOpenBox();
     }
 
+    // ===== Ubah buka/tutup kasir (hanya akun dengan akses penuh) =====
+    const canEditShift = () => !!currentUser && currentUser.role === 'owner';
+    let seC = null, seO = null;
+    function seCalc() {
+      if (!seC) return;
+      const opening = Math.round(cleanNum($('#seOpening').value)), counted = Math.round(cleanNum($('#seCounted').value)), deposit = Math.round(cleanNum($('#seDeposit').value));
+      const expected = opening + Number(seC.summary.cashIn || 0) - Number(seC.summary.cashOut || 0), diff = counted - expected;
+      $('#seCalc').innerHTML = 'Kas seharusnya <b>' + formatRp(expected) + '</b> · Selisih <b class="' + (diff !== 0 ? 'low' : '') + '">' + diffText(diff) + '</b> · Kas dibawa ke shift berikutnya <b>' + formatRp(counted - deposit) + '</b>';
+    }
+    function openShiftEdit(no) {
+      if (!canEditShift()) return;
+      seC = state.closings.find((x) => x.no === no) || null;
+      seO = seC ? opOf(seC) : ((state.shiftOpens || []).find((x) => x.no === no) || null);
+      if (!seC && !seO) return;
+      $('#seInfo').textContent = (seC ? seC.no + ' · ' : '') + (seO ? seO.no + ' · ' : '') + (seC ? seC.userName : seO.userName) + ' · ' + (seC ? seC.date : seO.date);
+      $('#seOpening').value = seC ? seC.opening : seO.opening;
+      $('#seBkBox').classList.toggle('hide', !seO);
+      $('#seBkNote').value = seO ? (seO.note || '') : '';
+      $('#seCloseBox').classList.toggle('hide', !seC);
+      if (seC) { $('#seCounted').value = seC.counted; $('#seDeposit').value = seC.deposit; $('#seNote').value = seC.note || ''; seCalc(); }
+      $('#seErr').textContent = '';
+      $('#shiftEditDialog').showModal();
+    }
+    function saveShiftEdit() {
+      if (!canEditShift() || (!seC && !seO)) { $('#shiftEditDialog').close(); return; }
+      const err = $('#seErr'), rawOp = $('#seOpening').value.trim(), opening = Math.round(cleanNum(rawOp));
+      if (rawOp === '' || opening < 0) { err.textContent = 'Isi modal awal (boleh 0), tidak boleh negatif.'; return; }
+      let counted = 0, deposit = 0;
+      if (seC) {
+        const rawC = $('#seCounted').value.trim();
+        counted = Math.round(cleanNum(rawC)); deposit = Math.round(cleanNum($('#seDeposit').value));
+        if (rawC === '' || counted < 0 || deposit < 0) { err.textContent = 'Isi uang fisik; angka tidak boleh negatif.'; return; }
+        if (deposit > counted) { err.textContent = 'Setoran tidak boleh lebih besar dari uang fisik.'; return; }
+      }
+      const by = currentUser.name, at = nowLabel();
+      if (seO) {
+        const hasLast = state.closings.some((x) => String(x.userId) === String(seO.userId) && x.ts < seO.ts);
+        seO.opening = opening;
+        seO.diff = hasLast ? opening - Number(seO.expectedCarry || 0) : 0;
+        seO.note = $('#seBkNote').value.trim();
+        seO.editedBy = by; seO.editedAt = at;
+      }
+      if (seC) {
+        seC.opening = opening;
+        seC.expected = opening + Number(seC.summary.cashIn || 0) - Number(seC.summary.cashOut || 0);
+        seC.counted = counted; seC.deposit = deposit;
+        seC.diff = counted - seC.expected; seC.carry = counted - deposit;
+        seC.note = $('#seNote').value.trim();
+        seC.editedBy = by; seC.editedAt = at;
+        // buka kasir berikutnya milik kasir yang sama ikut menyesuaikan selisih terhadap kas dibawa
+        const next = (state.shiftOpens || []).filter((x) => String(x.userId) === String(seC.userId) && x.ts > seC.ts).sort((a, b) => a.ts - b.ts)[0];
+        if (next) { next.expectedCarry = seC.carry; next.diff = Number(next.opening) - seC.carry; }
+      }
+      saveState();
+      $('#shiftEditDialog').close();
+      renderShift();
+      renderClosingsReport();
+    }
+
     function closingRowHtml(c, showUser) {
       const bad = c.diff !== 0;
       return '<div class="line"><div class="n"><b>' + escapeHtml(c.no) + (showUser ? ' · ' + escapeHtml(c.userName) : '') + '</b>' +
         '<small>' + escapeHtml(c.date) + ' · Penjualan bersih ' + formatRp(c.summary.netSales) + '</small>' +
-        '<small>Kas seharusnya ' + formatRp(c.expected) + ' · Fisik ' + formatRp(c.counted) + ' · <span class="' + (bad ? 'low' : '') + '">' + diffText(c.diff) + '</span></small></div>' +
-        '<div class="q"><button class="action ghost" data-open-closing="' + c.no + '" style="padding:8px 10px;">Buka</button></div></div>';
+        '<small>Kas seharusnya ' + formatRp(c.expected) + ' · Fisik ' + formatRp(c.counted) + ' · <span class="' + (bad ? 'low' : '') + '">' + diffText(c.diff) + '</span>' + (c.editedBy ? ' · diubah ' + escapeHtml(c.editedBy) : '') + '</small></div>' +
+        '<div class="q"><button class="action ghost" data-open-closing="' + c.no + '" style="padding:8px 10px;">Buka</button>' + (canEditShift() ? '<button class="action ghost" data-edit-shift="' + c.no + '" style="padding:8px 10px;">Ubah</button>' : '') + '</div></div>';
     }
 
     const NEED_OPEN_CLOSE_MSG = 'Tidak bisa tutup kasir karena kasir belum dibuka. Klik Buka kasir dulu.';
@@ -5552,8 +5754,8 @@ function syncPut_(b) {
       rows.sort((x, y) => y.ts - x.ts);
       if (!rows.length) return '<div class="muted">Belum ada buka/tutup kasir pada filter ini.</div>';
       const body = rows.map(({ c, o }) => c
-        ? '<tr><td><b>' + escapeHtml(c.no) + '</b></td><td>' + escapeHtml(c.userName) + '</td><td>' + (o ? escapeHtml(o.date) : '-') + '</td><td>' + escapeHtml(c.date) + '</td><td class="num">' + formatRp(c.opening) + '</td><td class="num">' + formatRp(c.summary.netSales) + '</td><td class="num">' + formatRp(c.expected) + '</td><td class="num">' + formatRp(c.counted) + '</td><td class="num"><span class="' + (c.diff !== 0 ? 'low' : '') + '">' + diffText(c.diff) + '</span></td><td class="num">' + formatRp(c.deposit) + '</td><td><button class="action ghost" data-open-closing="' + c.no + '" style="padding:6px 10px;">Buka</button></td></tr>'
-        : '<tr><td><b>' + escapeHtml(o.no) + '</b></td><td>' + escapeHtml(o.userName) + '</td><td>' + escapeHtml(o.date) + '</td><td colspan="2"><small>Shift berjalan</small></td><td class="num">' + formatRp(o.opening) + '</td><td class="num">-</td><td class="num">-</td><td class="num">-</td><td class="num">-</td><td class="num">-</td></tr>').join('');
+        ? '<tr><td><b>' + escapeHtml(c.no) + '</b></td><td>' + escapeHtml(c.userName) + '</td><td>' + (o ? escapeHtml(o.date) : '-') + '</td><td>' + escapeHtml(c.date) + '</td><td class="num">' + formatRp(c.opening) + '</td><td class="num">' + formatRp(c.summary.netSales) + '</td><td class="num">' + formatRp(c.expected) + '</td><td class="num">' + formatRp(c.counted) + '</td><td class="num"><span class="' + (c.diff !== 0 ? 'low' : '') + '">' + diffText(c.diff) + '</span></td><td class="num">' + formatRp(c.deposit) + '</td><td style="white-space:nowrap;"><button class="action ghost" data-open-closing="' + c.no + '" style="padding:6px 10px;">Buka</button> ' + (canEditShift() ? '<button class="action ghost" data-edit-shift="' + c.no + '" style="padding:6px 10px;">Ubah</button>' : '') + '</td></tr>'
+        : '<tr><td><b>' + escapeHtml(o.no) + '</b></td><td>' + escapeHtml(o.userName) + '</td><td>' + escapeHtml(o.date) + '</td><td colspan="2"><small>Shift berjalan</small></td><td class="num">' + formatRp(o.opening) + '</td><td class="num">-</td><td class="num">-</td><td class="num">-</td><td class="num">-</td><td>' + (canEditShift() ? '<button class="action ghost" data-edit-shift="' + o.no + '" style="padding:6px 10px;">Ubah</button>' : '') + '</td></tr>').join('');
       return '<div style="overflow-x:auto;"><table class="tbl" style="min-width:860px;"><thead><tr><th>No</th><th>Kasir</th><th>Dibuka</th><th>Ditutup</th><th class="num">Modal awal</th><th class="num">Penjualan bersih</th><th class="num">Kas seharusnya</th><th class="num">Uang fisik</th><th class="num">Selisih</th><th class="num">Setoran</th><th></th></tr></thead><tbody>' + body + '</tbody></table></div>';
     }
 
@@ -7022,7 +7224,7 @@ function syncPut_(b) {
       const prev = sel.value;
       let html = '<option value="owner">Administrator</option>';
       state.users.filter((u) => u.active !== false).forEach((u) => {
-        html += '<option value="' + escapeHtml(String(u.id)) + '">' + escapeHtml(u.name) + ' (Kasir)</option>';
+        html += '<option value="' + escapeHtml(String(u.id)) + '">' + escapeHtml(u.name) + (isViewerAcc(u) ? ' (Owner)' : ' (Kasir)') + '</option>';
       });
       sel.innerHTML = html;
       if (prev && Array.from(sel.options).some((o) => o.value === prev)) sel.value = prev;
@@ -7053,7 +7255,7 @@ function syncPut_(b) {
             $('#pinInput').value = '';
             return;
           }
-          enterApp({ role: 'kasir', name: u.name, id: u.id });
+          enterApp({ role: isViewerAcc(u) ? 'viewer' : 'kasir', name: u.name, id: u.id });
           return;
         }
       }
@@ -7074,6 +7276,7 @@ function syncPut_(b) {
       $('#pinInput').value = '';
       applyAccess();
       renderProductGrid();
+      if (isViewer()) { const lb = document.querySelector('nav button[data-tab="laporan"]'); if (lb) lb.click(); }
     }
 
     // ===== Menu per kategori =====
@@ -7104,7 +7307,9 @@ function syncPut_(b) {
       document.querySelectorAll('nav button[role="tab"]').forEach((b) => {
         b.classList.toggle('hide', !canAccess(b.dataset.tab));
       });
-      $('#whoami').textContent = owner ? 'Administrator' : currentUser.name + ' (Kasir)';
+      $('#whoami').textContent = owner ? 'Administrator' : (isViewer() ? currentUser.name + ' (Owner)' : currentUser.name + ' (Kasir)');
+      $('#viewerBar').classList.toggle('hide', !isViewer());
+      applyViewerLock();
       $('#txDateRow').classList.toggle('hide', !owner);
       if (!owner) $('#txDate').value = '';
       updatePinWarn();
@@ -7133,7 +7338,9 @@ function syncPut_(b) {
 
     function lockApp() {
       if (currentUser) { logAct('Logout', 'Akun', currentUser.name, 'Keluar / kunci aplikasi'); saveState(); }
+      const wasViewer = isViewer();
       currentUser = null;
+      if (wasViewer) { location.reload(); return; }
       cart = {};
       cartPrice = {};
       cartDisc = {};
@@ -7159,7 +7366,7 @@ function syncPut_(b) {
     function renderCashiers() {
       const html = state.users.map((u) => {
         return '<div class="line">' +
-          '<div class="n"><b>' + escapeHtml(u.name) + '</b><small>' + (u.active === false ? 'Nonaktif' : 'Aktif') + '</small></div>' +
+          '<div class="n"><b>' + escapeHtml(u.name) + '</b><small>' + (isViewerAcc(u) ? 'Owner · hanya lihat · ' : 'Kasir · ') + (u.active === false ? 'Nonaktif' : 'Aktif') + '</small></div>' +
           '<div class="q">' +
           '<button class="action ghost" data-cashier-pin="' + u.id + '" style="padding:6px 10px;">Reset PIN</button>' +
           '<button class="action ghost" data-cashier-toggle="' + u.id + '" style="padding:6px 10px;">' + (u.active === false ? 'Aktifkan' : 'Nonaktifkan') + '</button>' +
@@ -7174,11 +7381,11 @@ function syncPut_(b) {
       const name = $('#cashierName').value.trim();
       const pin = $('#cashierPin').value.trim();
       if (!name) {
-        $('#cashierMsg').textContent = 'Nama kasir wajib diisi.';
+        $('#cashierMsg').textContent = 'Nama akun wajib diisi.';
         return;
       }
       if (['owner', 'administrator'].includes(name.toLowerCase()) || state.users.some((u) => u.name.toLowerCase() === name.toLowerCase())) {
-        $('#cashierMsg').textContent = 'Nama kasir sudah ada.';
+        $('#cashierMsg').textContent = 'Nama akun sudah ada.';
         return;
       }
       if (!/^\d{4,12}$/.test(pin)) {
@@ -7189,7 +7396,7 @@ function syncPut_(b) {
         $('#cashierMsg').textContent = 'PIN kasir tidak boleh sama dengan PIN administrator.';
         return;
       }
-      state.users.push({ id: Date.now(), name, pin, active: true });
+      state.users.push({ id: Date.now(), name, pin, active: true, role: $('#cashierRole').value === 'owner' ? 'viewer' : 'kasir' });
       saveState();
       $('#cashierName').value = '';
       $('#cashierPin').value = '';
@@ -7250,11 +7457,11 @@ function syncPut_(b) {
       if (delBtn) {
         const u = findUser(delBtn.dataset.cashierDel);
         if (!u) return;
-        opAsk('Hapus kasir?', u.name + '\nRiwayat transaksinya tetap tersimpan.', () => {
+        opAsk('Hapus akun?', u.name + '\nRiwayat transaksinya tetap tersimpan.', () => {
           state.users = state.users.filter((x) => x !== u);
           saveState();
           renderCashiers();
-        }, 'Ya, hapus kasir', true);
+        }, 'Ya, hapus akun', true);
       }
     }
 
@@ -7298,7 +7505,7 @@ function syncPut_(b) {
     }
 
     function prodRows() {
-      const isAdmin = !!currentUser && currentUser.role === 'owner';
+      const isAdmin = seesAll();
       const from = $('#pdFrom').value || '0000-00-00';
       const to = $('#pdTo').value || '9999-99-99';
       const groups = {};
@@ -7341,7 +7548,7 @@ function syncPut_(b) {
 
     function renderProd() {
       if (!currentUser) return;
-      const isAdmin = currentUser.role === 'owner';
+      const isAdmin = seesAll();
       $('#prodTitle').textContent = isAdmin ? 'Produktivitas penjualan kasir' : 'Produktivitas penjualan saya';
       $('#pdExport').classList.toggle('hide', !isAdmin);
       const rows = prodRows();
@@ -8810,6 +9017,7 @@ function syncPut_(b) {
           $('#epBrand').value = prod.brand || '';
           $('#epSupplier').value = prod.supplier || supplierOf(prod);
           $('#epDesc').value = prod.description || '';
+          $('#epCost').value = Number(prod.cost) > 0 ? prod.cost : '';
           $('#epCategory').value = prod.category || '';
           $('#epPrice').value = Number(prod.price) || '';
           $('#epMin').value = minPriceOf(prod) || '';
@@ -8915,6 +9123,8 @@ function syncPut_(b) {
       $('#historyList').addEventListener('click', (e) => {
         const del = e.target.closest('[data-del-tx]');
         if (del) { deleteTx(del.dataset.delTx); return; }
+        const et = e.target.closest('[data-edit-txdate]');
+        if (et) { openTxDateEdit(et.dataset.editTxdate); return; }
         const rf = e.target.closest('[data-refund-tx]');
         if (rf) { openRefund(rf.dataset.refundTx); return; }
         const btn = e.target.closest('[data-open-receipt]');
@@ -8986,6 +9196,15 @@ function syncPut_(b) {
       $('#clCounted').addEventListener('input', updateCloseCalc);
       $('#clSubmit').addEventListener('click', submitClose);
       $('#clCancel').addEventListener('click', () => $('#closeDialog').close());
+      ['#closingList', '#clList', '#openList'].forEach((sel) => $(sel).addEventListener('click', (e) => {
+        const eb = e.target.closest('[data-edit-shift]');
+        if (eb) openShiftEdit(eb.dataset.editShift);
+      }));
+      $('#tdeSave').addEventListener('click', saveTxDateEdit);
+      $('#tdeCancel').addEventListener('click', () => $('#txDateEditDialog').close());
+      $('#seSave').addEventListener('click', saveShiftEdit);
+      $('#seCancel').addEventListener('click', () => $('#shiftEditDialog').close());
+      ['#seOpening', '#seCounted', '#seDeposit'].forEach((sel) => $(sel).addEventListener('input', seCalc));
       ['#closingList', '#clList'].forEach((sel) => $(sel).addEventListener('click', (e) => {
         const b = e.target.closest('[data-open-closing]');
         if (b) openClosingReceipt(b.dataset.openClosing);
