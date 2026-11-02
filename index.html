@@ -1086,14 +1086,14 @@ const SHEET_NAMES = {
 };
 
 const HEADERS = {
-  penjualan: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'Kasir', 'Member', 'Item', 'Subtotal', 'Diskon', 'Total', 'Metode', 'Dibayar saat transaksi'],
-  refund: ['Key', 'Perangkat', 'No', 'Ref Transaksi', 'Tanggal', 'Hari', 'Kasir', 'Member', 'Item', 'Nilai Barang', 'Total Refund', 'Potong Hutang', 'Dikembalikan', 'Metode', 'Alasan', 'Stok Dikembalikan'],
+  penjualan: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'Kasir', 'Member', 'Item', 'Subtotal', 'Diskon', 'Total', 'Metode', 'Dibayar saat transaksi', 'Status', 'Dihapus Pada', 'Dihapus Oleh'],
+  refund: ['Key', 'Perangkat', 'No', 'Ref Transaksi', 'Tanggal', 'Hari', 'Kasir', 'Member', 'Item', 'Nilai Barang', 'Total Refund', 'Potong Hutang', 'Dikembalikan', 'Metode', 'Alasan', 'Stok Dikembalikan', 'Status', 'Dihapus Pada', 'Dihapus Oleh'],
   bayar_hutang: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'Kasir', 'Member', 'Telepon', 'Ref Transaksi', 'Jumlah', 'Metode', 'Sisa Sebelum', 'Sisa Sesudah'],
   invoice: ['Key', 'Perangkat', 'No Invoice', 'Supplier', 'Tanggal', 'Jatuh Tempo', 'Total', 'Item', 'Foto Invoice'],
   bayar_invoice: ['Key', 'Perangkat', 'No Invoice', 'Tanggal', 'Hari', 'Pencatat', 'Jumlah', 'Metode', 'Catatan', 'Sisa Sesudah', 'Bukti Bayar'],
   tutup_kasir: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'Kasir', 'Periode Dari', 'Modal Awal', 'Penjualan Tunai', 'Penjualan QRIS', 'Penjualan Transfer', 'Penjualan Hutang', 'DP Hutang Tunai', 'Diskon', 'Refund', 'Refund Tunai', 'Bayar Hutang Tunai', 'Bayar Hutang Non-Tunai', 'Kas Seharusnya', 'Uang Fisik', 'Selisih', 'Setoran', 'Dibawa Shift Berikut', 'Catatan', 'No Buka', 'Waktu Buka'],
   retur_beli: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'Pencatat', 'Supplier', 'No Invoice', 'Item', 'Nilai Retur', 'Potong Tagihan', 'Uang Dikembalikan', 'Metode', 'Alasan', 'Foto Retur'],
-  penjualan_item: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'Kasir', 'Metode', 'Kode', 'Produk', 'Qty', 'Harga', 'Subtotal', 'Modal', 'Harga Normal', 'Diskon Item'],
+  penjualan_item: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'Kasir', 'Metode', 'Kode', 'Produk', 'Qty', 'Harga', 'Subtotal', 'Modal', 'Harga Normal', 'Diskon Item', 'Status', 'Dihapus Pada', 'Dihapus Oleh'],
   pre_order: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'Kasir', 'Pelanggan', 'Telepon', 'Item', 'Total', 'DP Tersimpan', 'Perkiraan Datang', 'Status', 'Catatan', 'No Transaksi', 'Alasan Batal', 'DP Hangus'],
   dp_preorder: ['Key', 'Perangkat', 'No', 'No PO', 'Tanggal', 'Hari', 'Kasir', 'Jenis', 'Jumlah', 'Metode'],
   opname: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'User', 'Produk Dihitung', 'Produk Selisih', 'Nilai Selisih', 'Catatan', 'Detail Selisih'],
@@ -2033,6 +2033,8 @@ function syncPut_(b) {
       storePhone: '',
       storeFooter: 'Terima kasih',
       confirmPrint: true,
+      deletedTx: [],
+      deletedRefunds: [],
       socIG: '',
       socTT: '',
       socFB: '',
@@ -2134,6 +2136,8 @@ function syncPut_(b) {
           if (!Array.isArray(state.debts)) state.debts = [];
           if (!Array.isArray(state.users)) state.users = [];
           if (!Array.isArray(parsed.refunds)) state.refunds = [];
+          if (!Array.isArray(parsed.deletedTx)) state.deletedTx = [];
+          if (!Array.isArray(parsed.deletedRefunds)) state.deletedRefunds = [];
           if (!Array.isArray(parsed.closings)) state.closings = [];
           if (!Array.isArray(parsed.journals)) state.journals = [];
           if (!Array.isArray(parsed.supReturns)) state.supReturns = [];
@@ -2869,6 +2873,15 @@ function syncPut_(b) {
       if (fn) fn(checked);
     }
 
+    // jejak data yang dihapus: di Google Sheets barisnya ditandai "Dihapus", tidak dibuang
+    function tombstone(list, rec) {
+      const copy = JSON.parse(JSON.stringify(rec));
+      copy.delAt = nowLabel();
+      copy.delBy = currentUser ? currentUser.name : '';
+      state[list] = (state[list] || []).filter((x) => x.no !== copy.no);
+      state[list].push(copy);
+    }
+
     function deleteTx(no) {
       if (!currentUser || currentUser.role !== 'owner') return;
       const idx = state.history.findIndex((t) => t.no === no);
@@ -2882,7 +2895,7 @@ function syncPut_(b) {
       const hasRefund = state.refunds.some((r) => r.txNo === no);
       askDel({
         title: 'Hapus transaksi ' + no + '?',
-        body: formatRp(tx.total) + '\n\nTidak bisa dibatalkan. Riwayat dan laporan ikut berubah. Data yang sudah terkirim ke Google Sheets tetap ada di sana sebagai arsip.',
+        body: formatRp(tx.total) + '\n\nTidak bisa dibatalkan. Riwayat dan laporan ikut berubah. Di Google Sheets, barisnya diberi tanda "Dihapus" dan tetap tersimpan sebagai arsip.',
         check: hasRefund ? '' : 'Kembalikan stok barang ke produk',
         checked: !hasRefund,
         onYes: (restock) => {
@@ -2896,7 +2909,9 @@ function syncPut_(b) {
           const delta = Number(tx.pointsUsed || 0) - Number(tx.pointsEarned || 0);
           if (mem && delta) addPoints(mem, delta, 'void', no, 'Transaksi dihapus');
           if (debt) state.debts = state.debts.filter((d) => d !== debt);
+          state.refunds.filter((r) => r.txNo === no).forEach((r) => tombstone('deletedRefunds', r));
           state.refunds = state.refunds.filter((r) => r.txNo !== no);
+          tombstone('deletedTx', tx);
           const i = state.history.indexOf(tx);
           if (i >= 0) state.history.splice(i, 1);
           saveState();
@@ -2910,10 +2925,12 @@ function syncPut_(b) {
       if (!state.history.length) { askDel({ title: 'Belum ada transaksi', body: 'Riwayat transaksi masih kosong.', info: true }); return; }
       askDel({
         title: 'Hapus SEMUA riwayat transaksi?',
-        body: 'Ini menghapus ' + state.history.length + ' transaksi dan semua refund. Stok, poin member, dan piutang tidak diubah. Tidak bisa dibatalkan. Data di Google Sheets tetap ada.',
+        body: 'Ini menghapus ' + state.history.length + ' transaksi dan semua refund. Stok, poin member, dan piutang tidak diubah. Tidak bisa dibatalkan. Di Google Sheets, barisnya diberi tanda "Dihapus".',
         type: true,
         yes: 'Hapus semua',
         onYes: () => {
+          state.history.forEach((t) => tombstone('deletedTx', t));
+          state.refunds.forEach((r) => tombstone('deletedRefunds', r));
           state.history = [];
           state.refunds = [];
           saveState();
@@ -2946,6 +2963,7 @@ function syncPut_(b) {
       const mem = r.memberPhone ? state.members.find((m) => m.phone === r.memberPhone) : null;
       const delta = Number(r.pointsBack || 0) - Number(r.pointsDeducted || 0);
       if (mem && delta) addPoints(mem, -delta, 'adjust', r.no, 'Refund dihapus');
+      tombstone('deletedRefunds', r);
       state.refunds = state.refunds.filter((x) => x !== r);
     }
 
@@ -2972,7 +2990,7 @@ function syncPut_(b) {
       const anyRestock = state.refunds.some((r) => r.restock);
       askDel({
         title: 'Hapus SEMUA riwayat refund?',
-        body: 'Ini membatalkan dan menghapus ' + state.refunds.length + ' refund. Transaksi aslinya kembali tercatat tanpa refund. Tidak bisa dibatalkan. Data di Google Sheets tetap ada.',
+        body: 'Ini membatalkan dan menghapus ' + state.refunds.length + ' refund. Transaksi aslinya kembali tercatat tanpa refund. Tidak bisa dibatalkan. Di Google Sheets, barisnya diberi tanda "Dihapus".',
         check: anyRestock ? 'Kurangi stok lagi untuk refund yang mengembalikan stok' : '',
         checked: anyRestock,
         type: true,
@@ -4238,15 +4256,17 @@ function syncPut_(b) {
       (state.shiftOpens || []).forEach((o) => add('buka_kasir', o.no, { No: o.no, Tanggal: o.date, Kasir: o.userName, 'Modal Awal': o.opening, 'Kas Shift Sebelumnya': o.expectedCarry, Selisih: o.diff, Catatan: o.note || '', 'Ditutup Dengan': o.closedNo || '' }));
       state.stockOuts.forEach((o) => add('stok_keluar', o.no, { No: o.no, Tanggal: o.date, Kode: o.code || '', Produk: o.name, Qty: o.qty, 'Modal Satuan': o.cost, Nilai: o.value, Alasan: SO_REASON[o.reason] || o.reason, Catatan: o.note || '', 'Dicatat oleh': o.by || '' }));
       state.members.forEach((m) => add('member', m.id, { Nama: m.name, Telepon: m.phone, 'Tgl Lahir': m.dob || '', 'Batas Hutang': Number(m.limit || 0), Poin: Number(m.points || 0) }));
-      state.history.forEach((tx) => add('penjualan', tx.no, {
+      const delMark = (r) => (r.delAt ? { Status: 'Dihapus', 'Dihapus Pada': r.delAt, 'Dihapus Oleh': r.delBy || '' } : {});
+      const txAll = state.history.concat((state.deletedTx || []).filter((d) => !state.history.some((h) => h.no === d.no)));
+      txAll.forEach((tx) => add('penjualan', tx.no, Object.assign({
         No: tx.no, Tanggal: tx.date, Hari: tx.day || '', Kasir: tx.cashier || '', Member: tx.member ? tx.member.name : '',
         Item: itemsText(tx.items, 'price'), Subtotal: tx.sub, Diskon: tx.disc || 0, Total: tx.total, Metode: tx.method, 'Dibayar saat transaksi': tx.cash
-      }));
-      state.history.forEach((tx) => (tx.items || []).forEach((it, i) => add('penjualan_item', tx.no + ':' + i, {
+      }, delMark(tx))));
+      txAll.forEach((tx) => (tx.items || []).forEach((it, i) => add('penjualan_item', tx.no + ':' + i, Object.assign({
         No: tx.no, Tanggal: tx.date, Hari: tx.day || '', Kasir: tx.cashier || '', Metode: tx.method, Kode: it.code || '', Produk: it.name,
         Qty: it.qty, Harga: it.price, Subtotal: Number(it.qty) * Number(it.price || 0), Modal: Number(it.cost || 0) * Number(it.qty),
         'Harga Normal': Number(it.listPrice || it.price || 0), 'Diskon Item': Number(it.disc || 0) * Number(it.qty)
-      })));
+      }, delMark(tx)))));
       state.preorders.forEach((po) => {
         add('pre_order', po.no, {
           No: po.no, Tanggal: po.date, Hari: po.day || '', Kasir: po.cashier || '', Pelanggan: po.customer.name, Telepon: po.customer.phone || '',
@@ -4268,11 +4288,11 @@ function syncPut_(b) {
         No: r.no, Tanggal: r.date, Hari: r.day || '', Kasir: r.cashier || '', Pelanggan: r.customer.name, Telepon: r.customer.phone || '', Produk: r.product,
         Brand: r.brand || '', Qty: r.qty, Budget: r.budget || 0, Status: RQ_STATUS[r.status] || r.status, Catatan: r.note || ''
       }));
-      state.refunds.forEach((r) => add('refund', r.no, {
+      state.refunds.concat((state.deletedRefunds || []).filter((d) => !state.refunds.some((x) => x.no === d.no))).forEach((r) => add('refund', r.no, Object.assign({
         No: r.no, 'Ref Transaksi': r.txNo, Tanggal: r.date, Hari: r.day || '', Kasir: r.cashier || '', Member: r.memberName || '',
         Item: itemsText(r.items, 'price'), 'Nilai Barang': r.itemsValue, 'Total Refund': r.amount, 'Potong Hutang': r.creditApplied || 0,
         Dikembalikan: r.cashBack || 0, Metode: r.method, Alasan: r.reason || '', 'Stok Dikembalikan': r.restock ? 'Ya' : 'Tidak'
-      }));
+      }, delMark(r))));
       state.debts.forEach((d) => (d.payments || []).forEach((p) => add('bayar_hutang', p.no || p.id, {
         No: p.no || '', Tanggal: p.date, Hari: p.day || '', Kasir: p.cashier || '', Member: d.memberName, Telepon: d.memberPhone,
         'Ref Transaksi': d.txNo || '', Jumlah: p.amount, Metode: p.method, 'Sisa Sebelum': p.before, 'Sisa Sesudah': p.after
@@ -4399,7 +4419,7 @@ function syncPut_(b) {
     // Snapshot terenkripsi disimpan di Drive lewat Apps Script. Tiap perangkat menggabungkan (3 arah: dasar, lokal, server).
     const S2_COLLS = [
       ['products', (r) => r.id, ['stock']], ['members', (r) => r.id, ['points']], ['history', (r) => r.no, []],
-      ['refunds', (r) => r.no, []], ['debts', (r) => r.id, ['credit']], ['stockHistory', (r) => r.no || r.uid, ['returnedValue']],
+      ['refunds', (r) => r.no, []], ['deletedTx', (r) => r.no, []], ['deletedRefunds', (r) => r.no, []], ['debts', (r) => r.id, ['credit']], ['stockHistory', (r) => r.no || r.uid, ['returnedValue']],
       ['supReturns', (r) => r.no, []], ['closings', (r) => r.no, []], ['journals', (r) => r.no || r.id, []],
       ['preorders', (r) => r.no || r.id, []], ['requests', (r) => r.no || r.id, []], ['opnames', (r) => r.no || r.id, []],
       ['shiftOpens', (r) => r.no, []], ['stockOuts', (r) => r.no, []], ['users', (r) => r.id, []],
