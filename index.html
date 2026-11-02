@@ -1018,10 +1018,12 @@
         <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;">
           <button id="syncSaveBtn" class="action">Simpan &amp; tes koneksi</button>
           <button id="syncNowBtn" class="action ghost">Kirim sekarang</button>
+          <button id="syncCheckBtn" class="action ghost">Periksa arsip</button>
           <button id="syncAllBtn" class="action ghost">Arsipkan ulang semua</button>
           <button id="syncOffBtn" class="action ghost">Putuskan</button>
         </div>
         <div id="syncStatus" class="muted" style="margin-top:8px;"></div>
+        <div id="syncCheckOut" class="muted" style="margin-top:6px; font-size:13px;"></div>
         <div class="err" id="syncErr" role="alert"></div>
         <div id="s2Box" style="margin-top:14px; padding-top:12px; border-top:1px dashed #b9c9c5;">
           <h3 style="margin:0 0 4px;">Sinkron antar perangkat</h3>
@@ -4345,7 +4347,7 @@ function syncPut_(b) {
           timeout
         ]);
         const data = await Promise.race([res.json(), timeout]);
-        if (!data || !data.ok) throw new Error((data && data.error) || 'Server menolak permintaan.');
+        if (!data || !data.ok) { const se = new Error((data && data.error) || 'Server menolak permintaan.'); se.server = true; throw se; }
         return data;
       } finally {
         clearTimeout(timer);
@@ -4714,6 +4716,34 @@ function syncPut_(b) {
       updateSyncUI();
     }
 
+    const SYNC_TYPE_LABEL = {"penjualan": "Penjualan", "refund": "Refund", "bayar_hutang": "Bayar Hutang", "invoice": "Invoice Masuk", "bayar_invoice": "Bayar Invoice", "tutup_kasir": "Tutup Kasir", "retur_beli": "Retur Supplier", "penjualan_item": "Penjualan Per Item", "pre_order": "Pre Order", "dp_preorder": "DP Pre Order", "opname": "Stok Opname", "request_produk": "Request Produk", "katalog": "Katalog", "pesanan_online": "Pesanan Online", "member": "Member", "biaya": "Biaya", "jurnal_manual": "Jurnal Manual", "afiliator": "Afiliator", "komisi_bayar": "Bayar Komisi", "stok_masuk": "Stok Masuk", "aktivitas": "Log Aktivitas", "buka_kasir": "Buka Kasir", "pendapatan_lain": "Pendapatan Lain", "stok_keluar": "Stok Keluar"};
+    const syncTypeLabel = (t) => SYNC_TYPE_LABEL[t] || t;
+    async function checkArchive() {
+      const out = $('#syncCheckOut'), btn = $('#syncCheckBtn');
+      out.textContent = 'Memeriksa…';
+      btn.disabled = true;
+      try {
+        const ping = await syncPost({ action: 'ping' });
+        const sent = state.sync.sent || {}, rows = {}, seenKeys = new Set();
+        syncRecords().forEach((r) => {
+          const o = rows[r.type] = rows[r.type] || { total: 0, pending: 0, dup: 0 };
+          o.total++;
+          if (seenKeys.has(r.key)) o.dup++; else seenKeys.add(r.key);
+          if (sent[r.key] !== r.sig) o.pending++;
+        });
+        const lines = ['Versi Apps Script di Google: ' + (ping.version || '?') + (Number(ping.version) >= 6 ? ' (terbaru)' : ' (lama, perlu di-deploy ulang)')];
+        Object.keys(rows).sort().forEach((t) => {
+          lines.push(syncTypeLabel(t) + ': ' + rows[t].total + ' baris' + (rows[t].pending ? ', ' + rows[t].pending + ' belum terkirim' : ', semua terkirim') + (rows[t].dup ? ' ⚠ ' + rows[t].dup + ' baris bernomor kembar, di Sheet hanya tersimpan satu' : ''));
+        });
+        if (state.sync.lastErr) lines.push('Pesan terakhir: ' + state.sync.lastErr);
+        out.innerHTML = lines.map((l) => escapeHtml(l)).join('<br>');
+      } catch (e) {
+        out.textContent = 'Gagal memeriksa: ' + syncFriendly(e);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
     async function runSync(manual) {
       if (!syncReady() || syncing) return;
       const cfg = state.sync;
@@ -4739,24 +4769,37 @@ function syncPut_(b) {
         const recs = syncRecords().filter((r) => cfg.sent[r.key] !== r.sig);
         const byType = {};
         recs.forEach((r) => { (byType[r.type] = byType[r.type] || []).push(r); });
-        const unsupported = [];
+        const unsupported = [], failed = [];
         let done = 0;
         for (const type of Object.keys(byType)) {
-          const list = byType[type];
-          for (let i = 0; i < list.length; i += 25) {
-            const batch = list.slice(i, i + 25);
-            const res = await syncPost({ action: 'records', records: batch.map((r) => ({ type: r.type, key: r.key, row: r.row })) });
-            if (Number(res.saved) !== batch.length) { unsupported.push(type); break; }
-            batch.forEach((r) => { cfg.sent[r.key] = r.sig; });
-            done += batch.length;
-            if (manual) $('#syncStatus').textContent = 'Mengirim ' + done + ' dari ' + recs.length + ' baris…';
-            persistState();
+          try {
+            const seen = new Set();
+            const list = byType[type].filter((r) => !seen.has(r.key) && seen.add(r.key));
+            for (let i = 0; i < list.length; i += 25) {
+              const batch = list.slice(i, i + 25);
+              const res = await syncPost({ action: 'records', records: batch.map((r) => ({ type: r.type, key: r.key, row: r.row })) });
+              const n = Number(res.saved);
+              if (n !== batch.length) {
+                if (n === 0) unsupported.push(type);
+                else failed.push({ type, msg: 'hanya ' + n + ' dari ' + batch.length + ' baris diterima' });
+                break;
+              }
+              batch.forEach((r) => { cfg.sent[r.key] = r.sig; });
+              done += batch.length;
+              if (manual) $('#syncStatus').textContent = 'Mengirim ' + done + ' dari ' + recs.length + ' baris…';
+              persistState();
+            }
+          } catch (err) {
+            // masalah jaringan/waktu habis: hentikan semua; kesalahan dari server: catat dan lanjut ke jenis berikutnya
+            if (!err || !err.server) throw err;
+            failed.push({ type, msg: syncFriendly(err) });
           }
         }
         cfg.lastOk = nowLabel();
-        cfg.lastErr = unsupported.length
-          ? 'Kode Apps Script di Google belum mendukung: ' + unsupported.join(', ') + '. Salin kode terbaru dari Pengaturan, tempel ulang, lalu Deploy → Kelola deployment → Edit → Versi baru.'
-          : '';
+        const parts = [];
+        if (unsupported.length) parts.push('Kode Apps Script di Google belum mendukung: ' + unsupported.map(syncTypeLabel).join(', ') + '. Salin kode terbaru dari Pengaturan, tempel ulang, lalu Deploy → Kelola deployment → Edit → Versi baru.');
+        if (failed.length) parts.push('Gagal mengirim ' + failed.map((f) => syncTypeLabel(f.type) + ' (' + f.msg + ')').join('; ') + '.');
+        cfg.lastErr = parts.join(' ');
       } catch (err) {
         cfg.lastErr = syncFriendly(err);
       } finally {
@@ -9226,6 +9269,7 @@ function syncPut_(b) {
       $('#spDetailClose').addEventListener('click', () => $('#spDialog').close());
       $('#syncSaveBtn').addEventListener('click', saveSyncConfig);
       $('#syncNowBtn').addEventListener('click', () => runSyncAll(true));
+      $('#syncCheckBtn').addEventListener('click', checkArchive);
       $('#syncAllBtn').addEventListener('click', () => {
         if (!syncReady()) { $('#syncErr').textContent = 'Hubungkan Google Sheets dulu (simpan URL dan token).'; return; }
         askDel({
