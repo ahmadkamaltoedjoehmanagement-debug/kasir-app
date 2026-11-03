@@ -1990,6 +1990,7 @@ function syncPut_(b) {
       <div id="printHint" class="muted" style="margin-top:4px; font-size:12px;">Pastikan printer menyala. Printer harus berjenis Bluetooth BLE dan aplikasi dibuka di Chrome.</div>
     </div>
 
+    <button id="editClosingBtn" class="action ghost full hide" style="margin-top:10px;">Ubah detail tutup kasir</button>
     <button id="closeReceiptBtn" class="action full" style="margin-top:10px;">Selesai</button>
   </dialog>
 
@@ -5699,6 +5700,7 @@ function syncPut_(b) {
       $('#shiftEditDialog').close();
       renderShift();
       renderClosingsReport();
+      if (seReopen && seC) { seReopen = false; showReceiptText(buildClosingText(seC), '', seC.no); }
     }
 
     function closingRowHtml(c, showUser) {
@@ -5798,7 +5800,7 @@ function syncPut_(b) {
       saveState();
       $('#closeDialog').close();
       renderShift();
-      showReceiptText(buildClosingText(c), '');
+      showReceiptText(buildClosingText(c), '', c.no);
     }
 
     function buildClosingText(c) {
@@ -5860,7 +5862,7 @@ function syncPut_(b) {
 
     function openClosingReceipt(no) {
       const c = state.closings.find((x) => x.no === no);
-      if (c) showReceiptText(buildClosingText(c), '');
+      if (c) showReceiptText(buildClosingText(c), '', c.no);
     }
 
     // ----- Laporan: daftar tutup kasir (administrator) -----
@@ -6809,7 +6811,10 @@ function syncPut_(b) {
       return L.join('\n');
     }
 
-    function showReceiptText(text, phone) {
+    let receiptClosingNo = null, seReopen = false;
+    function showReceiptText(text, phone, closingNo) {
+      receiptClosingNo = closingNo || null;
+      $('#editClosingBtn').classList.toggle('hide', !(receiptClosingNo && canEditShift()));
       currentReceiptText = text;
       $('#receiptText').textContent = text;
       $('#receiptLogo').classList.toggle('hide', !state.logo);
@@ -9337,7 +9342,14 @@ function syncPut_(b) {
       $('#tdeCancel').addEventListener('click', () => $('#txDateEditDialog').close());
       $('#seSave').addEventListener('click', saveShiftEdit);
       ['#seOpenAt', '#seCloseAt'].forEach((sel) => $(sel).addEventListener('input', seTimeCheck));
-      $('#seCancel').addEventListener('click', () => $('#shiftEditDialog').close());
+      $('#seCancel').addEventListener('click', () => { seReopen = false; $('#shiftEditDialog').close(); });
+      $('#editClosingBtn').addEventListener('click', () => {
+        const no = receiptClosingNo;
+        if (!no) return;
+        $('#receiptDialog').close();
+        seReopen = true;
+        openShiftEdit(no);
+      });
       ['#seOpening', '#seCounted', '#seDeposit'].forEach((sel) => $(sel).addEventListener('input', seCalc));
       ['#closingList', '#clList'].forEach((sel) => $(sel).addEventListener('click', (e) => {
         const b = e.target.closest('[data-open-closing]');
