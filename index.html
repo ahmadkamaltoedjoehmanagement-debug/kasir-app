@@ -915,6 +915,16 @@
           <button data-rmode="tutup" aria-pressed="false">Tutup kasir</button>
           <button data-rmode="supplier" aria-pressed="false">Supplier</button>
         </div>
+        <div id="chartMetricRow" style="margin:10px 0;">
+          <label class="muted">Grafik berdasarkan
+            <select id="chartMetric" aria-label="Isi grafik">
+              <option value="omzet">Omzet (penjualan bersih)</option>
+              <option value="unit">Unit terjual</option>
+              <option value="margin">Margin (Rp)</option>
+              <option value="marginpct">Margin (%)</option>
+            </select>
+          </label>
+        </div>
 
         <div id="rpDaily">
           <div class="row" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
@@ -2043,6 +2053,7 @@ function syncPut_(b) {
       storeFooter: 'Terima kasih',
       confirmPrint: true,
       singleShift: true,
+      chartMetric: 'omzet',
       deletedTx: [],
       deletedRefunds: [],
       socIG: '',
@@ -3347,13 +3358,14 @@ function syncPut_(b) {
     const shiftISO = (iso, n) => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return isoOf(d); };
     const DAYN = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
 
-    function svgBars(labels, vals, showAll) {
+    function svgBars(labels, vals, showAll, kind) {
       const W = showAll ? 420 : 640, fs = showAll ? 13 : 18, H = 220, L = 8, B = 28, T = 22, n = vals.length, max = Math.max(1, ...vals), bw = (W - L * 2) / n;
-      const short = (v) => v >= 1e6 ? (v / 1e6).toFixed(1).replace('.0', '') + ' jt' : v >= 1e3 ? Math.round(v / 1e3) + ' rb' : String(v);
+      const short = kind === 'pct' ? (v) => Math.round(v) + '%' : kind === 'unit' ? (v) => String(v) : (v) => v >= 1e6 ? (v / 1e6).toFixed(1).replace('.0', '') + ' jt' : v >= 1e3 ? Math.round(v / 1e3) + ' rb' : String(v);
+      const fmtv = kind === 'pct' ? (v) => v.toFixed(1).replace('.', ',') + '%' : kind === 'unit' ? (v) => v + ' pcs' : formatRp;
       let g = '';
       vals.forEach((v, i) => {
         const h = Math.round((H - B - T) * Math.max(v, 0) / max), x = L + i * bw + bw * 0.15, w = bw * 0.7, y = H - B - h, cx = (x + w / 2).toFixed(1);
-        g += '<rect x="' + x.toFixed(1) + '" y="' + y + '" width="' + w.toFixed(1) + '" height="' + Math.max(h, v > 0 ? 2 : 0) + '" rx="3" fill="var(--primary)"><title>' + escapeHtml(labels[i]) + ': ' + formatRp(v) + '</title></rect>';
+        g += '<rect x="' + x.toFixed(1) + '" y="' + y + '" width="' + w.toFixed(1) + '" height="' + Math.max(h, v > 0 ? 2 : 0) + '" rx="3" fill="var(--primary)"><title>' + escapeHtml(labels[i]) + ': ' + fmtv(v) + '</title></rect>';
         if (showAll && v > 0) g += '<text x="' + cx + '" y="' + (y - 5) + '" text-anchor="middle" font-size="' + fs + '" fill="var(--ink)">' + short(v) + '</text>';
         if (showAll || i % 5 === 0 || i === n - 1) g += '<text x="' + cx + '" y="' + (H - 9) + '" text-anchor="middle" font-size="' + fs + '" fill="var(--muted)">' + escapeHtml(labels[i]) + '</text>';
       });
@@ -3367,8 +3379,8 @@ function syncPut_(b) {
 
     function periodData(days) {
       const set = new Set(days), per = {}, prod = {}, meth = {};
-      days.forEach((d) => { per[d] = { sales: 0, refund: 0 }; });
-      let count = 0, sales = 0, cost = 0, refund = 0;
+      days.forEach((d) => { per[d] = { sales: 0, refund: 0, units: 0, refundUnits: 0, revK: 0, costK: 0 }; });
+      let count = 0, sales = 0, cost = 0, refund = 0, units = 0, refundUnits = 0, revK = 0, costK = 0;
       state.history.forEach((tx) => {
         if (!set.has(tx.day)) return;
         const t = Number(tx.total || 0), m = tx.method || '-';
@@ -3376,12 +3388,19 @@ function syncPut_(b) {
         meth[m] = (meth[m] || 0) + t;
         (tx.items || []).forEach((it) => {
           cost += Number(it.cost || 0) * Number(it.qty);
+          const q = Number(it.qty || 0);
+          units += q; per[tx.day].units += q;
+          if (Number(it.cost) > 0) { const rv = q * Number(it.price || 0), cs = q * Number(it.cost); revK += rv; costK += cs; per[tx.day].revK += rv; per[tx.day].costK += cs; }
           const p = (prod[it.name] = prod[it.name] || { qty: 0, rev: 0, cost: 0 });
           p.qty += Number(it.qty); p.rev += Number(it.qty) * Number(it.price || 0); p.cost += Number(it.qty) * Number(it.cost || 0);
         });
       });
-      state.refunds.forEach((r) => { if (set.has(r.day)) { per[r.day].refund += Number(r.amount || 0); refund += Number(r.amount || 0); } });
-      return { per, count, sales, cost, refund, prod, meth };
+      state.refunds.forEach((r) => {
+        if (!set.has(r.day)) return;
+        per[r.day].refund += Number(r.amount || 0); refund += Number(r.amount || 0);
+        (r.items || []).forEach((it) => { const q = Number(it.qty || 0); per[r.day].refundUnits += q; refundUnits += q; });
+      });
+      return { per, count, sales, cost, refund, units, refundUnits, revK, costK, prod, meth };
     }
 
     function rankBlocks(d) {
@@ -3396,12 +3415,23 @@ function syncPut_(b) {
         '<div class="muted" style="margin-top:6px;">Margin = (penjualan − modal) ÷ penjualan. Produk tanpa data modal tidak ikut dihitung.</div>';
     }
 
+    // pilihan isi grafik: omzet, unit terjual, margin (Rp), margin (%)
+    const CHART_METRICS = {
+      omzet: { title: 'Penjualan bersih', kind: 'rp', val: (x) => x.sales - x.refund },
+      unit: { title: 'Unit terjual (bersih refund)', kind: 'unit', val: (x) => Math.max(0, x.units - x.refundUnits) },
+      margin: { title: 'Margin (laba kotor)', kind: 'rp', val: (x) => x.revK - x.costK },
+      marginpct: { title: 'Margin', kind: 'pct', val: (x) => x.revK > 0 ? (x.revK - x.costK) / x.revK * 100 : 0 }
+    };
+    const chartMetricDef = () => CHART_METRICS[state.chartMetric] || CHART_METRICS.omzet;
+    const chartNote = () => (state.chartMetric === 'margin' || state.chartMetric === 'marginpct') ? '<div class="muted" style="margin-top:6px;">Margin dihitung dari produk yang modalnya sudah diisi, sebelum refund.</div>' : '';
+
     function renderDailyCharts(date) {
       const days = [];
       for (let i = 6; i >= 0; i--) days.push(shiftISO(date, -i));
       const d = periodData(days), one = periodData([date]);
       const labels = days.map((x) => DAYN[new Date(x + 'T12:00:00').getDay()] + ' ' + x.slice(8));
-      $('#reportChart').innerHTML = '<h2>Penjualan bersih 7 hari terakhir</h2>' + svgBars(labels, days.map((x) => d.per[x].sales - d.per[x].refund), true) + rankBlocks(one);
+      const cm = chartMetricDef();
+      $('#reportChart').innerHTML = '<h2>' + cm.title + ' 7 hari terakhir</h2>' + svgBars(labels, days.map((x) => cm.val(d.per[x])), true, cm.kind) + chartNote() + rankBlocks(one);
     }
 
     const MONN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
@@ -3437,7 +3467,7 @@ function syncPut_(b) {
         stat('Transaksi', cur.count) + stat('Rata-rata / transaksi', formatRp(cur.count ? Math.round(cur.sales / cur.count) : 0)) +
         stat('Laba kotor (sebelum refund)', formatRp(cur.sales - cur.cost)) +
         stat('Pendapatan lain (komisi live dll.)', formatRp(state.journals.filter((j) => j.kind === 'pendapatan' && periods[3].days.includes(j.date)).reduce((t, j) => t + Number(j.amount || 0), 0))) + '</div>' +
-        '<h2 style="margin-top:14px;">Penjualan bersih 4 ' + unit + ' terakhir</h2>' + svgBars(periods.map((p) => p.label), periods.map((p) => net(p.d)), true) +
+        '<h2 style="margin-top:14px;">' + chartMetricDef().title + ' 4 ' + unit + ' terakhir</h2>' + svgBars(periods.map((p) => p.label), periods.map((p) => chartMetricDef().val(p.d)), true, chartMetricDef().kind) + chartNote() +
         '<div style="overflow-x:auto; margin-top:10px;"><table class="tbl"><thead><tr><th>' + (weekly ? 'Minggu' : 'Bulan') + '</th><th class="num">Penjualan</th><th class="num hm">Refund</th><th class="num">Bersih</th><th class="num hm">Transaksi</th><th class="num hm">Laba kotor</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
         '<div class="muted" style="margin-top:10px;">Produk terlaris dan metode pembayaran di bawah dihitung dari 4 ' + unit + ' terakhir.</div>' + rankBlocks(all);
     }
@@ -4614,6 +4644,10 @@ function syncPut_(b) {
         for (let attempt = 0; attempt < 4; attempt++) {
           const s2 = cfg.s2;
           const g = await syncPost({ action: 'sync_get', deviceId: cfg.deviceId, since: s2.v });
+          // pengaman: server berbeda dari yang dulu terhubung (URL/proyek Apps Script berganti) -> jangan digabung
+          if (s2.prefix && g.meta && g.meta.keyPrefix && g.meta.keyPrefix !== s2.prefix) {
+            throw new Error('Server sinkron berbeda dari yang dulu terhubung (URL Apps Script berganti). Data tidak digabung supaya tidak ada yang hilang. Unduh cadangan data, lalu putuskan dan hubungkan ulang sinkron.');
+          }
           const R = g.same ? null : await s2Decode(g.snapshot);
           // --- blok tanpa await: stempel, gabung, terapkan, siapkan kiriman ---
           s2.idx = Number((g.meta.devices || {})[cfg.deviceId]) || 0;
@@ -4766,6 +4800,20 @@ function syncPut_(b) {
           lines.push(syncTypeLabel(t) + ': ' + rows[t].total + ' baris' + (rows[t].pending ? ', ' + rows[t].pending + ' belum terkirim' : ', semua terkirim') + (rows[t].dup ? ' ⚠ ' + rows[t].dup + ' baris bernomor kembar, di Sheet hanya tersimpan satu' : ''));
         });
         if (state.sync.lastErr) lines.push('Pesan terakhir: ' + state.sync.lastErr);
+        // status sinkron antar perangkat
+        const s2 = state.sync.s2;
+        if (!s2 || !s2.linked) {
+          lines.push('');
+          lines.push('Sinkron antar perangkat: BELUM AKTIF di perangkat ini. Transaksi di sini hanya tersimpan di perangkat ini dan tidak muncul di perangkat lain. Aktifkan di Pengaturan (administrator), atau hubungkan lewat tombol di layar login.');
+        } else {
+          const g = await syncPost({ action: 'sync_get', deviceId: state.sync.deviceId, since: s2.v });
+          const n = Object.keys((g.meta && g.meta.devices) || {}).length;
+          lines.push('');
+          lines.push('Sinkron antar perangkat: aktif · perangkat ke-' + ((Number(s2.idx) || 0) + 1) + ' dari ' + n + ' yang terdaftar di server · versi data di perangkat ini ' + s2.v + ', di server ' + g.version + (s2.at ? ' · terakhir kirim ' + s2.at : ''));
+          lines.push(g.same ? 'Data perangkat ini sama dengan server (tidak ada yang tertinggal).' : 'Server punya data yang lebih baru. Tekan Kirim sekarang untuk menariknya.');
+          if (s2.err) lines.push('Kesalahan sinkron terakhir: ' + s2.err);
+          if (n < 2) lines.push('Baru ' + n + ' perangkat yang terdaftar di server. Perangkat lain belum terhubung ke server yang sama.');
+        }
         out.innerHTML = lines.map((l) => escapeHtml(l)).join('<br>');
       } catch (e) {
         out.textContent = 'Gagal memeriksa: ' + syncFriendly(e);
@@ -6041,6 +6089,7 @@ function syncPut_(b) {
 
     function setReportMode(mode) {
       document.querySelectorAll('#reportMode button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.rmode === mode)));
+      $('#chartMetricRow').classList.toggle('hide', !['harian', 'mingguan', 'bulanan'].includes(mode));
       $('#rpDaily').classList.toggle('hide', mode !== 'harian');
       $('#rpClosings').classList.toggle('hide', mode !== 'tutup');
       $('#rpSuppliers').classList.toggle('hide', mode !== 'supplier');
@@ -9340,6 +9389,13 @@ function syncPut_(b) {
       }));
       $('#tdeSave').addEventListener('click', saveTxDateEdit);
       $('#tdeCancel').addEventListener('click', () => $('#txDateEditDialog').close());
+      $('#chartMetric').value = state.chartMetric || 'omzet';
+      $('#chartMetric').addEventListener('change', () => {
+        state.chartMetric = $('#chartMetric').value;
+        saveState();
+        renderReport();
+        if (periodMode === 'mingguan' || periodMode === 'bulanan') renderPeriod();
+      });
       $('#seSave').addEventListener('click', saveShiftEdit);
       ['#seOpenAt', '#seCloseAt'].forEach((sel) => $(sel).addEventListener('input', seTimeCheck));
       $('#seCancel').addEventListener('click', () => { seReopen = false; $('#shiftEditDialog').close(); });
