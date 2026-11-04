@@ -2018,9 +2018,9 @@ function syncPut_(b) {
     const defaultState = {
       store: 'Alkaff Fragrances',
       products: [
-        { id: 1, code: 'P001', name: 'Parfum A', cost: 850000, price: 1200000, minPrice: 1100000, stock: 25, type: 'BNIB' },
-        { id: 2, code: 'P002', name: 'Parfum B', cost: 400000, price: 650000, minPrice: 600000, stock: 18, type: 'Preloved' },
-        { id: 3, code: 'P003', name: 'Parfum C', cost: 60000, price: 100000, minPrice: 90000, stock: 35, type: 'Decant' }
+        { id: 1, code: 'P001', name: 'Parfum A', cost: 850000, price: 1200000, minPrice: 1100000, stock: 25 },
+        { id: 2, code: 'P002', name: 'Parfum B', cost: 400000, price: 650000, minPrice: 600000, stock: 18 },
+        { id: 3, code: 'P003', name: 'Parfum C', cost: 60000, price: 100000, minPrice: 90000, stock: 35 }
       ],
       members: [],
       history: [],
@@ -4221,8 +4221,7 @@ function syncPut_(b) {
         minPrice: 0,
         description: $('#prodDesc').value.trim(),
         minStock: Math.max(0, Math.floor(cleanNum($('#prodMinStock').value))),
-        stock: 0,
-        type: 'BNIB'
+        stock: 0
       });
       saveState();
       renderProductList();
@@ -4276,7 +4275,7 @@ function syncPut_(b) {
         out.push({ key: keyDev + ':' + type + ':' + id, type, row, sig: hash8(JSON.stringify(row)) });
       };
       state.products.forEach((p) => {
-        add('katalog', p.id, { Kode: p.code || String(p.id), Produk: p.name, Brand: p.brand || '', Kategori: p.category || '', Tipe: p.type || '', Harga: Number(p.price), Stok: (p.type === 'Decant' && !Number(p.stock)) ? 'ada' : Number(p.stock || 0), Deskripsi: p.description || '' });
+        add('katalog', p.id, { Kode: p.code || String(p.id), Produk: p.name, Brand: p.brand || '', Kategori: p.category || '', Harga: Number(p.price), Stok: Number(p.stock || 0), Deskripsi: p.description || '' });
       });
       state.journals.forEach((j) => {
         if (j.kind === 'biaya') {
@@ -6468,7 +6467,7 @@ function syncPut_(b) {
             do { code = 'P' + String(n).padStart(3, '0'); n++; } while (used.has(code.toLowerCase()));
           }
           used.add(code.toLowerCase());
-          state.products.push({ id, code, name: r.name, brand: r.brand, category: r.category, cost: 0, price: 0, minPrice: 0, minStock: r.minStock || 0, stock: 0, type: 'BNIB' });
+          state.products.push({ id, code, name: r.name, brand: r.brand, category: r.category, cost: 0, price: 0, minPrice: 0, minStock: r.minStock || 0, stock: 0 });
         });
         saveState();
         renderProductList();
