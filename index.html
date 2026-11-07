@@ -430,7 +430,7 @@
         <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:6px;">
           <input id="listSearch" class="search" placeholder="Cari nama, kode, atau brand" style="flex:2 1 200px;" />
           <select id="filterBrand" style="flex:1 1 140px;"></select>
-          <select id="filterStock" style="flex:1 1 140px;"><option value="">Semua stok</option><option value="low">Menipis &amp; habis</option><option value="nocost">Modal belum diisi</option><option value="needsinfo">Perlu dilengkapi</option></select>
+          <select id="filterStock" style="flex:1 1 140px;"><option value="">Semua stok</option><option value="low">Menipis &amp; habis</option><option value="nocost">Modal belum diisi</option><option value="needsinfo">Menunggu Stok Masuk / perlu dilengkapi</option></select>
         </div>
         <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin:6px 0;">
           <label class="muted" style="display:flex; align-items:center; gap:6px;"><input id="prodSelAll" type="checkbox" style="width:auto;" /> Pilih semua hasil</label>
@@ -1485,7 +1485,7 @@ function syncPut_(b) {
         <input id="storeFooterInput" maxlength="80" autocomplete="off" placeholder="Terima kasih" />
         <label style="display:flex; align-items:center; gap:8px; margin-top:12px;"><input id="confirmPrintChk" type="checkbox" style="width:auto;" /> Minta konfirmasi sebelum mencetak struk</label>
         <label style="display:flex; align-items:center; gap:8px; margin-top:8px;"><input id="singleShiftChk" type="checkbox" style="width:auto;" /> Hanya satu kasir yang boleh aktif (shift tidak boleh tumpang tindih)</label>
-        <label style="display:flex; align-items:center; gap:8px; margin-top:8px;"><input id="quickProductChk" type="checkbox" style="width:auto;" /> Kasir boleh membuat produk baru cepat di menu Kasir</label>
+        <label style="display:flex; align-items:center; gap:8px; margin-top:8px;"><input id="quickProductChk" type="checkbox" style="width:auto;" /> Kasir boleh membuat produk baru cepat dan menjual produk berstok habis yang sudah diambil</label>
         <h3 style="margin:14px 0 4px;">Media sosial (ditambahkan ke struk via WhatsApp)</h3>
         <div class="muted">Boleh diisi @username atau link lengkap. Kosongkan yang tidak dipakai.</div>
         <label class="blk" for="socIGInput">Instagram</label>
@@ -1591,9 +1591,17 @@ function syncPut_(b) {
     <button id="tdeCancel" class="action ghost full" style="margin-top:8px;">Batal</button>
   </dialog>
 
+  <dialog id="oosDialog">
+    <h2>Stok habis</h2>
+    <div class="muted" style="margin-bottom:10px;"><b id="oosName"></b> stoknya 0 di aplikasi. Kalau barangnya sudah diambil dan mau dijual sekarang, pilih Jual sekarang. Stok menjadi minus sampai Administrator mencatat Stok Masuk.</div>
+    <button id="oosSell" class="action success full">Jual sekarang (stok sudah diambil)</button>
+    <button id="oosPo" class="action ghost full" style="margin-top:8px;">Pre Order</button>
+    <button id="oosCancel" class="action ghost full" style="margin-top:8px;">Batal</button>
+  </dialog>
+
   <dialog id="quickDialog">
     <h2>Produk baru cepat</h2>
-    <div class="muted" style="margin-bottom:8px;">Untuk produk yang belum terdaftar tapi sudah mau dijual. Produk langsung masuk keranjang. Stoknya menjadi minus sampai Administrator mencatat Stok Masuk, dan produknya diberi tanda "Perlu dilengkapi".</div>
+    <div class="muted" style="margin-bottom:8px;">Untuk produk yang belum terdaftar tapi sudah mau dijual. (Produk yang sudah ada tapi stoknya habis: ketuk produknya di daftar, lalu pilih Jual sekarang.) Produk langsung masuk keranjang. Stoknya menjadi minus sampai Administrator mencatat Stok Masuk, dan produknya diberi tanda "Perlu dilengkapi".</div>
     <label class="blk" for="qpName">Nama produk</label>
     <input id="qpName" autocomplete="off" />
     <label class="blk" for="qpBrand">Brand (opsional)</label>
@@ -2506,7 +2514,30 @@ function syncPut_(b) {
     }
 
     // ===== Produk baru cepat di Kasir =====
+    const sellsBelowZero = (p) => !!(p.needsInfo || p.awaitStock);
     const canQuickProduct = () => !!currentUser && (currentUser.role === 'owner' || (currentUser.role === 'kasir' && state.quickProduct !== false));
+    let oosId = null;
+    function openOosDialog(id) {
+      const p = getProductById(id);
+      if (!p) return;
+      oosId = id;
+      $('#oosName').textContent = p.name;
+      $('#oosDialog').showModal();
+    }
+    function oosSell() {
+      const p = getProductById(oosId);
+      if (!p || !canQuickProduct() || !(Number(p.price) > 0)) { $('#oosDialog').close(); return; }
+      if (!p.awaitStock) {
+        p.awaitStock = true; p.awaitBy = currentUser.name; p.awaitAt = nowLabel();
+        logAct('Jual stok diambil', 'Produk', p.name, 'Stok 0; dijual langsung oleh ' + currentUser.name + '. Perlu dicatat di Stok Masuk.');
+      }
+      cart[p.id] = (cart[p.id] || 0) + 1;
+      saveState();
+      $('#oosDialog').close();
+      renderProductGrid();
+      renderCart();
+      showToast('"' + p.name + '" ditambahkan ke keranjang.');
+    }
     function openQuickProduct() {
       if (!canQuickProduct()) return;
       ['#qpName', '#qpBrand', '#qpPrice', '#qpCost'].forEach((i) => { $(i).value = ''; });
@@ -2568,11 +2599,11 @@ function syncPut_(b) {
       const isOwnerView = !!currentUser && currentUser.role === 'owner';
       list.forEach((p) => {
         const qty = cart[p.id] || 0;
-        html += '<button class="item' + (Number(p.stock || 0) <= 0 && !p.needsInfo ? ' oos' : ((minStockOf(p) ? isLowStock(p) : p.stock <= 5) ? ' warn' : '')) + '" data-id="' + p.id + '" ' + (Number(p.stock || 0) <= 0 && !p.needsInfo ? 'data-po="1"' : (((!p.needsInfo && qty >= (p.stock || 0)) || !(Number(p.price) > 0)) ? 'disabled' : '')) + '>' +
+        html += '<button class="item' + (Number(p.stock || 0) <= 0 && !sellsBelowZero(p) ? ' oos' : ((minStockOf(p) ? isLowStock(p) : p.stock <= 5) ? ' warn' : '')) + '" data-id="' + p.id + '" ' + (Number(p.stock || 0) <= 0 && !sellsBelowZero(p) ? 'data-po="1"' : (((!sellsBelowZero(p) && qty >= (p.stock || 0)) || !(Number(p.price) > 0)) ? 'disabled' : '')) + '>' +
           '<b>' + escapeHtml(p.name) + '</b>' +
           (p.brand ? '<span>' + escapeHtml(p.brand) + '</span>' : '') +
           '<span>' + escapeHtml(p.code) + ' · ' + (Number(p.price) > 0 ? formatRp(p.price) : 'Belum ada harga') + (isOwnerView && Number(p.price) > 0 && Number(p.cost) > 0 ? ' · Margin ' + ((Number(p.price) - Number(p.cost)) / Number(p.price) * 100).toFixed(0) + '%' : '') + '</span>' +
-          '<span>' + (p.needsInfo ? '<span class="pill y">Perlu dilengkapi' + (Number(p.stock || 0) ? ' · Stok ' + p.stock : '') + '</span>' : Number(p.stock || 0) <= 0 ? '<span class="pill r">Habis · Pre Order</span>' : !(Number(p.price) > 0) ? '<span class="pill g">Harga belum diisi</span>' : ((minStockOf(p) ? isLowStock(p) : p.stock <= 5) ? '<span class="pill y">Stok ' + p.stock + (minStockOf(p) ? ' · Min ' + minStockOf(p) : '') + '</span>' : 'Stok ' + p.stock + (minStockOf(p) ? ' · Min ' + minStockOf(p) : ''))) + '</span>' +
+          '<span>' + (sellsBelowZero(p) ? '<span class="pill y">' + (p.needsInfo ? 'Perlu dilengkapi' : 'Menunggu Stok Masuk') + (Number(p.stock || 0) ? ' · Stok ' + p.stock : '') + '</span>' : Number(p.stock || 0) <= 0 ? '<span class="pill r">Habis · Pre Order</span>' : !(Number(p.price) > 0) ? '<span class="pill g">Harga belum diisi</span>' : ((minStockOf(p) ? isLowStock(p) : p.stock <= 5) ? '<span class="pill y">Stok ' + p.stock + (minStockOf(p) ? ' · Min ' + minStockOf(p) : '') + '</span>' : 'Stok ' + p.stock + (minStockOf(p) ? ' · Min ' + minStockOf(p) : ''))) + '</span>' +
           '</button>';
       });
       $('#productGrid').innerHTML = html || '<div class="muted">Produk tidak ditemukan.</div>';
@@ -2656,7 +2687,7 @@ function syncPut_(b) {
         if (fb && (p.brand || '') !== fb) return false;
         if ($('#filterStock').value === 'low' && !isLowStock(p)) return false;
         if ($('#filterStock').value === 'nocost' && Number(p.cost) > 0) return false;
-        if ($('#filterStock').value === 'needsinfo' && !p.needsInfo) return false;
+        if ($('#filterStock').value === 'needsinfo' && !sellsBelowZero(p)) return false;
         const hay = (p.name + ' ' + p.code + ' ' + (p.brand || '')).toLowerCase();
         return hay.includes(q);
       });
@@ -2669,7 +2700,7 @@ function syncPut_(b) {
           '<small>Brand ' + escapeHtml(p.brand || '-') + '</small>' +
           '<small>Kode ' + escapeHtml(p.code) + (Number(p.price) > 0 ? ' · Modal ' + formatRp(p.cost) + ' · Eceran ' + formatRp(minPriceOf(p)) + ' - ' + formatRp(p.price) : ' · Harga belum diisi') + ' · Stok ' + (p.stock || 0) + ' · Min ' + (minStockOf(p) || '-') + '</small>' +
           (Number(p.cost) > 0 ? '' : '<small><span class="pill y">Modal belum diisi</span></small>') +
-          (p.needsInfo ? '<small><span class="pill y">Perlu dilengkapi · catat Stok Masuk (' + escapeHtml(p.quickBy || '') + ')</span></small>' : '') +
+          (p.needsInfo ? '<small><span class="pill y">Perlu dilengkapi · catat Stok Masuk (' + escapeHtml(p.quickBy || '') + ')</span></small>' : (p.awaitStock ? '<small><span class="pill y">Menunggu Stok Masuk (' + escapeHtml(p.awaitBy || '') + ')</span></small>' : '')) +
           (Number(p.stock || 0) <= 0 ? '<small><span class="pill r">Habis</span></small>' : (isLowStock(p) ? '<small><span class="pill y">Sudah minimum stock</span></small>' : '')) + '</div>' +
           '<div class="q"><button class="action ghost" data-edit-product="' + p.id + '" style="padding:6px 10px;">Ubah</button>' +
           '<button class="x" data-del-product="' + p.id + '">Hapus</button></div>' +
@@ -4034,6 +4065,7 @@ function syncPut_(b) {
             product.stock = Number(product.stock || 0) + Number(item.qty);
             if (supplier && !product.supplier) product.supplier = supplier;
             delete product.needsInfo;
+            delete product.awaitStock;
             if (item.cost > 0) product.cost = Number(item.cost);
             if (item.price > 0) {
               product.price = Number(item.price);
@@ -9152,11 +9184,15 @@ function syncPut_(b) {
       $('#productGrid').addEventListener('click', (e) => {
         const btn = e.target.closest('.item');
         if (!btn) return;
-        if (btn.dataset.po) { poPick(btn.dataset.id); return; }
+        if (btn.dataset.po) {
+          const op = getProductById(btn.dataset.id);
+          if (op && Number(op.price) > 0 && canQuickProduct()) openOosDialog(btn.dataset.id); else poPick(btn.dataset.id);
+          return;
+        }
         const id = btn.dataset.id;
         const p = getProductById(id);
         if (!p) return;
-        if ((!p.needsInfo && (cart[id] || 0) >= Number(p.stock || 0)) || !(Number(p.price) > 0)) return;
+        if ((!sellsBelowZero(p) && (cart[id] || 0) >= Number(p.stock || 0)) || !(Number(p.price) > 0)) return;
         cart[id] = (cart[id] || 0) + 1;
         renderCart();
       });
@@ -9636,6 +9672,9 @@ function syncPut_(b) {
       $('#confirmPrintChk').addEventListener('change', () => { state.confirmPrint = $('#confirmPrintChk').checked; saveState(); });
       $('#quickProductChk').addEventListener('change', () => { state.quickProduct = $('#quickProductChk').checked; saveState(); renderProductGrid(); });
       $('#quickProdBtn').addEventListener('click', openQuickProduct);
+      $('#oosSell').addEventListener('click', oosSell);
+      $('#oosPo').addEventListener('click', () => { const id = oosId; $('#oosDialog').close(); poPick(id); });
+      $('#oosCancel').addEventListener('click', () => $('#oosDialog').close());
       $('#qpSave').addEventListener('click', saveQuickProduct);
       $('#qpCancel').addEventListener('click', () => $('#quickDialog').close());
       $('#singleShiftChk').addEventListener('change', () => { state.singleShift = $('#singleShiftChk').checked; saveState(); renderShift(); });
