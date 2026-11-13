@@ -158,6 +158,10 @@
     .full { width: 100%; }
     .muted { color: var(--muted); font-size: 12px; }
     .err { min-height: 18px; color: var(--danger); font-size: 12px; margin-top: 8px; }
+    .setgrp > .box { margin: 0 0 18px !important; }
+    @media (max-width: 520px) { #rpDaily label[for="reportDate"] { display: none; } }
+    .setgrp.hide { display: none; }
+    #setTabs button { flex: 1 1 auto; }
     .seg {
       display: flex;
       border: 1px solid var(--line);
@@ -232,6 +236,10 @@
     }
     dialog { width: min(420px, calc(100vw - 28px)); border: 1px solid var(--line); border-radius: 14px; }
     dialog label.blk { display: block; margin: 8px 0 4px; }
+    .rawbox { margin-top: 14px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+    .rawbox > summary { cursor: pointer; font-weight: 700; }
+    .rawbox h3 { margin: 16px 0 6px; font-size: 15px; }
+    .rawbox .rawact { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
     .tbl { width: 100%; min-width: 640px; border-collapse: collapse; font-size: 13px; }
     .tbl th, .tbl td { padding: 8px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; vertical-align: middle; }
     .tbl th { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .02em; }
@@ -430,7 +438,7 @@
         <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:6px;">
           <input id="listSearch" class="search" placeholder="Cari nama, kode, atau brand" style="flex:2 1 200px;" />
           <select id="filterBrand" style="flex:1 1 140px;"></select>
-          <select id="filterStock" style="flex:1 1 140px;"><option value="">Semua stok</option><option value="low">Menipis &amp; habis</option><option value="nocost">Modal belum diisi</option><option value="needsinfo">Menunggu Stok Masuk / perlu dilengkapi</option></select>
+          <select id="filterStock" style="flex:1 1 140px;"><option value="">Semua stok</option><option value="low">Menipis &amp; habis</option><option value="nocost">Modal belum diisi</option><option value="needsinfo">Menunggu Stok Masuk / perlu dilengkapi / stok ditahan</option></select>
         </div>
         <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin:6px 0;">
           <label class="muted" style="display:flex; align-items:center; gap:6px;"><input id="prodSelAll" type="checkbox" style="width:auto;" /> Pilih semua hasil</label>
@@ -566,6 +574,16 @@
         <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
           <h2>Riwayat transaksi</h2>
           <button id="histClearBtn" class="action ghost hide" style="padding:8px 10px;">Hapus semua riwayat</button>
+        </div>
+        <div id="histRawBox" style="margin:10px 0 14px;">
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <b>Rincian per hari</b>
+            <button id="hrPrev" class="action ghost" aria-label="Hari sebelumnya">&lsaquo;</button>
+            <input id="histRawDate" type="date" aria-label="Tanggal rincian" style="max-width:170px;" />
+            <button id="hrNext" class="action ghost" aria-label="Hari berikutnya">&rsaquo;</button>
+            <button id="hrNow" class="action ghost">Hari ini</button>
+          </div>
+          <div id="histRaw"></div>
         </div>
         <div id="historyList"></div>
       </div>
@@ -924,12 +942,15 @@
         <div id="rpDaily">
           <div class="row" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
             <label for="reportDate" class="muted" style="font-weight:700;">Tanggal</label>
-            <input id="reportDate" type="date" style="max-width:220px;" />
+            <button id="dayPrev" class="action ghost" aria-label="Hari sebelumnya">&lsaquo;</button>
+            <input id="reportDate" type="date" aria-label="Tanggal laporan" style="max-width:190px;" />
+            <button id="dayNext" class="action ghost" aria-label="Hari berikutnya">&rsaquo;</button>
             <button id="todayBtn" class="action ghost">Hari ini</button>
           </div>
           <div id="reportStats" class="stats"></div>
           <div id="reportChart" style="margin-top:14px;"></div>
           <div id="reportCashier" style="margin-top:14px;"></div>
+          <div id="reportRaw"></div>
         </div>
 
         <div id="rpAff" class="hide">
@@ -962,6 +983,7 @@
             <button id="pdNow" class="action ghost">Saat ini</button>
           </div>
           <div id="pdOut"></div>
+          <div id="pdRaw"></div>
         </div>
 
         <div id="rpClosings" class="hide">
@@ -992,14 +1014,71 @@
     </section>
 
     <section id="pengaturan" class="view">
-      <div class="box">
-        <h2>Ganti PIN administrator</h2>
-        <div class="row" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
-          <input id="oldPin" type="password" placeholder="PIN lama" style="flex:1 1 140px;" />
-          <input id="newPin" type="password" placeholder="PIN baru" style="flex:1 1 140px;" />
-          <button id="changePinBtn" class="action">Simpan PIN</button>
+      <div class="seg" id="setTabs" role="tablist" aria-label="Kelompok pengaturan" style="margin-bottom:14px; flex-wrap:wrap;"><button type="button" role="tab" data-sgrp="toko" aria-pressed="true">Toko &amp; struk</button><button type="button" role="tab" data-sgrp="jual" aria-pressed="false">Penjualan &amp; stok</button><button type="button" role="tab" data-sgrp="akun" aria-pressed="false">Akun &amp; PIN</button><button type="button" role="tab" data-sgrp="sinkron" aria-pressed="false">Google Sheets</button><button type="button" role="tab" data-sgrp="data" aria-pressed="false">Data</button></div>
+      <div class="setgrp" data-sgrp-box="toko">
+      <div class="box" style="margin-top:18px;">
+        <h2>Info toko di struk</h2>
+        <div class="muted">Tampil di bagian atas struk, di bawah nama toko. Kosongkan bila tidak ingin dicetak.</div>
+        <label class="blk" for="storeGreetingInput">Salam / kalimat pembuka (opsional)</label>
+        <input id="storeGreetingInput" maxlength="80" autocomplete="off" placeholder="mis. Assalamualaikum" />
+        <label class="blk" for="storeAddrInput">Alamat</label>
+        <textarea id="storeAddrInput" rows="2" maxlength="160" style="width:100%;" placeholder="mis. Jl. Contoh No. 1, Kota"></textarea>
+        <label class="blk" for="storePhoneInput">Nomor telepon / WhatsApp</label>
+        <input id="storePhoneInput" maxlength="40" autocomplete="off" placeholder="mis. 0812 3456 7890" />
+        <label class="blk" for="storeFooterInput">Teks penutup struk</label>
+        <input id="storeFooterInput" maxlength="80" autocomplete="off" placeholder="Terima kasih" />
+        <label style="display:flex; align-items:center; gap:8px; margin-top:12px;"><input id="confirmPrintChk" type="checkbox" style="width:auto;" /> Minta konfirmasi sebelum mencetak struk</label>
+      </div>
+      <div class="box" style="margin-top:18px;">
+        <h2>Logo struk</h2>
+        <div class="muted">Logo dicetak di bagian atas struk (cetak printer). Gunakan gambar sederhana hitam-putih; otomatis diperkecil dan diubah menjadi hitam-putih agar jelas di printer thermal. Struk via WhatsApp tetap berupa teks.</div>
+        <div style="display:flex; align-items:center; gap:12px; margin-top:10px; flex-wrap:wrap;">
+          <img id="logoPreview" class="hide" alt="Logo toko" style="max-width:140px; max-height:90px; border:1px dashed #b9c9c5; padding:4px; background:#fff;" />
+          <div>
+            <input id="logoFile" type="file" accept="image/*" />
+            <button id="logoRemove" class="action ghost hide" style="margin-top:8px;">Hapus logo</button>
+          </div>
         </div>
-        <div id="pinMsg" class="err"></div>
+        <div class="err" id="logoErr" role="alert"></div>
+      </div>
+      <div class="box">
+        <h2>Media sosial</h2>
+        <div class="muted">Boleh diisi @username atau link lengkap. Kosongkan yang tidak dipakai.</div>
+        <label class="blk" for="socIGInput">Instagram</label>
+        <input id="socIGInput" maxlength="120" autocomplete="off" placeholder="@namatoko" />
+        <label class="blk" for="socTTInput">TikTok</label>
+        <input id="socTTInput" maxlength="120" autocomplete="off" placeholder="@namatoko" />
+        <label class="blk" for="socFBInput">Facebook</label>
+        <input id="socFBInput" maxlength="120" autocomplete="off" placeholder="namahalaman" />
+        <label class="blk" for="socWebInput">Website / toko online</label>
+        <input id="socWebInput" maxlength="160" autocomplete="off" placeholder="https://..." />
+        <label style="display:flex; align-items:center; gap:8px; margin-top:10px;"><input id="socPrintChk" type="checkbox" style="width:auto;" /> Cetak juga media sosial di struk cetak printer (format singkat)</label>
+      </div>
+      </div>
+      <div class="setgrp hide" data-sgrp-box="jual">
+      <div class="box">
+        <h2>Shift kasir</h2>
+        <label style="display:flex; gap:8px; align-items:center; margin-top:6px;">
+          <input id="reqOpen" type="checkbox" style="width:auto;" />
+          <span>Wajib buka kasir sebelum berjualan</span>
+        </label>
+        <div class="muted" style="margin-top:6px;">Bila dicentang, penjualan, refund, pembayaran piutang, serta DP, pelunasan, dan pengembalian DP pre order ditolak sampai kasir dibuka (isi modal awal) di tab Buka/Tutup Kasir.</div>
+      
+        <label style="display:flex; align-items:center; gap:8px; margin-top:10px;"><input id="singleShiftChk" type="checkbox" style="width:auto;" /> Hanya satu kasir yang boleh aktif (shift tidak boleh tumpang tindih)</label>
+      </div>
+      <div class="box" style="margin-top:18px;">
+        <h2>Izin kasir</h2>
+        <label style="display:flex; align-items:center; gap:8px;"><input id="allowCashierRefund" type="checkbox" style="width:auto;" /> Kasir boleh memproses refund</label>
+        <label style="display:flex; align-items:center; gap:8px; margin-top:8px;"><input id="restrictPriceChk" type="checkbox" style="width:auto;" /> Batasi harga jual manual &amp; diskon per produk sesuai rentang harga produk</label>
+        <div class="muted" style="margin-top:6px;">Bila dimatikan (bawaan), harga jual di keranjang boleh diisi bebas dan diskon per produk tidak dibatasi harga eceran terendah.</div>
+        <div class="muted" style="margin-top:6px;">Menerima pembayaran hutang selalu boleh dilakukan kasir. Refund hanya untuk transaksi milik kasir itu sendiri.</div>
+      
+        <label style="display:flex; align-items:center; gap:8px; margin-top:8px;"><input id="quickProductChk" type="checkbox" style="width:auto;" /> Kasir boleh membuat produk baru cepat dan menjual produk berstok habis yang sudah diambil</label>
+      </div>
+      <div class="box">
+        <h2>Stok &amp; harga beli</h2>
+        <div class="muted" style="margin-bottom:6px;">Berlaku saat mencatat Stok Masuk.</div>
+        <label style="display:flex; align-items:center; gap:8px; margin-top:6px;"><input id="holdWarnChk" type="checkbox" style="width:auto;" /> Beri peringatan dan opsi tahan stok baru saat harga beli berbeda dari stok lama</label>
       </div>
       <div class="box" style="margin-top:18px;">
         <h2>Poin member</h2>
@@ -1013,6 +1092,30 @@
         <div id="pcMsg" class="err"></div>
         <div class="muted">Poin didapat dari total bayar (setelah diskon dan tukar poin) pada transaksi bermember. Penukaran poin dihitung sebagai diskon dan tetap tidak boleh membuat harga di bawah harga eceran terendah. Refund mengembalikan poin secara proporsional.</div>
       </div>
+      </div>
+      <div class="setgrp hide" data-sgrp-box="akun">
+      <div class="box">
+        <h2>Ganti PIN administrator</h2>
+        <div class="row" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+          <input id="oldPin" type="password" placeholder="PIN lama" style="flex:1 1 140px;" />
+          <input id="newPin" type="password" placeholder="PIN baru" style="flex:1 1 140px;" />
+          <button id="changePinBtn" class="action">Simpan PIN</button>
+        </div>
+        <div id="pinMsg" class="err"></div>
+      </div>
+      <div class="box" style="margin-top:18px;">
+        <h2>Kelola akun</h2>
+        <div class="row" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+          <input id="cashierName" placeholder="Nama akun" style="flex:1 1 130px;" autocomplete="off" />
+          <select id="cashierRole" aria-label="Jenis akun" style="flex:1 1 150px;"><option value="kasir">Kasir</option><option value="owner">Owner (hanya lihat)</option></select>
+          <input id="cashierPin" inputmode="numeric" maxlength="12" placeholder="PIN kasir (4-12 angka)" style="flex:1 1 150px;" autocomplete="off" />
+          <button id="addCashierBtn" class="action">Tambah akun</button>
+        </div>
+        <div id="cashierMsg" class="err"></div>
+        <div id="cashierList"></div>
+      </div>
+      </div>
+      <div class="setgrp hide" data-sgrp-box="sinkron">
       <div class="box" style="margin-top:18px;">
         <h2>Arsip ke Google Sheets &amp; Drive</h2>
         <div class="muted" style="margin-bottom:8px;">Mengirim penjualan, refund, pembayaran hutang, invoice barang masuk, dan foto bukti ke Google Sheets dan Drive milik Anda, supaya bisa dilihat dari mana saja. Isi di setiap perangkat yang dipakai.</div>
@@ -1096,7 +1199,7 @@ const HEADERS = {
   bayar_hutang: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'Kasir', 'Member', 'Telepon', 'Ref Transaksi', 'Jumlah', 'Metode', 'Sisa Sebelum', 'Sisa Sesudah'],
   invoice: ['Key', 'Perangkat', 'No Invoice', 'Supplier', 'Tanggal', 'Jatuh Tempo', 'Total', 'Item', 'Foto Invoice'],
   bayar_invoice: ['Key', 'Perangkat', 'No Invoice', 'Tanggal', 'Hari', 'Pencatat', 'Jumlah', 'Metode', 'Catatan', 'Sisa Sesudah', 'Bukti Bayar'],
-  tutup_kasir: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'Kasir', 'Periode Dari', 'Modal Awal', 'Penjualan Tunai', 'Penjualan QRIS', 'Penjualan Transfer', 'Penjualan Hutang', 'DP Hutang Tunai', 'Diskon', 'Refund', 'Refund Tunai', 'Bayar Hutang Tunai', 'Bayar Hutang Non-Tunai', 'Kas Seharusnya', 'Uang Fisik', 'Selisih', 'Setoran', 'Dibawa Shift Berikut', 'Catatan', 'No Buka', 'Waktu Buka'],
+  tutup_kasir: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'Kasir', 'Periode Dari', 'Modal Awal', 'Penjualan Tunai', 'Penjualan QRIS', 'Penjualan Transfer', 'Penjualan Hutang', 'DP Hutang Tunai', 'Diskon', 'Refund', 'Refund Tunai', 'Bayar Hutang Tunai', 'Bayar Hutang Non-Tunai', 'Kas Seharusnya', 'Uang Fisik', 'Selisih', 'Setoran', 'Dibawa Shift Berikut', 'Catatan', 'No Buka', 'Waktu Buka', 'Status', 'Dihapus Pada', 'Dihapus Oleh'],
   retur_beli: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'Pencatat', 'Supplier', 'No Invoice', 'Item', 'Nilai Retur', 'Potong Tagihan', 'Uang Dikembalikan', 'Metode', 'Alasan', 'Foto Retur'],
   penjualan_item: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'Kasir', 'Metode', 'Kode', 'Produk', 'Qty', 'Harga', 'Subtotal', 'Modal', 'Harga Normal', 'Diskon Item', 'Status', 'Dihapus Pada', 'Dihapus Oleh'],
   pre_order: ['Key', 'Perangkat', 'No', 'Tanggal', 'Hari', 'Kasir', 'Pelanggan', 'Telepon', 'Item', 'Total', 'DP Tersimpan', 'Perkiraan Datang', 'Status', 'Catatan', 'No Transaksi', 'Alasan Batal', 'DP Hangus'],
@@ -1112,7 +1215,7 @@ const HEADERS = {
   komisi_bayar: ['Key', 'Perangkat', 'Tanggal', 'Kode', 'Jumlah', 'Catatan', 'Dicatat oleh'],
   stok_masuk: ['Key', 'Perangkat', 'Tanggal', 'No Invoice', 'Supplier', 'Kode', 'Produk', 'Qty', 'Harga Modal', 'Subtotal'],
   aktivitas: ['Key', 'Perangkat', 'Waktu', 'Pengguna', 'Aksi', 'Modul', 'Referensi', 'Detail'],
-  buka_kasir: ['Key', 'Perangkat', 'No', 'Tanggal', 'Kasir', 'Modal Awal', 'Kas Shift Sebelumnya', 'Selisih', 'Catatan', 'Ditutup Dengan'],
+  buka_kasir: ['Key', 'Perangkat', 'No', 'Tanggal', 'Kasir', 'Modal Awal', 'Kas Shift Sebelumnya', 'Selisih', 'Catatan', 'Ditutup Dengan', 'Status', 'Dihapus Pada', 'Dihapus Oleh'],
   pendapatan_lain: ['Key', 'Perangkat', 'No', 'Tanggal', 'Kategori', 'Diterima di', 'Jumlah', 'Catatan', 'Dicatat oleh'],
   stok_keluar: ['Key', 'Perangkat', 'No', 'Tanggal', 'Kode', 'Produk', 'Qty', 'Modal Satuan', 'Nilai', 'Alasan', 'Catatan', 'Dicatat oleh']
 };
@@ -1472,78 +1575,20 @@ function syncPut_(b) {
 </textarea>
         </details>
       </div>
-      <div class="box" style="margin-top:18px;">
-        <h2>Info toko di struk</h2>
-        <div class="muted">Tampil di bagian atas struk, di bawah nama toko. Kosongkan bila tidak ingin dicetak.</div>
-        <label class="blk" for="storeGreetingInput">Salam / kalimat pembuka (opsional)</label>
-        <input id="storeGreetingInput" maxlength="80" autocomplete="off" placeholder="mis. Assalamualaikum" />
-        <label class="blk" for="storeAddrInput">Alamat</label>
-        <textarea id="storeAddrInput" rows="2" maxlength="160" style="width:100%;" placeholder="mis. Jl. Contoh No. 1, Kota"></textarea>
-        <label class="blk" for="storePhoneInput">Nomor telepon / WhatsApp</label>
-        <input id="storePhoneInput" maxlength="40" autocomplete="off" placeholder="mis. 0812 3456 7890" />
-        <label class="blk" for="storeFooterInput">Teks penutup struk</label>
-        <input id="storeFooterInput" maxlength="80" autocomplete="off" placeholder="Terima kasih" />
-        <label style="display:flex; align-items:center; gap:8px; margin-top:12px;"><input id="confirmPrintChk" type="checkbox" style="width:auto;" /> Minta konfirmasi sebelum mencetak struk</label>
-        <label style="display:flex; align-items:center; gap:8px; margin-top:8px;"><input id="singleShiftChk" type="checkbox" style="width:auto;" /> Hanya satu kasir yang boleh aktif (shift tidak boleh tumpang tindih)</label>
-        <label style="display:flex; align-items:center; gap:8px; margin-top:8px;"><input id="quickProductChk" type="checkbox" style="width:auto;" /> Kasir boleh membuat produk baru cepat dan menjual produk berstok habis yang sudah diambil</label>
-        <h3 style="margin:14px 0 4px;">Media sosial (ditambahkan ke struk via WhatsApp)</h3>
-        <div class="muted">Boleh diisi @username atau link lengkap. Kosongkan yang tidak dipakai.</div>
-        <label class="blk" for="socIGInput">Instagram</label>
-        <input id="socIGInput" maxlength="120" autocomplete="off" placeholder="@namatoko" />
-        <label class="blk" for="socTTInput">TikTok</label>
-        <input id="socTTInput" maxlength="120" autocomplete="off" placeholder="@namatoko" />
-        <label class="blk" for="socFBInput">Facebook</label>
-        <input id="socFBInput" maxlength="120" autocomplete="off" placeholder="namahalaman" />
-        <label class="blk" for="socWebInput">Website / toko online</label>
-        <input id="socWebInput" maxlength="160" autocomplete="off" placeholder="https://..." />
-        <label style="display:flex; align-items:center; gap:8px; margin-top:10px;"><input id="socPrintChk" type="checkbox" style="width:auto;" /> Cetak juga media sosial di struk cetak printer (format singkat)</label>
       </div>
-      <div class="box" style="margin-top:18px;">
-        <h2>Logo struk</h2>
-        <div class="muted">Logo dicetak di bagian atas struk (cetak printer). Gunakan gambar sederhana hitam-putih; otomatis diperkecil dan diubah menjadi hitam-putih agar jelas di printer thermal. Struk via WhatsApp tetap berupa teks.</div>
-        <div style="display:flex; align-items:center; gap:12px; margin-top:10px; flex-wrap:wrap;">
-          <img id="logoPreview" class="hide" alt="Logo toko" style="max-width:140px; max-height:90px; border:1px dashed #b9c9c5; padding:4px; background:#fff;" />
-          <div>
-            <input id="logoFile" type="file" accept="image/*" />
-            <button id="logoRemove" class="action ghost hide" style="margin-top:8px;">Hapus logo</button>
-          </div>
-        </div>
-        <div class="err" id="logoErr" role="alert"></div>
-      </div>
-      <div class="box" style="margin-top:18px;">
-        <h2>Izin kasir</h2>
-        <label style="display:flex; align-items:center; gap:8px;"><input id="allowCashierRefund" type="checkbox" style="width:auto;" /> Kasir boleh memproses refund</label>
-        <label style="display:flex; align-items:center; gap:8px; margin-top:8px;"><input id="restrictPriceChk" type="checkbox" style="width:auto;" /> Batasi harga jual manual &amp; diskon per produk sesuai rentang harga produk</label>
-        <div class="muted" style="margin-top:6px;">Bila dimatikan (bawaan), harga jual di keranjang boleh diisi bebas dan diskon per produk tidak dibatasi harga eceran terendah.</div>
-        <div class="muted" style="margin-top:6px;">Menerima pembayaran hutang selalu boleh dilakukan kasir. Refund hanya untuk transaksi milik kasir itu sendiri.</div>
-      </div>
-      <div class="box" style="margin-top:18px;">
-        <h2>Kelola akun</h2>
-        <div class="row" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
-          <input id="cashierName" placeholder="Nama akun" style="flex:1 1 130px;" autocomplete="off" />
-          <select id="cashierRole" aria-label="Jenis akun" style="flex:1 1 150px;"><option value="kasir">Kasir</option><option value="owner">Owner (hanya lihat)</option></select>
-          <input id="cashierPin" inputmode="numeric" maxlength="12" placeholder="PIN kasir (4-12 angka)" style="flex:1 1 150px;" autocomplete="off" />
-          <button id="addCashierBtn" class="action">Tambah akun</button>
-        </div>
-        <div id="cashierMsg" class="err"></div>
-        <div id="cashierList"></div>
-      </div>
-    
-      <div class="box">
-        <h2>Aturan kasir</h2>
-        <label style="display:flex; gap:8px; align-items:center; margin-top:6px;">
-          <input id="reqOpen" type="checkbox" style="width:auto;" />
-          <span>Wajib buka kasir sebelum berjualan</span>
-        </label>
-        <div class="muted" style="margin-top:6px;">Bila dicentang, penjualan, refund, pembayaran piutang, serta DP, pelunasan, dan pengembalian DP pre order ditolak sampai kasir dibuka (isi modal awal) di tab Buka/Tutup Kasir.</div>
-      </div>
+      <div class="setgrp hide" data-sgrp-box="data">
       <div class="box" style="border:1px solid #e3b4af;">
         <h2 style="color:#b34036;">Zona berbahaya</h2>
         <div class="muted" style="margin-bottom:10px;">Master reset menghapus semua data di perangkat ini: produk, stok, transaksi, member, piutang, biaya, dan lainnya. Data yang sudah terkirim ke Google Sheets tidak ikut terhapus. Unduh cadangan dulu bila perlu (berisi PIN dan token, simpan baik-baik).</div>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
           <button id="backupBtn" class="action ghost">Unduh cadangan data</button>
+          <button id="restoreBtn" class="action ghost">Pulihkan dari file cadangan</button>
+          <input id="restoreFile" type="file" accept=".json,application/json" class="hide" />
           <button id="resetBtn" class="action danger">Master reset</button>
         </div>
+        <div id="restoreMsg" class="err" role="alert" style="margin-top:8px;"></div>
+        <div class="muted" style="margin-top:8px; font-size:12px;">File cadangan berisi seluruh data, termasuk PIN dan token sinkron. Simpan di tempat aman.</div>
+      </div>
       </div>
     </section>
   </main>
@@ -1589,6 +1634,14 @@ function syncPut_(b) {
     <div class="err" id="tdeErr" role="alert"></div>
     <button id="tdeSave" class="action success full" style="margin-top:10px;">Simpan tanggal</button>
     <button id="tdeCancel" class="action ghost full" style="margin-top:8px;">Batal</button>
+  </dialog>
+
+  <dialog id="holdDialog">
+    <h2>Harga beli berbeda dari stok lama</h2>
+    <div class="muted" style="margin-bottom:8px;">Stok lama masih ada dan harga beli invoice ini berbeda. Anda bisa menahan stok baru dulu: stok baru dan modal barunya baru aktif otomatis saat stok lama habis. Penjualan stok lama tetap memakai modal lama.</div>
+    <div id="holdList"></div>
+    <button id="holdOk" class="action success full" style="margin-top:12px;">Lanjutkan simpan invoice</button>
+    <button id="holdCancel" class="action ghost full" style="margin-top:8px;">Batal</button>
   </dialog>
 
   <dialog id="oosDialog">
@@ -2023,6 +2076,7 @@ function syncPut_(b) {
     </div>
 
     <button id="editClosingBtn" class="action ghost full hide" style="margin-top:10px;">Ubah detail tutup kasir</button>
+    <button id="delClosingBtn" class="action ghost full hide" style="margin-top:8px;">Hapus tutup kasir ini</button>
     <button id="closeReceiptBtn" class="action full" style="margin-top:10px;">Selesai</button>
   </dialog>
 
@@ -2076,9 +2130,12 @@ function syncPut_(b) {
       confirmPrint: true,
       singleShift: true,
       quickProduct: true,
+      holdWarn: true,
       chartMetric: 'omzet',
       deletedTx: [],
       deletedRefunds: [],
+      deletedOpens: [],
+      deletedClosings: [],
       socIG: '',
       socTT: '',
       socFB: '',
@@ -2182,6 +2239,8 @@ function syncPut_(b) {
           if (!Array.isArray(parsed.refunds)) state.refunds = [];
           if (!Array.isArray(parsed.deletedTx)) state.deletedTx = [];
           if (!Array.isArray(parsed.deletedRefunds)) state.deletedRefunds = [];
+          if (!Array.isArray(parsed.deletedOpens)) state.deletedOpens = [];
+          if (!Array.isArray(parsed.deletedClosings)) state.deletedClosings = [];
           if (!Array.isArray(parsed.closings)) state.closings = [];
           if (!Array.isArray(parsed.journals)) state.journals = [];
           if (!Array.isArray(parsed.supReturns)) state.supReturns = [];
@@ -2330,7 +2389,7 @@ function syncPut_(b) {
     }
 
     // ===== Akun Owner: hanya lihat =====
-    const VIEWER_OK_BTN = '[data-open-receipt],[data-open-closing],[data-rmode],[data-jmode],[data-bd-preset],[data-pd-preset],#todayBtn,#rfPrev,#rfNext,#rfNow,#cfPrev,#cfNext,#cfNow,#pdPrev,#pdNext,#pdNow,#pdExport,#clExport,#spExport,#spPrint,#jrExport,#jrPrint,#invExportBtn,#exportProductsBtn,#onRefresh,#afRefresh,#srOpenBtn';
+    const VIEWER_OK_BTN = '[data-open-receipt],[data-open-closing],[data-rmode],[data-jmode],[data-bd-preset],[data-pd-preset],#todayBtn,#dayPrev,#dayNext,#hrPrev,#hrNext,#hrNow,[data-raw-more],[data-raw-csv],#rfPrev,#rfNext,#rfNow,#cfPrev,#cfNext,#cfNow,#pdPrev,#pdNext,#pdNow,#pdExport,#clExport,#spExport,#spPrint,#jrExport,#jrPrint,#invExportBtn,#exportProductsBtn,#onRefresh,#afRefresh,#srOpenBtn';
     const VIEWER_OK_TXT = /^(buka|lihat|detail|unduh|ekspor|export|cetak|print|muat|segarkan|refresh|hari ini|sebelum|berikut|sekarang|bulan ini)/i;
     let viewerObs = null;
     function applyViewerLock() {
@@ -2391,8 +2450,57 @@ function syncPut_(b) {
       return true;
     }
 
+    // ===== Stok baru ditahan (hold) sampai stok lama habis =====
+    function releaseHold(p, force) {
+      let n = 0;
+      while (p.holds && p.holds.length && (force || Number(p.stock || 0) <= 0)) {
+        const h = p.holds.shift();
+        p.stock = Number(p.stock || 0) + Number(h.qty);
+        if (Number(h.cost) > 0) p.cost = Number(h.cost);
+        if (Number(h.price) > 0) {
+          p.price = Number(h.price);
+          p.minPrice = Number(h.minPrice) > 0 ? Math.min(Number(h.minPrice), Number(h.price)) : Number(h.price);
+        } else if (Number(h.minPrice) > 0) {
+          p.minPrice = Math.min(Number(h.minPrice), Number(p.price) || Number(h.minPrice));
+        }
+        delete p.needsInfo;
+        delete p.awaitStock;
+        logAct('Stok hold aktif', 'Produk', p.name, h.qty + ' pcs dari ' + h.no + ' diaktifkan, modal ' + formatRp(h.cost) + (force ? ' (manual)' : ' (stok lama habis)'));
+        n++;
+      }
+      if (p.holds && !p.holds.length) delete p.holds;
+      return n;
+    }
+    function releaseDueHolds() {
+      (state.products || []).forEach((p) => { if (p.holds && p.holds.length) releaseHold(p, false); });
+    }
+    function holdCandidates() {
+      if (state.holdWarn === false) return [];
+      const out = [];
+      activeStockDraft.forEach((item) => {
+        const p = getProductById(item.id);
+        if (!p || !(Number(p.stock || 0) > 0) || !(Number(p.cost) > 0) || !(Number(item.cost) > 0)) return;
+        if (Math.round(Number(item.cost)) === Math.round(Number(p.cost))) return;
+        out.push({ id: p.id, name: p.name, oldStock: Number(p.stock), oldCost: Number(p.cost), qty: Number(item.qty), newCost: Number(item.cost) });
+      });
+      return out;
+    }
+    let holdChoice = {}, holdDecided = false;
+    function openHoldDialog(list) {
+      holdChoice = {};
+      $('#holdList').innerHTML = list.map((x) => {
+        const pct = ((x.newCost - x.oldCost) / x.oldCost * 100);
+        holdChoice[x.id] = 'hold';
+        return '<div class="line"><div class="n"><b>' + escapeHtml(x.name) + '</b>' +
+          '<small>Stok lama masih <b>' + x.oldStock + ' pcs</b> bermodal ' + formatRp(x.oldCost) + '</small>' +
+          '<small>Invoice baru: ' + x.qty + ' pcs bermodal ' + formatRp(x.newCost) + ' (' + (pct >= 0 ? 'naik ' : 'turun ') + Math.abs(pct).toFixed(1).replace('.', ',') + '%)</small>' +
+          '<select data-hold-id="' + x.id + '" aria-label="Pilihan untuk ' + escapeHtml(x.name) + '" style="margin-top:6px;"><option value="hold">Tahan stok baru sampai stok lama habis</option><option value="now">Aktifkan sekarang (modal jadi ' + formatRp(x.newCost) + ')</option></select></div></div>';
+      }).join('');
+      $('#holdDialog').showModal();
+    }
     function saveState() {
       if (viewerGuard()) return;
+      releaseDueHolds();
       trackActivity();
       persistState();
       scheduleSync();
@@ -2603,7 +2711,7 @@ function syncPut_(b) {
           '<b>' + escapeHtml(p.name) + '</b>' +
           (p.brand ? '<span>' + escapeHtml(p.brand) + '</span>' : '') +
           '<span>' + escapeHtml(p.code) + ' · ' + (Number(p.price) > 0 ? formatRp(p.price) : 'Belum ada harga') + (isOwnerView && Number(p.price) > 0 && Number(p.cost) > 0 ? ' · Margin ' + ((Number(p.price) - Number(p.cost)) / Number(p.price) * 100).toFixed(0) + '%' : '') + '</span>' +
-          '<span>' + (sellsBelowZero(p) ? '<span class="pill y">' + (p.needsInfo ? 'Perlu dilengkapi' : 'Menunggu Stok Masuk') + (Number(p.stock || 0) ? ' · Stok ' + p.stock : '') + '</span>' : Number(p.stock || 0) <= 0 ? '<span class="pill r">Habis · Pre Order</span>' : !(Number(p.price) > 0) ? '<span class="pill g">Harga belum diisi</span>' : ((minStockOf(p) ? isLowStock(p) : p.stock <= 5) ? '<span class="pill y">Stok ' + p.stock + (minStockOf(p) ? ' · Min ' + minStockOf(p) : '') + '</span>' : 'Stok ' + p.stock + (minStockOf(p) ? ' · Min ' + minStockOf(p) : ''))) + '</span>' +
+          '<span>' + (p.holds && p.holds.length ? '<span class="pill y">Stok baru ditahan ' + p.holds.reduce((a, h) => a + Number(h.qty), 0) + '</span> ' : '') + (sellsBelowZero(p) ? '<span class="pill y">' + (p.needsInfo ? 'Perlu dilengkapi' : 'Menunggu Stok Masuk') + (Number(p.stock || 0) ? ' · Stok ' + p.stock : '') + '</span>' : Number(p.stock || 0) <= 0 ? '<span class="pill r">Habis · Pre Order</span>' : !(Number(p.price) > 0) ? '<span class="pill g">Harga belum diisi</span>' : ((minStockOf(p) ? isLowStock(p) : p.stock <= 5) ? '<span class="pill y">Stok ' + p.stock + (minStockOf(p) ? ' · Min ' + minStockOf(p) : '') + '</span>' : 'Stok ' + p.stock + (minStockOf(p) ? ' · Min ' + minStockOf(p) : ''))) + '</span>' +
           '</button>';
       });
       $('#productGrid').innerHTML = html || '<div class="muted">Produk tidak ditemukan.</div>';
@@ -2687,7 +2795,7 @@ function syncPut_(b) {
         if (fb && (p.brand || '') !== fb) return false;
         if ($('#filterStock').value === 'low' && !isLowStock(p)) return false;
         if ($('#filterStock').value === 'nocost' && Number(p.cost) > 0) return false;
-        if ($('#filterStock').value === 'needsinfo' && !sellsBelowZero(p)) return false;
+        if ($('#filterStock').value === 'needsinfo' && !sellsBelowZero(p) && !(p.holds && p.holds.length)) return false;
         const hay = (p.name + ' ' + p.code + ' ' + (p.brand || '')).toLowerCase();
         return hay.includes(q);
       });
@@ -2700,9 +2808,10 @@ function syncPut_(b) {
           '<small>Brand ' + escapeHtml(p.brand || '-') + '</small>' +
           '<small>Kode ' + escapeHtml(p.code) + (Number(p.price) > 0 ? ' · Modal ' + formatRp(p.cost) + ' · Eceran ' + formatRp(minPriceOf(p)) + ' - ' + formatRp(p.price) : ' · Harga belum diisi') + ' · Stok ' + (p.stock || 0) + ' · Min ' + (minStockOf(p) || '-') + '</small>' +
           (Number(p.cost) > 0 ? '' : '<small><span class="pill y">Modal belum diisi</span></small>') +
+          (p.holds && p.holds.length ? '<small><span class="pill y">Stok baru ditahan: ' + p.holds.reduce((a, h) => a + Number(h.qty), 0) + ' pcs, modal ' + formatRp(p.holds[0].cost) + ' (' + escapeHtml(p.holds[0].no) + ')</span></small>' : '') +
           (p.needsInfo ? '<small><span class="pill y">Perlu dilengkapi · catat Stok Masuk (' + escapeHtml(p.quickBy || '') + ')</span></small>' : (p.awaitStock ? '<small><span class="pill y">Menunggu Stok Masuk (' + escapeHtml(p.awaitBy || '') + ')</span></small>' : '')) +
           (Number(p.stock || 0) <= 0 ? '<small><span class="pill r">Habis</span></small>' : (isLowStock(p) ? '<small><span class="pill y">Sudah minimum stock</span></small>' : '')) + '</div>' +
-          '<div class="q"><button class="action ghost" data-edit-product="' + p.id + '" style="padding:6px 10px;">Ubah</button>' +
+          '<div class="q"><button class="action ghost" data-edit-product="' + p.id + '" style="padding:6px 10px;">Ubah</button>' + (p.holds && p.holds.length ? '<button class="action ghost" data-release-hold="' + p.id + '" style="padding:6px 10px;">Aktifkan stok hold</button>' : '') +
           '<button class="x" data-del-product="' + p.id + '">Hapus</button></div>' +
           '</div>';
       }).join('');
@@ -2919,6 +3028,7 @@ function syncPut_(b) {
     }
 
     function renderHistory() {
+      renderHistoryRaw();
       const isOwner = !!currentUser && currentUser.role === 'owner';
       const visible = currentUser ? state.history.filter((tx) => seesAll() || tx.cashierId === currentUser.id) : [];
       const html = visible.slice().reverse().map((tx) => {
@@ -3112,6 +3222,55 @@ function syncPut_(b) {
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     }
 
+    // ===== Pulihkan data dari file cadangan =====
+    const RESTORE_COUNTERS = ['seq', 'pid', 'poseq', 'rqseq', 'opseq', 'cseq', 'koseq', 'bkseq', 'jseq', 'sseq', 'bseq', 'rseq', 'afseq', 'actseq'];
+    function restoreSummary(d) {
+      const n = (k) => (Array.isArray(d[k]) ? d[k].length : 0);
+      const act = Array.isArray(d.activity) && d.activity.length ? d.activity[d.activity.length - 1].ts : 0;
+      return [
+        n('products') + ' produk', n('history') + ' transaksi penjualan', n('members') + ' member', n('stockHistory') + ' invoice stok masuk',
+        n('closings') + ' tutup kasir', n('refunds') + ' refund', n('users') + ' akun kasir/owner'
+      ].join(' · ') + (act ? '\nAktivitas terakhir di file: ' + new Date(act).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : '');
+    }
+    function applyRestore(d, backupFirst) {
+      if (backupFirst) downloadBackup();
+      const cur = state, next = structuredClone(defaultState);
+      Object.keys(d).forEach((k) => { if (!['sync', 'auth', 'opDraft'].includes(k)) next[k] = structuredClone(d[k]); });
+      ['products', 'history', 'members', 'stockHistory', 'debts', 'users', 'preorders', 'requests', 'opnames', 'pointLog', 'refunds', 'closings', 'shiftOpens', 'stockOuts', 'journals', 'supReturns', 'affiliates', 'affPaid', 'activity', 'deletedTx', 'deletedRefunds', 'deletedOpens', 'deletedClosings'].forEach((k) => { if (!Array.isArray(next[k])) next[k] = []; });
+      // penghitung nomor: ambil yang terbesar agar nomor baru tidak bentrok dengan arsip di Google Sheets
+      RESTORE_COUNTERS.forEach((k) => { next[k] = Math.max(Number(d[k]) || 1, Number(cur[k]) || 1); });
+      // pengaturan sinkron milik perangkat ini dipertahankan; sinkron antar perangkat diputus
+      next.sync = cur.sync ? structuredClone(cur.sync) : makeSync();
+      next.sync.s2 = null; next.sync.sent = {}; next.sync.photos = {};
+      next.auth = cur.auth;
+      next.activity.push({ id: next.actseq++, ts: Date.now(), user: currentUser ? currentUser.name : 'Sistem', act: 'Pulihkan', mod: 'Sistem', ref: 'cadangan', detail: 'Data dipulihkan dari file cadangan: ' + restoreSummary(d).split('\n')[0] });
+      state = next;
+      persistState();
+      location.reload();
+    }
+    function onRestoreFile(file) {
+      const msg = $('#restoreMsg');
+      msg.textContent = '';
+      if (!file) return;
+      if (!currentUser || currentUser.role !== 'owner') return;
+      if (file.size > 60 * 1024 * 1024) { msg.textContent = 'File terlalu besar untuk file cadangan.'; return; }
+      const fr = new FileReader();
+      fr.onerror = () => { msg.textContent = 'File tidak bisa dibaca.'; };
+      fr.onload = () => {
+        let d;
+        try { d = JSON.parse(String(fr.result)); } catch (e) { msg.textContent = 'File bukan JSON yang valid. Pilih file "cadangan-kasir-….json".'; return; }
+        if (!d || typeof d !== 'object' || Array.isArray(d) || !Array.isArray(d.products) || !Array.isArray(d.history) || !d.store) { msg.textContent = 'File ini bukan cadangan dari aplikasi kasir (data produk atau transaksi tidak ditemukan).'; return; }
+        askDel({
+          title: 'Pulihkan data dari file cadangan?',
+          body: restoreSummary(d) + '\n\nSemua data di perangkat ini diganti dengan isi file. Login berikutnya memakai PIN dari file cadangan, dan sinkron antar perangkat diputus di perangkat ini (hubungkan ulang setelahnya). Nomor transaksi baru tetap melanjutkan nomor terbesar supaya tidak bentrok dengan arsip.',
+          check: 'Unduh salinan data saat ini lebih dulu (disarankan)', checked: true,
+          type: 'PULIHKAN', yes: 'Pulihkan',
+          onYes: (backupFirst) => applyRestore(d, backupFirst)
+        });
+      };
+      fr.readAsText(file);
+    }
+
     function masterReset(keep) {
       const old = state;
       const who = currentUser ? currentUser.name : 'Sistem';
@@ -3121,7 +3280,7 @@ function syncPut_(b) {
       next.actseq = Number(old.actseq || 1) + 1;
       next.activity = [{ id: Number(old.actseq || 1), ts: Date.now(), user: who, act: 'Reset', mod: 'Sistem', ref: '-', detail: 'Master reset: semua data dihapus' + (keep ? ' (pengaturan dipertahankan)' : '') }];
       if (keep) {
-        ['store', 'ownerPin', 'ownerUser', 'users', 'lockSalt', 'paper', 'receiptMode', 'kasirRefund', 'restrictPrice', 'logo', 'logoAspect', 'supplierPrefix', 'storeAddr', 'storePhone', 'storeFooter', 'confirmPrint', 'singleShift', 'quickProduct', 'socIG', 'socTT', 'socFB', 'socWeb', 'storeGreeting', 'socPrint', 'pointCfg', 'requireOpen', 'hetPct', 'hetMode', 'hetRound', 'hetAuto'].forEach((k) => { if (old[k] !== undefined) next[k] = structuredClone(old[k]); });
+        ['store', 'ownerPin', 'ownerUser', 'users', 'lockSalt', 'paper', 'receiptMode', 'kasirRefund', 'restrictPrice', 'logo', 'logoAspect', 'supplierPrefix', 'storeAddr', 'storePhone', 'storeFooter', 'confirmPrint', 'singleShift', 'quickProduct', 'holdWarn', 'socIG', 'socTT', 'socFB', 'socWeb', 'storeGreeting', 'socPrint', 'pointCfg', 'requireOpen', 'hetPct', 'hetMode', 'hetRound', 'hetAuto'].forEach((k) => { if (old[k] !== undefined) next[k] = structuredClone(old[k]); });
         if (old.sync) { next.sync = structuredClone(old.sync); next.sync.sent = {}; next.sync.photos = {}; next.sync.s2 = null; next.sync.deviceId = 'D' + Math.random().toString(36).slice(2, 7).toUpperCase(); }
       }
       state = next;
@@ -3386,8 +3545,100 @@ function syncPut_(b) {
       $('#debtList').innerHTML = html || '<div class="muted">Belum ada piutang.</div>';
     }
 
+    // ===== Rincian data (data mentah di bawah laporan) =====
+    const RAW_PAGE = 50;
+    const rawStore = {}, rawOpen = {};
+    function rawPack(id, sel) {
+      const showCost = seesAll();
+      const txs = state.history.filter((t) => sel.day(t.day) && sel.tx(t)).sort((a, b) => Number(b.ts) - Number(a.ts));
+      const rfs = state.refunds.filter((r) => sel.day(r.day) && sel.tx(r)).sort((a, b) => Number(b.ts) - Number(a.ts));
+      const pays = [];
+      state.debts.forEach((d) => (d.payments || []).forEach((q) => { if (sel.day(q.day) && sel.tx(q)) pays.push({ d, q }); }));
+      pays.sort((a, b) => Number(b.q.id || 0) - Number(a.q.id || 0));
+      const st = rawStore[id] = {};
+      st.tx = { title: 'Transaksi penjualan', head: ['No', 'Waktu', 'Kasir', 'Metode', 'Total'], num: [4],
+        rows: txs.map((t) => [t.no, t.date, t.cashier || '', t.method || '', Number(t.total || 0)]),
+        foot: ['Jumlah', txs.length + ' transaksi', '', '', txs.reduce((a, t) => a + Number(t.total || 0), 0)] };
+      const items = [];
+      txs.forEach((t) => (t.items || []).forEach((it) => {
+        const q = Number(it.qty || 0), pr = Number(it.price || 0), sub = q * pr, cost = Number(it.cost || 0) * q;
+        const row = [t.no, t.date, it.name, q, pr, Number(it.disc || 0) * q, sub];
+        if (showCost) row.push(Number(it.cost || 0) > 0 ? cost : '-', Number(it.cost || 0) > 0 ? sub - cost : '-', Number(it.cost || 0) > 0 && sub > 0 ? ((sub - cost) / sub * 100).toFixed(1).replace('.', ',') + '%' : '-');
+        items.push(row);
+      }));
+      const sumCol = (c) => items.reduce((a, r) => a + (typeof r[c] === 'number' ? r[c] : 0), 0);
+      st.item = { title: 'Rincian per item', head: ['No', 'Waktu', 'Produk', 'Qty', 'Harga', 'Diskon item', 'Subtotal'].concat(showCost ? ['Modal', 'Margin (Rp)', 'Margin (%)'] : []), num: showCost ? [3, 4, 5, 6, 7, 8, 9] : [3, 4, 5, 6],
+        rows: items, foot: ['Jumlah', items.length + ' baris', '', sumCol(3), '', sumCol(5), sumCol(6)].concat(showCost ? [sumCol(7), sumCol(8), ''] : []) };
+      st.rf = { title: 'Refund', head: ['No', 'Waktu', 'Transaksi asal', 'Kasir', 'Metode', 'Jumlah'], num: [5],
+        rows: rfs.map((r) => [r.no, r.date, r.txNo || '', r.cashier || '', r.method || '', Number(r.amount || 0)]),
+        foot: ['Jumlah', rfs.length + ' refund', '', '', '', rfs.reduce((a, r) => a + Number(r.amount || 0), 0)] };
+      st.pay = { title: 'Pembayaran piutang masuk', head: ['Waktu', 'Pelanggan', 'Kasir', 'Metode', 'Jumlah'], num: [4],
+        rows: pays.map((x) => [x.q.date || x.q.day, x.d.name || '', x.q.cashier || '', x.q.method || '', Number(x.q.amount || 0)]),
+        foot: ['Jumlah', pays.length + ' pembayaran', '', '', pays.reduce((a, x) => a + Number(x.q.amount || 0), 0)] };
+      Object.keys(st).forEach((k) => { st[k].shown = RAW_PAGE; });
+      return st;
+    }
+    function rawCell(v, isNum) {
+      if (isNum && typeof v === 'number') return '<td class="num">' + (v < 0 ? '-' : '') + formatRp(Math.abs(v)).replace('Rp', 'Rp ') + '</td>';
+      return '<td' + (isNum ? ' class="num"' : '') + '>' + escapeHtml(v) + '</td>';
+    }
+    function rawTableHtml(id, key) {
+      const t = rawStore[id][key];
+      if (!t.rows.length) return '';
+      const qtyCols = key === 'item' ? [3] : [];
+      const cell = (v, c) => (qtyCols.includes(c) ? '<td class="num">' + escapeHtml(v) + '</td>' : rawCell(v, t.num.includes(c)));
+      const body = t.rows.slice(0, t.shown).map((r) => '<tr>' + r.map((v, c) => cell(v, c)).join('') + '</tr>').join('');
+      const foot = '<tr style="font-weight:700;">' + t.foot.map((v, c) => cell(v, c)).join('') + '</tr>';
+      const left = t.rows.length - t.shown;
+      return '<h3>' + t.title + ' (' + t.rows.length + ')</h3><div style="overflow-x:auto;"><table class="tbl" style="min-width:' + (t.head.length > 6 ? 760 : 520) + 'px;"><thead><tr>' +
+        t.head.map((h, c) => '<th' + (t.num.includes(c) ? ' class="num"' : '') + '>' + h + '</th>').join('') + '</tr></thead><tbody>' + body + foot + '</tbody></table></div>' +
+        '<div class="rawact">' + (left > 0 ? '<button class="action ghost" data-raw-more="' + id + ':' + key + '" style="padding:8px 12px;">Tampilkan ' + Math.min(RAW_PAGE, left) + ' lagi (sisa ' + left + ')</button>' : '') +
+        '<button class="action ghost" data-raw-csv="' + id + ':' + key + '" style="padding:8px 12px;">Unduh CSV</button></div>';
+    }
+    function rawHtml(id, label) {
+      const st = rawStore[id];
+      const total = st.tx.rows.length + st.rf.rows.length + st.pay.rows.length;
+      const inner = ['tx', 'item', 'rf', 'pay'].map((k) => rawTableHtml(id, k)).join('') || '<div class="muted" style="margin-top:8px;">Belum ada data pada periode ini.</div>';
+      return '<details class="rawbox" data-raw-id="' + id + '"' + (rawOpen[id] ? ' open' : '') + '><summary>Rincian data · ' + escapeHtml(label) + ' (' + st.tx.rows.length + ' transaksi · ' + st.item.rows.length + ' baris item' + (total ? '' : ', kosong') + ')</summary>' +
+        '<div class="muted" style="margin-top:6px; font-size:12px;">Baris-baris di bawah inilah yang membentuk angka ringkasan di atas. Total tiap tabel bisa dicocokkan dengan ringkasan.</div>' + inner + '</details>';
+    }
+    function rawCsv(id, key) {
+      const t = rawStore[id] && rawStore[id][key];
+      if (!t) return;
+      const lines = [t.head.map(csvQ).join(';')].concat(t.rows.map((r) => r.map(csvQ).join(';')));
+      downloadCsv('rincian-' + key + '-' + id + '.csv', lines);
+    }
+    function wireRaw(box) {
+      box.addEventListener('toggle', (e) => { const d = e.target.closest('details[data-raw-id]'); if (d) rawOpen[d.dataset.rawId] = d.open; }, true);
+      box.addEventListener('click', (e) => {
+        const more = e.target.closest('[data-raw-more]'), csv = e.target.closest('[data-raw-csv]');
+        if (more) {
+          const [id, key] = more.dataset.rawMore.split(':');
+          rawStore[id][key].shown += RAW_PAGE;
+          const det = more.closest('details'), y = window.scrollY;
+          const holder = document.createElement('div');
+          holder.innerHTML = rawTableHtml(id, key);
+          // ganti hanya blok tabel itu (judul + tabel + tombol)
+          const h3 = [...det.querySelectorAll('h3')].find((h) => h.textContent.startsWith(rawStore[id][key].title));
+          const nodes = [h3, h3.nextElementSibling, h3.nextElementSibling.nextElementSibling];
+          holder.childNodes.forEach((n) => det.insertBefore(n.cloneNode(true), nodes[0]));
+          nodes.forEach((n) => n && n.remove());
+          window.scrollTo(0, y);
+        }
+        if (csv) { const [id, key] = csv.dataset.rawCsv.split(':'); rawCsv(id, key); }
+      });
+    }
+    function renderHistoryRaw() {
+      if (!$('#histRaw') || !currentUser) return;
+      const date = $('#histRawDate').value || localISODate();
+      $('#hrNext').disabled = date >= localISODate();
+      rawPack('hist', { day: (d) => d === date, tx: (x) => seesAll() || String(x.cashierId) === String(currentUser.id) });
+      $('#histRaw').innerHTML = rawHtml('hist', seesAll() ? date : 'milik saya · ' + date);
+    }
+
     function renderReport() {
       const date = $('#reportDate').value || localISODate();
+      $('#dayNext').disabled = date >= localISODate();
       let sales = 0, count = 0, refunds = 0, payments = 0, debt = 0;
       const by = {};
       const row = (name) => (by[name] = by[name] || { name, count: 0, sales: 0, refund: 0, pay: 0 });
@@ -3425,6 +3676,8 @@ function syncPut_(b) {
             (r.refund ? ' · Refund -' + formatRp(r.refund) : '') + (r.pay ? ' · Bayar hutang ' + formatRp(r.pay) : '') + '</small></div><b>' + formatRp(r.sales) + '</b></div>').join('')
         : '';
       renderDailyCharts(date);
+      rawPack('daily', { day: (d) => d === date, tx: () => true });
+      $('#reportRaw').innerHTML = rawHtml('daily', date);
     }
 
     // ===== Laporan harian / mingguan / bulanan + grafik =====
@@ -3546,6 +3799,9 @@ function syncPut_(b) {
         '<h2 style="margin-top:14px;">' + chartMetricDef().title + ' 4 ' + unit + ' terakhir</h2>' + svgBars(periods.map((p) => p.label), periods.map((p) => chartMetricDef().val(p.d)), true, chartMetricDef().kind) + chartNote() +
         '<div style="overflow-x:auto; margin-top:10px;"><table class="tbl"><thead><tr><th>' + (weekly ? 'Minggu' : 'Bulan') + '</th><th class="num">Penjualan</th><th class="num hm">Refund</th><th class="num">Bersih</th><th class="num hm">Transaksi</th><th class="num hm">Laba kotor</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
         '<div class="muted" style="margin-top:10px;">Produk terlaris dan metode pembayaran di bawah dihitung dari 4 ' + unit + ' terakhir.</div>' + rankBlocks(all);
+      const selDays = new Set(periods[3].days);
+      rawPack('period', { day: (d) => selDays.has(d), tx: () => true });
+      $('#pdRaw').innerHTML = rawHtml('period', periods[3].range);
     }
 
     // ===== Arus kas (dari jurnal: akun Kas dan Bank & E-Wallet) =====
@@ -4048,6 +4304,8 @@ function syncPut_(b) {
         $('#stockProofStatus').scrollIntoView({ block: 'center', behavior: 'smooth' });
         return;
       }
+      const hl = holdDecided ? [] : holdCandidates();
+      if (hl.length) { openHoldDialog(hl); return; }
       savingStock = true;
       try {
         const photoId = newPhotoId();
@@ -4061,7 +4319,11 @@ function syncPut_(b) {
         }
         activeStockDraft.forEach((item) => {
           const product = getProductById(item.id);
-          if (product) {
+          if (product && holdChoice[item.id] === 'hold') {
+            product.holds = (product.holds || []).concat([{ no, qty: Number(item.qty), cost: Number(item.cost) || 0, price: Number(item.price) || 0, minPrice: Number(item.minPrice) || 0, at: nowLabel() }]);
+            if (supplier && !product.supplier) product.supplier = supplier;
+            item.held = true;
+          } else if (product) {
             product.stock = Number(product.stock || 0) + Number(item.qty);
             if (supplier && !product.supplier) product.supplier = supplier;
             delete product.needsInfo;
@@ -4103,6 +4365,8 @@ function syncPut_(b) {
           items: activeStockDraft.map((item) => ({ ...item }))
         });
         saveState();
+        const heldN = activeStockDraft.filter((i) => i.held).length;
+        holdChoice = {}; holdDecided = false;
         activeStockDraft = [];
         $('#stockNo').value = '';
         $('#stockSupplier').value = '';
@@ -4367,10 +4631,10 @@ function syncPut_(b) {
         const d = new Date(l.ts), p2 = (n) => String(n).padStart(2, '0');
         add('aktivitas', l.id, { Waktu: d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes()) + ':' + p2(d.getSeconds()), Pengguna: l.user, Aksi: l.act, Modul: l.mod, Referensi: l.ref, Detail: l.detail });
       });
-      (state.shiftOpens || []).forEach((o) => add('buka_kasir', o.no, { No: o.no, Tanggal: o.date, Kasir: o.userName, 'Modal Awal': o.opening, 'Kas Shift Sebelumnya': o.expectedCarry, Selisih: o.diff, Catatan: o.note || '', 'Ditutup Dengan': o.closedNo || '' }));
+      const delMark = (r) => (r.delAt ? { Status: 'Dihapus', 'Dihapus Pada': r.delAt, 'Dihapus Oleh': r.delBy || '' } : {});
+      (state.shiftOpens || []).concat((state.deletedOpens || []).filter((d) => !(state.shiftOpens || []).some((x) => x.no === d.no))).forEach((o) => add('buka_kasir', o.no, Object.assign({ No: o.no, Tanggal: o.date, Kasir: o.userName, 'Modal Awal': o.opening, 'Kas Shift Sebelumnya': o.expectedCarry, Selisih: o.diff, Catatan: o.note || '', 'Ditutup Dengan': o.closedNo || '' }, delMark(o))));
       state.stockOuts.forEach((o) => add('stok_keluar', o.no, { No: o.no, Tanggal: o.date, Kode: o.code || '', Produk: o.name, Qty: o.qty, 'Modal Satuan': o.cost, Nilai: o.value, Alasan: SO_REASON[o.reason] || o.reason, Catatan: o.note || '', 'Dicatat oleh': o.by || '' }));
       state.members.forEach((m) => add('member', m.id, { Nama: m.name, Telepon: m.phone, 'Tgl Lahir': m.dob || '', 'Batas Hutang': Number(m.limit || 0), Poin: Number(m.points || 0) }));
-      const delMark = (r) => (r.delAt ? { Status: 'Dihapus', 'Dihapus Pada': r.delAt, 'Dihapus Oleh': r.delBy || '' } : {});
       const txAll = state.history.concat((state.deletedTx || []).filter((d) => !state.history.some((h) => h.no === d.no)));
       txAll.forEach((tx) => add('penjualan', tx.no, Object.assign({
         No: tx.no, Tanggal: tx.date, Hari: tx.day || '', Kasir: tx.cashier || '', Member: tx.member ? tx.member.name : '',
@@ -4416,16 +4680,16 @@ function syncPut_(b) {
         Item: itemsText(r.items, 'cost'), 'Nilai Retur': r.value, 'Potong Tagihan': r.credit, 'Uang Dikembalikan': r.cash,
         Metode: r.cash ? r.method : '', Alasan: r.reason || '', 'Foto Retur': syncPhotoUrl(r.photoId)
       }));
-      state.closings.forEach((c) => {
+      state.closings.concat((state.deletedClosings || []).filter((d) => !state.closings.some((x) => x.no === d.no))).forEach((c) => {
         const s = c.summary;
-        add('tutup_kasir', c.no, {
+        add('tutup_kasir', c.no, Object.assign({
           No: c.no, Tanggal: c.date, Hari: c.day, Kasir: c.userName, 'Periode Dari': c.from || '', 'Modal Awal': c.opening,
           'Penjualan Tunai': s.byMethod.Tunai || 0, 'Penjualan QRIS': s.byMethod.QRIS || 0, 'Penjualan Transfer': s.byMethod.Transfer || 0,
           'Penjualan Hutang': s.byMethod.Hutang || 0, 'DP Hutang Tunai': s.dp, Diskon: s.disc, Refund: s.refundTotal, 'Refund Tunai': s.refundCashOut,
           'Bayar Hutang Tunai': s.payByMethod.Tunai || 0, 'Bayar Hutang Non-Tunai': (s.payTotal || 0) - (s.payByMethod.Tunai || 0),
           'Kas Seharusnya': c.expected, 'Uang Fisik': c.counted, Selisih: c.diff, Setoran: c.deposit, 'Dibawa Shift Berikut': c.carry, Catatan: c.note || '',
-          'No Buka': c.openNo || '', 'Waktu Buka': ((state.shiftOpens || []).find((o) => o.no === c.openNo) || {}).date || ''
-        });
+          'No Buka': c.openNo || '', 'Waktu Buka': ((state.shiftOpens || []).concat(state.deletedOpens || []).find((o) => o.no === c.openNo) || {}).date || ''
+        }, delMark(c)));
       });
       state.stockHistory.forEach((e, idx) => {
         const base = (e.uid !== undefined && e.uid !== null && e.uid !== '' ? e.uid : idx) + '-' + e.no;
@@ -4533,14 +4797,14 @@ function syncPut_(b) {
     // Snapshot terenkripsi disimpan di Drive lewat Apps Script. Tiap perangkat menggabungkan (3 arah: dasar, lokal, server).
     const S2_COLLS = [
       ['products', (r) => r.id, ['stock']], ['members', (r) => r.id, ['points']], ['history', (r) => r.no, []],
-      ['refunds', (r) => r.no, []], ['deletedTx', (r) => r.no, []], ['deletedRefunds', (r) => r.no, []], ['debts', (r) => r.id, ['credit']], ['stockHistory', (r) => r.no || r.uid, ['returnedValue']],
+      ['refunds', (r) => r.no, []], ['deletedTx', (r) => r.no, []], ['deletedRefunds', (r) => r.no, []], ['deletedOpens', (r) => r.no, []], ['deletedClosings', (r) => r.no, []], ['debts', (r) => r.id, ['credit']], ['stockHistory', (r) => r.no || r.uid, ['returnedValue']],
       ['supReturns', (r) => r.no, []], ['closings', (r) => r.no, []], ['journals', (r) => r.no || r.id, []],
       ['preorders', (r) => r.no || r.id, []], ['requests', (r) => r.no || r.id, []], ['opnames', (r) => r.no || r.id, []],
       ['shiftOpens', (r) => r.no, []], ['stockOuts', (r) => r.no, []], ['users', (r) => r.id, []],
       ['affiliates', (r) => r.id, []], ['affPaid', (r) => r.id, []], ['pointLog', (r) => r.id, []],
       ['activity', (r) => [r.ts, r.user, r.act, r.mod, r.ref].join('|'), []]
     ];
-    const S2_SET = ['store', 'receiptMode', 'kasirRefund', 'restrictPrice', 'logo', 'logoAspect', 'supplierPrefix', 'storeAddr', 'storePhone', 'storeFooter', 'confirmPrint', 'singleShift', 'quickProduct', 'socIG', 'socTT', 'socFB', 'socWeb', 'storeGreeting', 'socPrint', 'pointCfg', 'ownerUser', 'ownerPin', 'lockSalt', 'requireOpen', 'hetPct', 'hetMode', 'hetVer', 'hetRound', 'hetAuto'];
+    const S2_SET = ['store', 'receiptMode', 'kasirRefund', 'restrictPrice', 'logo', 'logoAspect', 'supplierPrefix', 'storeAddr', 'storePhone', 'storeFooter', 'confirmPrint', 'singleShift', 'quickProduct', 'holdWarn', 'socIG', 'socTT', 'socFB', 'socWeb', 'storeGreeting', 'socPrint', 'pointCfg', 'ownerUser', 'ownerPin', 'lockSalt', 'requireOpen', 'hetPct', 'hetMode', 'hetVer', 'hetRound', 'hetAuto'];
     let s2Busy = false, s2KeyP = null, s2KeyFor = '';
     const s2On = () => !!(syncReady() && state.sync.s2 && state.sync.s2.linked);
     const devTag = () => { const i = s2On() ? Number(state.sync.s2.idx) || 0 : 0; return i > 0 ? String.fromCharCode(64 + Math.min(i, 26)) : ''; };
@@ -5025,8 +5289,14 @@ function syncPut_(b) {
       return Number(it.qty) - Number((e.returnedQty || {})[it.id] || 0);
     }
 
-    function returnAvail(e, it) {
+    // barang invoice yang masih ditahan (hold) belum masuk stok: retur diambil dari stok tahan itu
+    function holdOf(e, it) {
       const prod = getProductById(it.id);
+      return prod && prod.holds ? prod.holds.find((h) => h.no === e.no) || null : null;
+    }
+    function returnAvail(e, it) {
+      const prod = getProductById(it.id), h = holdOf(e, it);
+      if (h) return Math.max(0, Math.min(returnableQty(e, it), Number(h.qty)));
       return Math.max(0, Math.min(returnableQty(e, it), prod ? Number(prod.stock || 0) : 0));
     }
 
@@ -5126,8 +5396,12 @@ function syncPut_(b) {
         }
         const items = (e.items || []).filter((it) => qty[it.id] > 0).map((it) => ({ id: it.id, name: it.name, code: it.code, qty: qty[it.id], cost: it.cost }));
         items.forEach((it) => {
-          const prod = getProductById(it.id);
-          if (prod) prod.stock = Math.max(0, Number(prod.stock || 0) - it.qty);
+          const prod = getProductById(it.id), h = holdOf(e, it);
+          if (h && prod) {
+            h.qty = Number(h.qty) - it.qty;
+            if (h.qty <= 0) prod.holds = prod.holds.filter((x) => x !== h);
+            if (!prod.holds.length) delete prod.holds;
+          } else if (prod) prod.stock = Math.max(0, Number(prod.stock || 0) - it.qty);
         });
         e.returnedQty = e.returnedQty || {};
         items.forEach((it) => { e.returnedQty[it.id] = Number(e.returnedQty[it.id] || 0) + it.qty; });
@@ -5688,7 +5962,7 @@ function syncPut_(b) {
           ? '<div class="muted" style="margin-bottom:8px;">' + escapeHtml(otherActiveMsg(otherActive(currentUser))) + '</div>' + (currentUser.role === 'owner' ? '<button id="forceCloseBtn" class="action full">Tutup paksa shift ' + escapeHtml(otherActive(currentUser).userName) + '</button>' : '')
           : '<div class="muted" style="margin-bottom:8px;">Kasir belum dibuka. Catat modal awal di laci sebelum mulai berjualan.</div><button id="openShiftBtn" class="action full">Buka kasir</button>');
       const mine = (state.shiftOpens || []).filter((o) => o.userId === currentUser.id).slice(-10).reverse();
-      $('#openList').innerHTML = mine.map((o) => '<div class="line"><div class="n"><b>' + escapeHtml(o.no) + '</b><small>' + escapeHtml(o.date) + ' · Modal awal ' + formatRp(o.opening) + '</small></div><small>' + (o.closedNo ? 'Ditutup ' + escapeHtml(o.closedNo) : 'Berjalan') + (o.editedBy ? ' · diubah ' + escapeHtml(o.editedBy) : '') + '</small>' + (canEditShift() ? '<button class="action ghost" data-edit-shift="' + o.no + '" style="padding:6px 10px;">Ubah</button>' : '') + '</div>').join('') || '<div class="muted">Belum ada buka kasir.</div>';
+      $('#openList').innerHTML = mine.map((o) => '<div class="line"><div class="n"><b>' + escapeHtml(o.no) + '</b><small>' + escapeHtml(o.date) + ' · Modal awal ' + formatRp(o.opening) + '</small></div><small>' + (o.closedNo ? 'Ditutup ' + escapeHtml(o.closedNo) : 'Berjalan') + (o.editedBy ? ' · diubah ' + escapeHtml(o.editedBy) : '') + '</small>' + (canEditShift() ? '<button class="action ghost" data-edit-shift="' + o.no + '" style="padding:6px 10px;">Ubah</button>' : '') + (canEditShift() ? '<button class="action ghost" data-del-shift="' + o.no + '" style="padding:6px 10px;">Hapus</button>' : '') + '</div>').join('') || '<div class="muted">Belum ada buka kasir.</div>';
     }
     function openOpenDialog() {
       if (!currentUser || currentOpen(currentUser)) return;
@@ -5763,6 +6037,45 @@ function syncPut_(b) {
       });
       if (clash) w.textContent = '⚠ Waktu ini tumpang tindih dengan shift ' + clash.userName + ' (' + clash.no + ').';
     }
+    // hitung ulang "kas shift sebelumnya" dan selisih pada buka kasir milik satu kasir setelah ada yang dihapus
+    function recalcOpens(uid) {
+      (state.shiftOpens || []).filter((x) => String(x.userId) === String(uid)).sort((a, b) => a.ts - b.ts).forEach((o) => {
+        const prev = state.closings.filter((x) => String(x.userId) === String(uid) && x.ts < o.ts).sort((a, b) => b.ts - a.ts)[0];
+        o.expectedCarry = prev ? Number(prev.carry || 0) : 0;
+        o.diff = prev ? Number(o.opening) - o.expectedCarry : 0;
+      });
+    }
+    function deleteShift(no) {
+      if (!canEditShift()) return;
+      let c = state.closings.find((x) => x.no === no) || null;
+      let o = c ? opOf(c) : ((state.shiftOpens || []).find((x) => x.no === no) || null);
+      if (!c && o && o.closedNo) c = state.closings.find((x) => x.no === o.closedNo) || null;
+      if (!c && !o) return;
+      const who = c ? c.userName : o.userName, ref = (c ? c.no : '') + (c && o ? ' / ' : '') + (o ? o.no : '');
+      askDel({
+        title: 'Hapus ' + (c ? 'tutup kasir' : 'buka kasir') + ' ' + ref + '?',
+        body: 'Kasir ' + who + (c ? ' · fisik ' + formatRp(c.counted) + ' · selisih ' + diffText(c.diff) : ' · modal awal ' + formatRp(o.opening)) +
+          '\n\nTidak bisa dibatalkan. Penjualan di dalam shift ini tidak terhapus, tapi ikut dihitung di shift berikutnya milik kasir yang sama. Di Google Sheets, barisnya diberi tanda "Dihapus".',
+        check: (c && o) ? 'Hapus juga catatan buka kasirnya (jika tidak, shift ini kembali berjalan)' : '',
+        checked: true,
+        yes: 'Hapus',
+        onYes: (alsoOpen) => {
+          const uid = c ? c.userId : o.userId, removeOpen = !c || !o || alsoOpen;
+          if (c && o && !removeOpen && singleShiftOn()) {
+            const act = otherActive({ id: uid });
+            if (act) { showToast('Shift ' + act.userName + ' sedang berjalan, jadi shift ini tidak bisa dibuka kembali.'); return; }
+          }
+          if (c) { tombstone('deletedClosings', c); state.closings = state.closings.filter((x) => x !== c); }
+          if (o && removeOpen) { tombstone('deletedOpens', o); state.shiftOpens = state.shiftOpens.filter((x) => x !== o); }
+          else if (o) delete o.closedNo;
+          recalcOpens(uid);
+          logAct('Hapus', 'Buka/Tutup Kasir', ref, 'Kasir ' + who + (c ? ' · fisik ' + formatRp(c.counted) + ' · selisih ' + diffText(c.diff) : ' · modal awal ' + formatRp(o.opening)));
+          saveState();
+          renderAll();
+          showToast('Dihapus: ' + ref);
+        }
+      });
+    }
     function openShiftEdit(no) {
       if (!canEditShift()) return;
       seC = state.closings.find((x) => x.no === no) || null;
@@ -5830,7 +6143,7 @@ function syncPut_(b) {
       return '<div class="line"><div class="n"><b>' + escapeHtml(c.no) + (showUser ? ' · ' + escapeHtml(c.userName) : '') + '</b>' +
         '<small>' + escapeHtml(c.date) + ' · Penjualan bersih ' + formatRp(c.summary.netSales) + '</small>' +
         '<small>Kas seharusnya ' + formatRp(c.expected) + ' · Fisik ' + formatRp(c.counted) + ' · <span class="' + (bad ? 'low' : '') + '">' + diffText(c.diff) + '</span>' + (c.editedBy ? ' · diubah ' + escapeHtml(c.editedBy) : '') + '</small></div>' +
-        '<div class="q"><button class="action ghost" data-open-closing="' + c.no + '" style="padding:8px 10px;">Buka</button>' + (canEditShift() ? '<button class="action ghost" data-edit-shift="' + c.no + '" style="padding:8px 10px;">Ubah</button>' : '') + '</div></div>';
+        '<div class="q"><button class="action ghost" data-open-closing="' + c.no + '" style="padding:8px 10px;">Buka</button>' + (canEditShift() ? '<button class="action ghost" data-edit-shift="' + c.no + '" style="padding:8px 10px;">Ubah</button>' : '') + (canEditShift() ? '<button class="action ghost" data-del-shift="' + c.no + '" style="padding:8px 10px;">Hapus</button>' : '') + '</div></div>';
     }
 
     const NEED_OPEN_CLOSE_MSG = 'Tidak bisa tutup kasir karena kasir belum dibuka. Klik Buka kasir dulu.';
@@ -6003,8 +6316,8 @@ function syncPut_(b) {
       rows.sort((x, y) => y.ts - x.ts);
       if (!rows.length) return '<div class="muted">Belum ada buka/tutup kasir pada filter ini.</div>';
       const body = rows.map(({ c, o }) => c
-        ? '<tr><td><b>' + escapeHtml(c.no) + '</b></td><td>' + escapeHtml(c.userName) + '</td><td>' + (o ? escapeHtml(o.date) : '-') + '</td><td>' + escapeHtml(c.date) + '</td><td class="num">' + formatRp(c.opening) + '</td><td class="num">' + formatRp(c.summary.netSales) + '</td><td class="num">' + formatRp(c.expected) + '</td><td class="num">' + formatRp(c.counted) + '</td><td class="num"><span class="' + (c.diff !== 0 ? 'low' : '') + '">' + diffText(c.diff) + '</span></td><td class="num">' + formatRp(c.deposit) + '</td><td style="white-space:nowrap;"><button class="action ghost" data-open-closing="' + c.no + '" style="padding:6px 10px;">Buka</button> ' + (canEditShift() ? '<button class="action ghost" data-edit-shift="' + c.no + '" style="padding:6px 10px;">Ubah</button>' : '') + '</td></tr>'
-        : '<tr><td><b>' + escapeHtml(o.no) + '</b></td><td>' + escapeHtml(o.userName) + '</td><td>' + escapeHtml(o.date) + '</td><td colspan="2"><small>Shift berjalan</small></td><td class="num">' + formatRp(o.opening) + '</td><td class="num">-</td><td class="num">-</td><td class="num">-</td><td class="num">-</td><td>' + (canEditShift() ? '<button class="action ghost" data-edit-shift="' + o.no + '" style="padding:6px 10px;">Ubah</button>' : '') + '</td></tr>').join('');
+        ? '<tr><td><b>' + escapeHtml(c.no) + '</b></td><td>' + escapeHtml(c.userName) + '</td><td>' + (o ? escapeHtml(o.date) : '-') + '</td><td>' + escapeHtml(c.date) + '</td><td class="num">' + formatRp(c.opening) + '</td><td class="num">' + formatRp(c.summary.netSales) + '</td><td class="num">' + formatRp(c.expected) + '</td><td class="num">' + formatRp(c.counted) + '</td><td class="num"><span class="' + (c.diff !== 0 ? 'low' : '') + '">' + diffText(c.diff) + '</span></td><td class="num">' + formatRp(c.deposit) + '</td><td style="white-space:nowrap;"><button class="action ghost" data-open-closing="' + c.no + '" style="padding:6px 10px;">Buka</button> ' + (canEditShift() ? '<button class="action ghost" data-edit-shift="' + c.no + '" style="padding:6px 10px;">Ubah</button>' : '') + (canEditShift() ? '<button class="action ghost" data-del-shift="' + c.no + '" style="padding:6px 10px;">Hapus</button>' : '') + '</td></tr>'
+        : '<tr><td><b>' + escapeHtml(o.no) + '</b></td><td>' + escapeHtml(o.userName) + '</td><td>' + escapeHtml(o.date) + '</td><td colspan="2"><small>Shift berjalan</small></td><td class="num">' + formatRp(o.opening) + '</td><td class="num">-</td><td class="num">-</td><td class="num">-</td><td class="num">-</td><td>' + (canEditShift() ? '<button class="action ghost" data-edit-shift="' + o.no + '" style="padding:6px 10px;">Ubah</button>' : '') + (canEditShift() ? '<button class="action ghost" data-del-shift="' + o.no + '" style="padding:6px 10px;">Hapus</button>' : '') + '</td></tr>').join('');
       return '<div style="overflow-x:auto;"><table class="tbl" style="min-width:860px;"><thead><tr><th>No</th><th>Kasir</th><th>Dibuka</th><th>Ditutup</th><th class="num">Modal awal</th><th class="num">Penjualan bersih</th><th class="num">Kas seharusnya</th><th class="num">Uang fisik</th><th class="num">Selisih</th><th class="num">Setoran</th><th></th></tr></thead><tbody>' + body + '</tbody></table></div>';
     }
 
@@ -6935,6 +7248,7 @@ function syncPut_(b) {
     function showReceiptText(text, phone, closingNo) {
       receiptClosingNo = closingNo || null;
       $('#editClosingBtn').classList.toggle('hide', !(receiptClosingNo && canEditShift()));
+      $('#delClosingBtn').classList.toggle('hide', !(receiptClosingNo && canEditShift()));
       currentReceiptText = text;
       $('#receiptText').textContent = text;
       $('#receiptLogo').classList.toggle('hide', !state.logo);
@@ -7535,8 +7849,8 @@ function syncPut_(b) {
       ['Penjualan', '🛒', ['kasir', 'tutup', 'riwayat', 'preorder', 'online', 'request']],
       ['Produk & Stok', '📦', ['produk', 'stok', 'stokout', 'opname']],
       ['Pelanggan', '👥', ['member', 'broadcast', 'afiliator', 'piutang']],
-      ['Keuangan', '💰', ['laporan', 'biaya', 'jurnal']],
-      ['Lainnya', '⚙️', ['produktivitas', 'pengaturan']]
+      ['Keuangan', '💰', ['laporan', 'produktivitas', 'biaya', 'jurnal']],
+      ['Pengaturan', '⚙️', ['pengaturan']]
     ];
     const navLast = {};
     const navCatOf = (tab) => { const i = NAV_CATS.findIndex((c) => c[2].includes(tab)); return i < 0 ? 0 : i; };
@@ -7572,6 +7886,7 @@ function syncPut_(b) {
       $('#confirmPrintChk').checked = state.confirmPrint !== false;
       $('#singleShiftChk').checked = state.singleShift !== false;
       $('#quickProductChk').checked = state.quickProduct !== false;
+      $('#holdWarnChk').checked = state.holdWarn !== false;
       [['#socIGInput', 'socIG'], ['#socTTInput', 'socTT'], ['#socFBInput', 'socFB'], ['#socWebInput', 'socWeb'], ['#storeGreetingInput', 'storeGreeting']].forEach(([sel, key]) => { $(sel).value = state[key] || ''; });
       $('#socPrintChk').checked = state.socPrint !== false;
       renderLogoSettings();
@@ -8736,6 +9051,7 @@ function syncPut_(b) {
       if (!rows.length) return;
       const note = $('#opNote').value.trim();
       const now = Date.now();
+      rows.forEach((r) => { if (r.p.holds && r.p.holds.length) releaseHold(r.p, true); });
       const items = rows.map((r) => ({ id: r.p.id, code: r.p.code, name: r.p.name, system: Number(r.p.stock || 0), physical: r.phys, diff: r.phys - Number(r.p.stock || 0), cost: Number(r.p.cost || 0) }));
       const o = {
         id: now,
@@ -9264,6 +9580,17 @@ function syncPut_(b) {
         $(sel).addEventListener('input', renderProductList);
       });
       $('#productList').addEventListener('click', (e) => {
+        const rh = e.target.closest('[data-release-hold]');
+        if (rh) {
+          const hp = getProductById(rh.dataset.releaseHold);
+          if (hp && currentUser && currentUser.role === 'owner') {
+            askDel({
+              title: 'Aktifkan stok hold ' + hp.name + '?', body: 'Stok baru ' + hp.holds.reduce((a, h) => a + Number(h.qty), 0) + ' pcs langsung ditambahkan dan modal produk menjadi ' + formatRp(hp.holds[0].cost) + ', walau stok lama masih ada.',
+              yes: 'Aktifkan', safe: true, onYes: () => { releaseHold(hp, true); saveState(); renderProductList(); renderProductGrid(); }
+            });
+          }
+          return;
+        }
         const editBtn = e.target.closest('[data-edit-product]');
         if (editBtn) {
           const prod = getProductById(editBtn.dataset.editProduct);
@@ -9350,7 +9677,15 @@ function syncPut_(b) {
         if (c.checked) delete bcOff[c.dataset.bcPick]; else bcOff[c.dataset.bcPick] = true;
         renderBroadcast();
       });
+      $('#setTabs').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-sgrp]');
+        if (!b) return;
+        document.querySelectorAll('#setTabs [data-sgrp]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+        document.querySelectorAll('.setgrp').forEach((g) => g.classList.toggle('hide', g.dataset.sgrpBox !== b.dataset.sgrp));
+      });
       $('#backupBtn').addEventListener('click', downloadBackup);
+      $('#restoreBtn').addEventListener('click', () => { $('#restoreMsg').textContent = ''; $('#restoreFile').click(); });
+      $('#restoreFile').addEventListener('change', () => { const f = $('#restoreFile').files[0]; $('#restoreFile').value = ''; onRestoreFile(f); });
       $('#resetBtn').addEventListener('click', askMasterReset);
       $('#delYes').addEventListener('click', delConfirm);
       $('#delNo').addEventListener('click', () => $('#delDialog').close());
@@ -9461,6 +9796,8 @@ function syncPut_(b) {
       ['#closingList', '#clList', '#openList'].forEach((sel) => $(sel).addEventListener('click', (e) => {
         const eb = e.target.closest('[data-edit-shift]');
         if (eb) openShiftEdit(eb.dataset.editShift);
+        const db = e.target.closest('[data-del-shift]');
+        if (db) deleteShift(db.dataset.delShift);
       }));
       $('#tdeSave').addEventListener('click', saveTxDateEdit);
       $('#tdeCancel').addEventListener('click', () => $('#txDateEditDialog').close());
@@ -9474,6 +9811,12 @@ function syncPut_(b) {
       $('#seSave').addEventListener('click', saveShiftEdit);
       ['#seOpenAt', '#seCloseAt'].forEach((sel) => $(sel).addEventListener('input', seTimeCheck));
       $('#seCancel').addEventListener('click', () => { seReopen = false; $('#shiftEditDialog').close(); });
+      $('#delClosingBtn').addEventListener('click', () => {
+        const no = receiptClosingNo;
+        if (!no) return;
+        $('#receiptDialog').close();
+        deleteShift(no);
+      });
       $('#editClosingBtn').addEventListener('click', () => {
         const no = receiptClosingNo;
         if (!no) return;
@@ -9670,9 +10013,13 @@ function syncPut_(b) {
       }
       $('#btPrintBtn').addEventListener('click', confirmPrint);
       $('#confirmPrintChk').addEventListener('change', () => { state.confirmPrint = $('#confirmPrintChk').checked; saveState(); });
+      $('#holdWarnChk').addEventListener('change', () => { state.holdWarn = $('#holdWarnChk').checked; saveState(); });
       $('#quickProductChk').addEventListener('change', () => { state.quickProduct = $('#quickProductChk').checked; saveState(); renderProductGrid(); });
       $('#quickProdBtn').addEventListener('click', openQuickProduct);
       $('#oosSell').addEventListener('click', oosSell);
+      $('#holdList').addEventListener('change', (e) => { const sel = e.target.closest('[data-hold-id]'); if (sel) holdChoice[sel.dataset.holdId] = sel.value; });
+      $('#holdOk').addEventListener('click', () => { $('#holdDialog').close(); holdDecided = true; saveStockEntry().finally(() => { holdDecided = false; }); });
+      $('#holdCancel').addEventListener('click', () => { holdChoice = {}; holdDecided = false; $('#holdDialog').close(); });
       $('#oosPo').addEventListener('click', () => { const id = oosId; $('#oosDialog').close(); poPick(id); });
       $('#oosCancel').addEventListener('click', () => $('#oosDialog').close());
       $('#qpSave').addEventListener('click', saveQuickProduct);
@@ -9704,6 +10051,22 @@ function syncPut_(b) {
       });
       $('#reportDate').value = localISODate();
       $('#reportDate').addEventListener('change', renderReport);
+      ['#reportRaw', '#pdRaw', '#histRaw'].forEach((sel) => wireRaw($(sel)));
+      $('#histRawDate').value = localISODate();
+      $('#histRawDate').addEventListener('change', renderHistoryRaw);
+      $('#hrPrev').addEventListener('click', () => { $('#histRawDate').value = shiftISO($('#histRawDate').value || localISODate(), -1); renderHistoryRaw(); });
+      $('#hrNext').addEventListener('click', () => { const n = shiftISO($('#histRawDate').value || localISODate(), 1); if (n > localISODate()) return; $('#histRawDate').value = n; renderHistoryRaw(); });
+      $('#hrNow').addEventListener('click', () => { $('#histRawDate').value = localISODate(); renderHistoryRaw(); });
+      $('#dayPrev').addEventListener('click', () => {
+        $('#reportDate').value = shiftISO($('#reportDate').value || localISODate(), -1);
+        renderReport();
+      });
+      $('#dayNext').addEventListener('click', () => {
+        const n = shiftISO($('#reportDate').value || localISODate(), 1);
+        if (n > localISODate()) return;
+        $('#reportDate').value = n;
+        renderReport();
+      });
       $('#todayBtn').addEventListener('click', () => {
         $('#reportDate').value = localISODate();
         renderReport();
