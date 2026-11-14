@@ -923,6 +923,7 @@
           <button data-rmode="harian" aria-pressed="true">Harian</button>
           <button data-rmode="mingguan" aria-pressed="false">Mingguan</button>
           <button data-rmode="bulanan" aria-pressed="false">Bulanan</button>
+          <button data-rmode="periode" aria-pressed="false">Periode</button>
           <button data-rmode="aruskas" aria-pressed="false">Arus kas</button>
           <button data-rmode="afiliator" aria-pressed="false">Afiliator</button>
           <button data-rmode="tutup" aria-pressed="false">Tutup kasir</button>
@@ -984,6 +985,23 @@
           </div>
           <div id="pdOut"></div>
           <div id="pdRaw"></div>
+        </div>
+
+        <div id="rpRange" class="hide">
+          <div class="chips" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">
+            <button type="button" class="chip" data-rgpreset="7">7 hari</button>
+            <button type="button" class="chip" data-rgpreset="30">30 hari</button>
+            <button type="button" class="chip" data-rgpreset="bulan">Bulan ini</button>
+            <button type="button" class="chip" data-rgpreset="lalu">Bulan lalu</button>
+            <button type="button" class="chip" data-rgpreset="tahun">Tahun ini</button>
+          </div>
+          <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end;">
+            <label class="muted" style="flex:1 1 140px;">Dari<input id="rgFrom" type="date" /></label>
+            <label class="muted" style="flex:1 1 140px;">Sampai<input id="rgTo" type="date" /></label>
+          </div>
+          <div class="err" id="rgErr" role="alert"></div>
+          <div id="rgOut"></div>
+          <div id="rgRaw"></div>
         </div>
 
         <div id="rpClosings" class="hide">
@@ -2389,7 +2407,7 @@ function syncPut_(b) {
     }
 
     // ===== Akun Owner: hanya lihat =====
-    const VIEWER_OK_BTN = '[data-open-receipt],[data-open-closing],[data-rmode],[data-jmode],[data-bd-preset],[data-pd-preset],#todayBtn,#dayPrev,#dayNext,#hrPrev,#hrNext,#hrNow,[data-raw-more],[data-raw-csv],#rfPrev,#rfNext,#rfNow,#cfPrev,#cfNext,#cfNow,#pdPrev,#pdNext,#pdNow,#pdExport,#clExport,#spExport,#spPrint,#jrExport,#jrPrint,#invExportBtn,#exportProductsBtn,#onRefresh,#afRefresh,#srOpenBtn';
+    const VIEWER_OK_BTN = '[data-open-receipt],[data-open-closing],[data-rmode],[data-jmode],[data-bd-preset],[data-pd-preset],#todayBtn,[data-rgpreset],#rgCsv,#dayPrev,#dayNext,#hrPrev,#hrNext,#hrNow,[data-raw-more],[data-raw-csv],#rfPrev,#rfNext,#rfNow,#cfPrev,#cfNext,#cfNow,#pdPrev,#pdNext,#pdNow,#pdExport,#clExport,#spExport,#spPrint,#jrExport,#jrPrint,#invExportBtn,#exportProductsBtn,#onRefresh,#afRefresh,#srOpenBtn';
     const VIEWER_OK_TXT = /^(buka|lihat|detail|unduh|ekspor|export|cetak|print|muat|segarkan|refresh|hari ini|sebelum|berikut|sekarang|bulan ini)/i;
     let viewerObs = null;
     function applyViewerLock() {
@@ -6474,9 +6492,96 @@ function syncPut_(b) {
       downloadCsv('laporan-supplier.csv', lines);
     }
 
+    // ===== Laporan periode tertentu (rentang tanggal bebas) =====
+    function rangeDefaults() {
+      const t = localISODate();
+      $('#rgFrom').value = t.slice(0, 8) + '01';
+      $('#rgTo').value = t;
+    }
+    function rangeBuckets(days) {
+      // sampai 31 hari per hari, sampai 120 hari per minggu (Senin), selebihnya per bulan
+      const out = [];
+      if (days.length <= 31) days.forEach((d) => out.push({ days: [d], label: d.slice(8) + '/' + d.slice(5, 7), range: d }));
+      else if (days.length <= 120) {
+        const m = new Map();
+        days.forEach((d) => {
+          const st = shiftISO(d, -((new Date(d + 'T12:00:00').getDay() + 6) % 7));
+          if (!m.has(st)) m.set(st, []);
+          m.get(st).push(d);
+        });
+        m.forEach((ds, st) => out.push({ days: ds, label: st.slice(8) + '/' + st.slice(5, 7), range: ds[0] + ' s/d ' + ds[ds.length - 1] }));
+      } else {
+        const m = new Map();
+        days.forEach((d) => { const k = d.slice(0, 7); if (!m.has(k)) m.set(k, []); m.get(k).push(d); });
+        m.forEach((ds, k) => out.push({ days: ds, label: MONN[Number(k.slice(5)) - 1] + ' ' + k.slice(2, 4), range: MONN[Number(k.slice(5)) - 1] + ' ' + k.slice(0, 4) }));
+      }
+      return out;
+    }
+    function renderRange() {
+      if (!$('#rgOut')) return;
+      const err = $('#rgErr');
+      err.textContent = '';
+      let from = $('#rgFrom').value, to = $('#rgTo').value;
+      const today = localISODate();
+      if (!from || !to) { $('#rgOut').innerHTML = '<div class="muted" style="margin-top:12px;">Pilih tanggal Dari dan Sampai.</div>'; $('#rgRaw').innerHTML = ''; return; }
+      if (to > today) { to = today; $('#rgTo').value = today; }
+      if (from > to) { err.textContent = 'Tanggal Dari tidak boleh setelah tanggal Sampai.'; $('#rgOut').innerHTML = ''; $('#rgRaw').innerHTML = ''; return; }
+      const days = [];
+      for (let d = from; d <= to && days.length <= 366; d = shiftISO(d, 1)) days.push(d);
+      if (days.length > 366) { err.textContent = 'Rentang maksimal 366 hari. Persempit tanggalnya.'; $('#rgOut').innerHTML = ''; $('#rgRaw').innerHTML = ''; return; }
+      const d = periodData(days), net = (x) => x.sales - x.refund;
+      const buckets = rangeBuckets(days);
+      buckets.forEach((b) => { b.d = periodData(b.days); });
+      const stat = (l, v) => '<div class="stat"><span>' + l + '</span><b>' + v + '</b></div>';
+      const sel = new Set(days);
+      const other = state.journals.filter((j) => j.kind === 'pendapatan' && sel.has(j.date)).reduce((t, j) => t + Number(j.amount || 0), 0);
+      // per kasir
+      const byK = {};
+      state.history.forEach((t) => { if (!sel.has(t.day)) return; const k = t.cashier || '-'; (byK[k] = byK[k] || { n: 0, sales: 0, refund: 0 }); byK[k].n++; byK[k].sales += Number(t.total || 0); });
+      state.refunds.forEach((r) => { if (!sel.has(r.day)) return; const k = r.cashier || '-'; (byK[k] = byK[k] || { n: 0, sales: 0, refund: 0 }); byK[k].refund += Number(r.amount || 0); });
+      const kRows = Object.entries(byK).sort((a, b) => (b[1].sales - b[1].refund) - (a[1].sales - a[1].refund))
+        .map(([k, v]) => '<tr><td>' + escapeHtml(k) + '</td><td class="num">' + v.n + '</td><td class="num">' + formatRp(v.sales) + '</td><td class="num">-' + formatRp(v.refund) + '</td><td class="num"><b>' + formatRp(v.sales - v.refund) + '</b></td></tr>').join('');
+      const cm = chartMetricDef(), per = buckets.length > 0 && days.length <= 31 ? 'hari' : (days.length <= 120 ? 'minggu' : 'bulan');
+      const rows = buckets.map((b) => '<tr><td>' + escapeHtml(b.range) + '</td><td class="num">' + formatRp(b.d.sales) + '</td><td class="num">-' + formatRp(b.d.refund) + '</td><td class="num"><b>' + formatRp(net(b.d)) + '</b></td><td class="num">' + b.d.count + '</td><td class="num">' + Math.max(0, b.d.units - b.d.refundUnits) + '</td><td class="num">' + formatRp(b.d.sales - b.d.cost) + '</td></tr>').join('');
+      const showCostCol = seesAll();
+      $('#rgOut').innerHTML = '<h2 style="margin-top:14px;">' + from + ' s/d ' + to + ' <small class="muted">(' + days.length + ' hari)</small></h2><div class="stats">' +
+        stat('Penjualan', formatRp(d.sales)) + stat('Refund', '-' + formatRp(d.refund)) + stat('Penjualan bersih', formatRp(net(d))) +
+        stat('Transaksi', d.count) + stat('Rata-rata / transaksi', formatRp(d.count ? Math.round(d.sales / d.count) : 0)) +
+        stat('Unit terjual (bersih refund)', Math.max(0, d.units - d.refundUnits)) + stat('Rata-rata bersih / hari', formatRp(Math.round(net(d) / days.length))) +
+        (showCostCol ? stat('Laba kotor (sebelum refund)', formatRp(d.sales - d.cost)) : '') +
+        stat('Pendapatan lain (komisi live dll.)', formatRp(other)) + '</div>' +
+        '<h2 style="margin-top:14px;">' + cm.title + ' per ' + per + '</h2>' + svgBars(buckets.map((b) => b.label), buckets.map((b) => cm.val(b.d)), true, cm.kind) + chartNote() +
+        '<div style="overflow-x:auto; margin-top:10px;"><table class="tbl"><thead><tr><th>Periode</th><th class="num">Penjualan</th><th class="num">Refund</th><th class="num">Bersih</th><th class="num">Transaksi</th><th class="num">Unit</th><th class="num">Laba kotor</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+        '<div class="rawact" style="display:flex; gap:8px; margin-top:8px;"><button class="action ghost" id="rgCsv" style="padding:8px 12px;">Unduh CSV ringkasan</button></div>' +
+        '<h2 style="margin-top:14px;">Per kasir</h2><div style="overflow-x:auto;"><table class="tbl" style="min-width:420px;"><thead><tr><th>Kasir</th><th class="num">Transaksi</th><th class="num">Penjualan</th><th class="num">Refund</th><th class="num">Bersih</th></tr></thead><tbody>' + (kRows || '<tr><td colspan="5" class="muted">Belum ada penjualan.</td></tr>') + '</tbody></table></div>' +
+        rankBlocks(d);
+      rawPack('range', { day: (x) => sel.has(x), tx: () => true });
+      $('#rgRaw').innerHTML = rawHtml('range', from + ' s/d ' + to);
+      $('#rgCsv').onclick = () => {
+        const head = ['Periode', 'Penjualan', 'Refund', 'Bersih', 'Transaksi', 'Unit', 'Laba kotor'];
+        const lines = [head.map(csvQ).join(';')].concat(buckets.map((b) => [b.range, b.d.sales, b.d.refund, net(b.d), b.d.count, Math.max(0, b.d.units - b.d.refundUnits), b.d.sales - b.d.cost].map(csvQ).join(';')));
+        downloadCsv('laporan-periode-' + from + '-sd-' + to + '.csv', lines);
+      };
+    }
+    function rangePreset(k) {
+      const t = localISODate(), y = Number(t.slice(0, 4)), m = Number(t.slice(5, 7));
+      if (k === '7') { $('#rgFrom').value = shiftISO(t, -6); $('#rgTo').value = t; }
+      if (k === '30') { $('#rgFrom').value = shiftISO(t, -29); $('#rgTo').value = t; }
+      if (k === 'bulan') { $('#rgFrom').value = t.slice(0, 8) + '01'; $('#rgTo').value = t; }
+      if (k === 'lalu') {
+        const last = new Date(y, m - 1, 0), first = new Date(y, m - 2, 1);
+        $('#rgFrom').value = first.getFullYear() + '-' + pad2(first.getMonth() + 1) + '-01';
+        $('#rgTo').value = last.getFullYear() + '-' + pad2(last.getMonth() + 1) + '-' + pad2(last.getDate());
+      }
+      if (k === 'tahun') { $('#rgFrom').value = y + '-01-01'; $('#rgTo').value = t; }
+      renderRange();
+    }
+
     function setReportMode(mode) {
       document.querySelectorAll('#reportMode button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.rmode === mode)));
-      $('#chartMetricRow').classList.toggle('hide', !['harian', 'mingguan', 'bulanan'].includes(mode));
+      $('#chartMetricRow').classList.toggle('hide', !['harian', 'mingguan', 'bulanan', 'periode'].includes(mode));
+      $('#rpRange').classList.toggle('hide', mode !== 'periode');
+      if (mode === 'periode') { if (!$('#rgFrom').value) rangeDefaults(); renderRange(); }
       $('#rpDaily').classList.toggle('hide', mode !== 'harian');
       $('#rpClosings').classList.toggle('hide', mode !== 'tutup');
       $('#rpSuppliers').classList.toggle('hide', mode !== 'supplier');
@@ -9807,6 +9912,7 @@ function syncPut_(b) {
         saveState();
         renderReport();
         if (periodMode === 'mingguan' || periodMode === 'bulanan') renderPeriod();
+        if (!$('#rpRange').classList.contains('hide')) renderRange();
       });
       $('#seSave').addEventListener('click', saveShiftEdit);
       ['#seOpenAt', '#seCloseAt'].forEach((sel) => $(sel).addEventListener('input', seTimeCheck));
@@ -10051,7 +10157,9 @@ function syncPut_(b) {
       });
       $('#reportDate').value = localISODate();
       $('#reportDate').addEventListener('change', renderReport);
-      ['#reportRaw', '#pdRaw', '#histRaw'].forEach((sel) => wireRaw($(sel)));
+      ['#reportRaw', '#pdRaw', '#histRaw', '#rgRaw'].forEach((sel) => wireRaw($(sel)));
+      ['#rgFrom', '#rgTo'].forEach((sel) => $(sel).addEventListener('change', renderRange));
+      document.querySelectorAll('[data-rgpreset]').forEach((b) => b.addEventListener('click', () => rangePreset(b.dataset.rgpreset)));
       $('#histRawDate').value = localISODate();
       $('#histRawDate').addEventListener('change', renderHistoryRaw);
       $('#hrPrev').addEventListener('click', () => { $('#histRawDate').value = shiftISO($('#histRawDate').value || localISODate(), -1); renderHistoryRaw(); });
