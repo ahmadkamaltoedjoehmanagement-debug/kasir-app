@@ -573,6 +573,7 @@
       <div class="box">
         <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
           <h2>Riwayat transaksi</h2>
+          <button id="histFixBtn" class="action ghost hide" style="padding:8px 10px;">Sinkronkan kode &amp; modal transaksi</button>
           <button id="histClearBtn" class="action ghost hide" style="padding:8px 10px;">Hapus semua riwayat</button>
         </div>
         <div id="histRawBox" style="margin:10px 0 14px;">
@@ -3065,6 +3066,7 @@ function syncPut_(b) {
       }).join('');
       $('#historyList').innerHTML = html || '<div class="muted">Belum ada transaksi.</div>';
       $('#histClearBtn').classList.toggle('hide', !isOwner);
+      $('#histFixBtn').classList.toggle('hide', !isOwner);
       renderRefunds();
     }
 
@@ -3105,6 +3107,48 @@ function syncPut_(b) {
       copy.delBy = currentUser ? currentUser.name : '';
       state[list] = (state[list] || []).filter((x) => x.no !== copy.no);
       state[list].push(copy);
+    }
+
+    // ===== Sinkronkan kode & modal pada transaksi dengan data produk saat ini (Administrator) =====
+    function scanTxFix(overwrite, apply) {
+      const r = { codeItems: 0, costFill: 0, costDiff: 0, txs: new Set() };
+      const touch = (tx, it) => {
+        const pr = getProductById(it.id);
+        if (!pr) return;
+        if (pr.code && it.code !== undefined && it.code !== pr.code) { r.codeItems++; r.txs.add(tx.no); if (apply) it.code = pr.code; }
+        else if (pr.code && it.code === undefined && apply === 'force') it.code = pr.code;
+        const nc = Number(pr.cost || 0);
+        if (nc > 0 && it.cost !== undefined) {
+          const cur = Number(it.cost) || 0;
+          if (!(cur > 0)) { r.costFill++; r.txs.add(tx.no); if (apply) it.cost = nc; }
+          else if (cur !== nc) { r.costDiff++; if (overwrite) { r.txs.add(tx.no); if (apply) it.cost = nc; } }
+        }
+      };
+      state.history.forEach((tx) => (tx.items || []).forEach((it) => touch(tx, it)));
+      state.refunds.forEach((rf) => (rf.items || []).forEach((it) => { const pr = getProductById(it.id); if (pr && pr.code && it.code !== undefined && it.code !== pr.code) { r.codeItems++; if (apply) it.code = pr.code; } }));
+      return r;
+    }
+    function fixTxData() {
+      if (!currentUser || currentUser.role !== 'owner') return;
+      const pre = scanTxFix(false, false);
+      if (!pre.codeItems && !pre.costFill && !pre.costDiff) { showToast('Semua transaksi sudah sesuai dengan data produk saat ini.'); return; }
+      askDel({
+        title: 'Sinkronkan kode & modal transaksi?',
+        body: 'Mengikuti data produk saat ini (kode sesuai supplier):\n' +
+          '• Kode barang diperbarui: ' + pre.codeItems + ' item\n' +
+          '• Modal Rp0 diisi dengan modal produk: ' + pre.costFill + ' item\n' +
+          '• Modal yang sudah terisi tapi berbeda: ' + pre.costDiff + ' item (tidak diubah kecuali dicentang)\n\n' +
+          'Laporan, jurnal, dan margin transaksi lama ikut berubah. Tidak bisa dibatalkan, jadi unduh cadangan data dulu bila ragu.',
+        check: 'Timpa juga modal yang sudah terisi dengan modal produk saat ini (tidak disarankan)', checked: false,
+        yes: 'Sinkronkan', safe: true,
+        onYes: (overwrite) => {
+          const r = scanTxFix(!!overwrite, true);
+          logAct('Koreksi', 'Transaksi', 'massal', 'Kode diperbarui ' + r.codeItems + ' item, modal diisi ' + r.costFill + ' item' + (overwrite ? ', modal ditimpa ' + r.costDiff + ' item' : '') + ' (' + r.txs.size + ' transaksi)');
+          saveState();
+          renderAll();
+          showToast('Selesai: ' + r.txs.size + ' transaksi disesuaikan.');
+        }
+      });
     }
 
     function deleteTx(no) {
@@ -9834,6 +9878,7 @@ function syncPut_(b) {
         openReceiptByNo(btn.dataset.openReceipt);
       });
       $('#histClearBtn').addEventListener('click', clearHistory);
+      $('#histFixBtn').addEventListener('click', fixTxData);
       $('#refClearBtn').addEventListener('click', clearRefunds);
       $('#refundList').addEventListener('click', (e) => {
         const dr = e.target.closest('[data-del-refund]');
