@@ -2193,6 +2193,7 @@ function syncPut_(b) {
     let cartPrice = {};
     let cartDisc = {};
     let cartDiscMode = {};
+    let cartAllow = {};
     const baseUnit = (p) => (Number(cartPrice[p.id]) > 0 ? Number(cartPrice[p.id]) : Number(p.price));
     const itemDisc = (p) => {
       const d = cartDisc[p.id];
@@ -2490,6 +2491,12 @@ function syncPut_(b) {
       if (p.holds && !p.holds.length) delete p.holds;
       return n;
     }
+    // tanda "Menunggu Stok Masuk" hanya berarti jika stok minus (ada penjualan yang belum dicatat Stok Masuk-nya); selain itu kembali ke awal
+    function clearStaleAwait() {
+      (state.products || []).forEach((p) => {
+        if (p.awaitStock && Number(p.stock || 0) >= 0) { delete p.awaitStock; delete p.awaitBy; delete p.awaitAt; }
+      });
+    }
     function releaseDueHolds() {
       (state.products || []).forEach((p) => { if (p.holds && p.holds.length) releaseHold(p, false); });
     }
@@ -2520,6 +2527,7 @@ function syncPut_(b) {
     function saveState() {
       if (viewerGuard()) return;
       releaseDueHolds();
+      clearStaleAwait();
       trackActivity();
       persistState();
       scheduleSync();
@@ -2641,7 +2649,7 @@ function syncPut_(b) {
     }
 
     // ===== Produk baru cepat di Kasir =====
-    const sellsBelowZero = (p) => !!(p.needsInfo || p.awaitStock);
+    const sellsBelowZero = (p) => !!(p.needsInfo || p.awaitStock || cartAllow[p.id]);
     const canQuickProduct = () => !!currentUser && (currentUser.role === 'owner' || (currentUser.role === 'kasir' && state.quickProduct !== false));
     let oosId = null;
     function openOosDialog(id) {
@@ -2654,10 +2662,8 @@ function syncPut_(b) {
     function oosSell() {
       const p = getProductById(oosId);
       if (!p || !canQuickProduct() || !(Number(p.price) > 0)) { $('#oosDialog').close(); return; }
-      if (!p.awaitStock) {
-        p.awaitStock = true; p.awaitBy = currentUser.name; p.awaitAt = nowLabel();
-        logAct('Jual stok diambil', 'Produk', p.name, 'Stok 0; dijual langsung oleh ' + currentUser.name + '. Perlu dicatat di Stok Masuk.');
-      }
+      // izin hanya berlaku untuk keranjang ini; tanda "Menunggu Stok Masuk" baru dipasang setelah penjualan benar-benar tersimpan
+      cartAllow[p.id] = true;
       cart[p.id] = (cart[p.id] || 0) + 1;
       saveState();
       $('#oosDialog').close();
@@ -7236,7 +7242,12 @@ function syncPut_(b) {
 
       items.forEach(({ id, qty }) => {
         const p = getProductById(id);
-        if (p) p.stock = Number(p.stock || 0) - qty;
+        if (!p) return;
+        p.stock = Number(p.stock || 0) - qty;
+        if (cartAllow[id] && p.stock < 0 && !p.awaitStock) {
+          p.awaitStock = true; p.awaitBy = currentUser.name; p.awaitAt = nowLabel();
+          logAct('Jual stok diambil', 'Produk', p.name, 'Stok 0; dijual langsung oleh ' + currentUser.name + '. Perlu dicatat di Stok Masuk.');
+        }
       });
 
       saveState();
@@ -7249,6 +7260,7 @@ function syncPut_(b) {
       cartPrice = {};
       cartDisc = {};
       cartDiscMode = {};
+      cartAllow = {};
       $('#pointUse').value = '';
       $('#cashInput').value = '';
       $('#dpInput').value = '';
@@ -7836,6 +7848,7 @@ function syncPut_(b) {
       cartPrice = {};
       cartDisc = {};
       cartDiscMode = {};
+      cartAllow = {};
       renderCart();
     }
 
@@ -8062,6 +8075,7 @@ function syncPut_(b) {
       cartPrice = {};
       cartDisc = {};
       cartDiscMode = {};
+      cartAllow = {};
       currentMember = null;
       $('#memberSelected').classList.add('hide');
       $('#memberSelected').innerHTML = '';
@@ -9668,7 +9682,7 @@ function syncPut_(b) {
         const op = value.startsWith('+') ? 1 : -1;
         const id = value.slice(1);
         cart[id] = (cart[id] || 0) + op;
-        if ((cart[id] || 0) <= 0) { delete cart[id]; delete cartPrice[id]; delete cartDisc[id]; delete cartDiscMode[id]; }
+        if ((cart[id] || 0) <= 0) { delete cart[id]; delete cartPrice[id]; delete cartDisc[id]; delete cartDiscMode[id]; delete cartAllow[id]; }
         renderCart();
       });
       $('#cartList').addEventListener('change', (e) => {
